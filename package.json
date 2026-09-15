@@ -17,7 +17,13 @@
     "desktop:dist": "electron-builder",
     "desktop:dist:win": "electron-builder --win nsis --x64",
     "desktop:dist:mac": "electron-builder --mac",
-    "desktop:dist:linux": "electron-builder --linux"
+    "desktop:dist:linux": "electron-builder --linux",
+    "desktop:dist:win:x64": "electron-builder --win nsis --x64",
+    "desktop:dist:win:arm64": "electron-builder --win nsis --arm64",
+    "desktop:dist:mac:x64": "electron-builder --mac --x64",
+    "desktop:dist:mac:arm64": "electron-builder --mac --arm64",
+    "desktop:dist:linux:x64": "electron-builder --linux --x64",
+    "desktop:dist:linux:arm64": "electron-builder --linux --arm64"
   },
   "dependencies": {
     "colophon": "https://github.com/colophon-hub/colophon/archive/3c3eebf22cbc28703452250a3bad1d4ee7709be1.tar.gz",
@@ -58,7 +64,8 @@
         {
           "target": "nsis",
           "arch": [
-            "x64"
+            "x64",
+            "arm64"
           ]
         }
       ],
@@ -74,8 +81,20 @@
     "mac": {
       "icon": "public/icons/icon-512.png",
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "category": "public.app-category.productivity",
       "artifactName": "Bondfire-${version}-macOS-${arch}.${ext}"
@@ -83,8 +102,20 @@
     "linux": {
       "icon": "public/icons/icon-512.png",
       "target": [
-        "AppImage",
-        "deb"
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "category": "Network",
       "artifactName": "Bondfire-${version}-Linux-${arch}.${ext}"
