@@ -14,16 +14,16 @@
     "smoke:thread1": "node scripts/thread1-emergency-smoke.mjs",
     "package:webapp": "node scripts/package-webapp.mjs",
     "desktop": "electron .",
-    "desktop:dist": "electron-builder",
+    "desktop:dist": "electron-builder --publish never",
     "desktop:dist:win": "electron-builder --win nsis --x64",
     "desktop:dist:mac": "electron-builder --mac",
     "desktop:dist:linux": "electron-builder --linux",
-    "desktop:dist:win:x64": "electron-builder --win nsis --x64",
-    "desktop:dist:win:arm64": "electron-builder --win nsis --arm64",
-    "desktop:dist:mac:x64": "electron-builder --mac --x64",
-    "desktop:dist:mac:arm64": "electron-builder --mac --arm64",
-    "desktop:dist:linux:x64": "electron-builder --linux --x64",
-    "desktop:dist:linux:arm64": "electron-builder --linux --arm64"
+    "desktop:dist:win:x64": "electron-builder --win nsis --x64 --publish never",
+    "desktop:dist:win:arm64": "electron-builder --win nsis --arm64 --publish never",
+    "desktop:dist:mac:x64": "electron-builder --mac --x64 --publish never",
+    "desktop:dist:mac:arm64": "electron-builder --mac --arm64 --publish never",
+    "desktop:dist:linux:x64": "electron-builder --linux --x64 --publish never",
+    "desktop:dist:linux:arm64": "electron-builder --linux --arm64 --publish never"
   },
   "dependencies": {
     "colophon": "https://github.com/colophon-hub/colophon/archive/3c3eebf22cbc28703452250a3bad1d4ee7709be1.tar.gz",
@@ -61,13 +61,7 @@
     },
     "win": {
       "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "nsis"
       ],
       "artifactName": "Bondfire-${version}-Windows-${arch}.${ext}",
       "icon": "public/icons/icon-512.png"
@@ -81,20 +75,8 @@
     "mac": {
       "icon": "public/icons/icon-512.png",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "dmg",
+        "zip"
       ],
       "category": "public.app-category.productivity",
       "artifactName": "Bondfire-${version}-macOS-${arch}.${ext}"
@@ -102,23 +84,13 @@
     "linux": {
       "icon": "public/icons/icon-512.png",
       "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "AppImage",
+        "deb"
       ],
       "category": "Network",
-      "artifactName": "Bondfire-${version}-Linux-${arch}.${ext}"
+      "artifactName": "Bondfire-${version}-Linux-${arch}.${ext}",
+      "maintainer": "BondfireApp <329370031+BondfireApp@users.noreply.github.com>",
+      "syncDesktopName": true
     }
   }
 }
