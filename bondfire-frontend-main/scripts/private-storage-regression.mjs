@@ -1,0 +1,168 @@
+import { decodeLegacyRecord } from '../src/lib/privateClient.js';
+import { encryptWithOrgKey } from '../src/lib/zk.js';
+import assert from 'node:assert/strict';
+import { DatabaseSync, constants } from 'node:sqlite';
+import { signJwt } from '../functions/api/_lib/jwt.js';
+import { onRequest as middleware } from '../functions/api/_middleware.js';
+import { onRequestPost as createOrg } from '../functions/api/orgs/create.js';
+import { encryptPrivate, decryptPrivate } from '../src/lib/privateCrypto.js';
+import { contentContext, isCiphertext } from '../shared/privateContent.js';
+import { migrationInventory } from '../functions/api/_lib/privateMigration.js';
+import { ensureDriveSchema } from '../functions/api/_lib/drive.js';
+import { onRequestGet as getCrypto } from '../functions/api/orgs/[orgId]/crypto.js';
+
+const sql=new DatabaseSync(':memory:');let failSql=null;
+const db={prepare(query){
+  let stmt;try{stmt=sql.prepare(query);}catch(e){throw new Error('D1_ERROR: '+e.message+' SQLITE_ERROR');}
+  let values=[];const check=()=>{if(failSql?.test(query))throw new Error('injected failure');};
+  return {bind(...v){values=v;return this;},async first(){check();return stmt.get(...values)||null;},async all(){check();return{results:stmt.all(...values)};},async run(){check();return{success:true,meta:stmt.run(...values)};}};
+},async batch(stmts){sql.exec('BEGIN');try{const result=[];for(const s of stmts)result.push(await s.run());sql.exec('COMMIT');return result;}catch(e){sql.exec('ROLLBACK');throw e;}}};
+sql.exec(`CREATE TABLE _cf_KV(key TEXT); CREATE TABLE users(id TEXT PRIMARY KEY); INSERT INTO users VALUES('owner'),('member'),('viewer'),('outsider');
+CREATE TABLE orgs(id TEXT PRIMARY KEY,name TEXT,created_at INTEGER);
+CREATE TABLE org_memberships(org_id TEXT,user_id TEXT,role TEXT,created_at INTEGER,PRIMARY KEY(org_id,user_id));
+CREATE TABLE newsletter_subscribers(id TEXT,org_id TEXT);
+CREATE TABLE needs(id TEXT PRIMARY KEY,org_id TEXT,title TEXT NOT NULL,description TEXT,status TEXT,created_at INTEGER,updated_at INTEGER);
+CREATE TABLE people(id TEXT PRIMARY KEY,org_id TEXT,name TEXT NOT NULL,phone TEXT,notes TEXT);
+`);
+sql.setAuthorizer((action,name,arg)=>action===constants.SQLITE_PRAGMA&&/^_cf_/i.test(arg)?constants.SQLITE_DENY:constants.SQLITE_OK);
+const objects=new Map();let failDelete=false;
+const bucket={async put(k,v){objects.set(k,typeof v==='string'?v:new TextDecoder().decode(v));},async get(k){if(!objects.has(k))return null;const s=objects.get(k);return{text:async()=>s,arrayBuffer:async()=>new TextEncoder().encode(s).buffer};},async delete(k){if(failDelete)throw new Error('storage failure');objects.delete(k);},async list({prefix}){return{objects:[...objects.keys()].filter(k=>k.startsWith(prefix)).map(key=>({key})),truncated:false};}};
+const env={BF_DB:db,JWT_SECRET:'private-test',BF_DRIVE_BUCKET:bucket};
+await ensureDriveSchema(env);
+const tokens={};for(const id of ['owner','member','viewer','outsider'])tokens[id]=await signJwt(env.JWT_SECRET,{sub:id},3600);
+const request=(path,{body,user='owner',method=body?'POST':'GET'}={})=>new Request('https://example.test'+path,{method,headers:{authorization:'Bearer '+tokens[user],'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+async function call(path,options={},expected=200){const req=request(path,options);const res=await middleware({env,request:req,next:async()=>{if(path==='/api/orgs/create')return createOrg({env,request:req});if(path.endsWith('/crypto'))return getCrypto({env,request:req,params:{orgId:path.split('/')[3]}});return Response.json({legacyReached:true});}});const data=await res.json();if(res.status===500&&expected!==500)console.error('Unexpected middleware 500',{path,method:req.method,user:options.user||'owner',data});assert.equal(res.status,expected,JSON.stringify(data));return data;}
+const id=crypto.randomUUID(),key=crypto.getRandomValues(new Uint8Array(32));
+const b64=b=>Buffer.from(b).toString('base64url');
+const device=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+const pub=await crypto.subtle.exportKey('jwk',device.publicKey);
+const wrappedKey=JSON.stringify({v:1,sender_pub:pub,salt:b64(new Uint8Array(16)),iv:b64(new Uint8Array(12)),ct:b64(new Uint8Array(48))});
+const oldDescription=await encryptWithOrgKey(key,'SECRET legacy encrypted description');
+const decodedLegacy=await decodeLegacyRecord(key,'needs',{id:'legacy-field',encrypted_description:oldDescription});
+assert.equal(decodedLegacy.description,'SECRET legacy encrypted description');
+assert.equal(decodedLegacy._legacyEncryptedFields.encrypted_description,oldDescription);
+const oldText=await encryptWithOrgKey(key,'SECRET legacy title');
+assert.equal((await decodeLegacyRecord(key,'drive/notes',{title:'bfzk1:'+oldText})).title,'SECRET legacy title');
+await assert.rejects(decodeLegacyRecord(key,'needs',{encrypted_blob:'bad'}));
+const oldScreen=await encryptWithOrgKey(key,JSON.stringify({title:'SECRET edited title',description:'SECRET edited body'}));
+const openedPatch=await decodeLegacyRecord(key,'needs',{title:'__encrypted__',description:'',encrypted_blob:oldScreen},{normalize:false});
+assert.equal(openedPatch.title,'SECRET edited title');
+assert.equal(openedPatch.description,'SECRET edited body');
+const notePatch=await decodeLegacyRecord(key,'drive/notes',{parentId:null},{normalize:false});
+assert(!Object.hasOwn(notePatch,'body'),'partial folder move must not add an empty note body');
+const camel=await decodeLegacyRecord(key,'drive/notes',{encryptedBlob:await encryptWithOrgKey(key,JSON.stringify({body:'SECRET camel-case note'}))},{normalize:false});
+assert.equal(camel.body,'SECRET camel-case note');
+const keyCheck=await encryptPrivate(key,{check:'bondfire-private-mode'},id,'key-check',id);
+const ciphertext=await encryptPrivate(key,{name:'SECRET organization'},id,'organization',id);
+await call('/api/orgs/create',{body:{private_mode:true,id,keyCheck,ciphertext,wrappedKey,recovery:{salt:b64(new Uint8Array(16)),iv:b64(new Uint8Array(12)),ct:b64(new Uint8Array(48))}}});
+assert.equal(sql.prepare('SELECT name FROM orgs WHERE id=?').get(id).name,'Private organization');
+assert(sql.prepare('SELECT * FROM org_key_recovery WHERE org_id=?').get(id), 'creation includes recovery');
+await call('/api/orgs/create',{body:{name:'MUST NEVER STORE'}},400);
+for(const variant of ['wrapped_key','recovery_payload']) {
+  if(variant==='recovery_payload') {
+    sql.exec('ALTER TABLE org_key_recovery RENAME TO recovery_saved; CREATE TABLE org_key_recovery(org_id TEXT,user_id TEXT,recovery_payload TEXT NOT NULL,updated_at INTEGER,PRIMARY KEY(org_id,user_id))');
+  }
+  const nextId=crypto.randomUUID();
+  const body={private_mode:true,id:nextId,wrappedKey,
+    ciphertext:await encryptPrivate(key,{name:'SECRET transactional org'},nextId,'organization',nextId),
+    keyCheck:await encryptPrivate(key,{check:'bondfire-private-mode'},nextId,'key-check',nextId),
+    recovery:{salt:b64(new Uint8Array(16)),iv:b64(new Uint8Array(12)),ct:b64(new Uint8Array(48))},enabled_modules:['needs','studio']};
+  await call('/api/orgs/create',{body:{...body,recovery:undefined}},400);
+  failSql=/INSERT INTO org_key_recovery/;
+  await call('/api/orgs/create',{body},500);
+  failSql=null;
+  for(const table of ['orgs','org_memberships','org_private_records','org_key_wrapped','org_private_mode','org_module_configs']) {
+    const column=table==='orgs'?'id':'org_id';
+    assert.equal(sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column}=?`).get(nextId).n,0,'failed backup must roll back '+table);
+  }
+  await call('/api/orgs/create',{body});
+  assert.deepEqual(JSON.parse(sql.prepare('SELECT enabled_modules_json FROM org_module_configs WHERE org_id=?').get(nextId).enabled_modules_json),['people','public-site','needs','studio']);
+  assert(sql.prepare('SELECT * FROM org_key_recovery WHERE org_id=?').get(nextId));
+  if(variant==='recovery_payload') sql.exec('DROP TABLE org_key_recovery; ALTER TABLE recovery_saved RENAME TO org_key_recovery');
+}
+
+assert(!JSON.stringify(sql.prepare('SELECT * FROM org_private_records').all()).includes('SECRET'));
+for(const [user,role]of [['member','member'],['viewer','viewer']])sql.prepare('INSERT INTO org_memberships(org_id,user_id,role,created_at) VALUES(?,?,?,0)').run(id,user,role);
+const base='/api/orgs/'+id;
+await call(base+'/privacy',{user:'outsider'},403);
+await call(base+'/crypto',{user:'viewer'});
+await call(base+'/public/save',{body:{title:'no'}},409);
+await call(base+'/colophon/posts',{body:{body:'no'}},409);
+await call(base+'/drive/import',{body:{notes:[{body:'no'}]}},409);
+await call(base+'/needs',{body:{title:'secret'}},400);
+const recordId=crypto.randomUUID();
+const encrypted=await encryptPrivate(key,{title:'SECRET need',description:'SECRET phone 555',status:'open'},id,'needs',recordId);
+assert(isCiphertext(encrypted,contentContext(id,'needs',recordId)));
+assert.equal(await decryptPrivate(key,encrypted,id,'needs',recordId).then(x=>x.title),'SECRET need');
+await assert.rejects(decryptPrivate(key,encrypted,'other','needs',recordId));
+const tampered=JSON.parse(encrypted);tampered.ct=(tampered.ct[0]==='A'?'B':'A')+tampered.ct.slice(1);
+await assert.rejects(decryptPrivate(key,JSON.stringify(tampered),id,'needs',recordId));
+await call(base+'/needs',{user:'viewer',body:{id:recordId,ciphertext:encrypted,revision:0}},403);
+const created=await call(base+'/needs',{body:{id:recordId,ciphertext:encrypted,revision:0}});
+assert.equal(created.need.revision,1);
+await call(base+'/needs',{method:'PUT',body:{id:recordId,ciphertext:encrypted,revision:0}},409);
+await call(base+'/needs',{method:'PUT',body:{id:recordId,ciphertext:encrypted,revision:1,title:'plaintext'}},400);
+const otherId=crypto.randomUUID();
+await call(base+'/needs',{body:{id:otherId,ciphertext:encrypted,revision:0}},400);
+const read=await call(base+'/needs',{user:'viewer'});assert.equal(read.needs[0].ciphertext,encrypted);
+await call(base+'/pledges',{user:'viewer'},403);
+assert.throws(()=>sql.prepare('INSERT INTO needs VALUES(?,?,?,?,?,?,?)').run('late',id,'LEAK','LEAK','open',0,0),/PRIVATE_LEGACY_WRITE/);
+const blobId=crypto.randomUUID(),binary=new Uint8Array([0,1,2,255,10]);
+const fileCipher=await encryptPrivate(key,binary,id,'drive/blob',blobId);
+await call(base+'/privacy/blob/'+blobId,{body:{ciphertext:fileCipher,fileId:'file1'}});
+const blob=await call(base+'/privacy/blob/'+blobId,{user:'viewer'});
+assert.deepEqual(await decryptPrivate(key,blob.ciphertext,id,'drive/blob',blobId,true),binary);
+assert.equal(objects.get(`${id}/drive/private/${blobId}`),fileCipher);
+const old='legacy';sql.prepare('INSERT INTO orgs VALUES(?,?,0)').run(old,'Old SECRET org');sql.prepare('INSERT INTO org_memberships(org_id,user_id,role,created_at) VALUES(?,?,?,0)').run(old,'owner','owner');
+sql.prepare('INSERT INTO org_key_wrapped(org_id,user_id,wrapped_key) VALUES(?,?,?)').run(old,'owner',wrappedKey);
+sql.prepare('INSERT INTO needs VALUES(?,?,?,?,?,?,?)').run('n1',old,'Old SECRET need','Old SECRET notes','open',1,2);
+sql.exec("CREATE TABLE plugin_data(id TEXT,org_id TEXT,body TEXT);INSERT INTO plugin_data VALUES('p1','legacy','DO NOT LOSE');");
+let audit=await migrationInventory(env,old);assert(audit.blockers.some(b=>b.table==='plugin_data'));
+const oldCheck=await encryptPrivate(key,{check:'bondfire-private-mode'},old,'key-check',old);
+await call('/api/orgs/legacy/privacy/begin',{body:{keyCheck:oldCheck}},409);
+assert.equal(sql.prepare('SELECT title FROM needs WHERE id=?').get('n1').title,'Old SECRET need');
+sql.exec('DELETE FROM plugin_data');
+await call('/api/orgs/legacy/privacy/begin',{body:{keyCheck:oldCheck}});
+await call('/api/orgs/legacy/needs',{body:{title:'late plaintext'}},409);
+let page=await call('/api/orgs/legacy/privacy/source?kind=needs');
+const item=page.records[0];const sealed=await encryptPrivate(key,item.row,old,'needs','n1');
+await call('/api/orgs/legacy/privacy/record',{body:{kind:'needs',id:'n1',sourceHash:'incorrect',ciphertext:sealed}},409);
+failSql=/UPDATE "needs"/;
+await call('/api/orgs/legacy/privacy/record',{body:{kind:'needs',id:'n1',sourceHash:item.sourceHash,ciphertext:sealed}},400);
+failSql=null;assert.equal(sql.prepare("SELECT COUNT(*) n FROM org_private_records WHERE org_id='legacy'").get().n,0);
+await call('/api/orgs/legacy/privacy/record',{body:{kind:'needs',id:'n1',sourceHash:item.sourceHash,ciphertext:sealed}});
+assert.equal(sql.prepare('SELECT title FROM needs WHERE id=?').get('n1').title,'');
+page=await call('/api/orgs/legacy/privacy/source?kind=organization');const orgRow=page.records[0];
+await call('/api/orgs/legacy/privacy/record',{body:{kind:'organization',id:old,sourceHash:orgRow.sourceHash,ciphertext:await encryptPrivate(key,orgRow.row,old,'organization',old)}});
+await call('/api/orgs/legacy/privacy/finish',{body:{}});
+assert.equal((await call('/api/orgs/legacy/privacy')).state,'enabled');
+assert.equal(sql.prepare("SELECT name FROM orgs WHERE id='legacy'").get().name,'Private organization');
+assert.equal(sql.prepare('SELECT COUNT(*) n FROM org_private_records WHERE org_id=?').get(id).n,2);
+const fileOrg='file-legacy';
+sql.prepare('INSERT INTO orgs VALUES(?,?,0)').run(fileOrg,'File SECRET org');
+sql.prepare('INSERT INTO org_memberships(org_id,user_id,role,created_at) VALUES(?,?,?,0)').run(fileOrg,'owner','owner');
+sql.prepare('INSERT INTO org_key_wrapped(org_id,user_id,wrapped_key) VALUES(?,?,?)').run(fileOrg,'owner',wrappedKey);
+sql.prepare('INSERT INTO drive_files(id,org_id,name,mime,size,storage_key,created_at,updated_at) VALUES(?,?,?,?,?,?,1,1)').run('old-file',fileOrg,'SECRET.txt','text/plain',11,fileOrg+'/drive/files/old-file');
+objects.set(fileOrg+'/drive/files/old-file','SECRET file');
+const fb='/api/orgs/'+fileOrg+'/privacy';
+await call(fb+'/begin',{body:{keyCheck:await encryptPrivate(key,{check:'bondfire-private-mode'},fileOrg,'key-check',fileOrg)}});
+const source=(await call(fb+'/source?kind=drive%2Ffiles')).records[0];
+const sourceFile=(await call(fb+'/source-file?id=old-file')).file;
+assert.equal(sourceFile.textContent,'SECRET file');
+const newBlob=crypto.randomUUID();
+await call(fb+'/blob/'+newBlob,{body:{fileId:'old-file',ciphertext:await encryptPrivate(key,new TextEncoder().encode(sourceFile.textContent),fileOrg,'drive/blob',newBlob)}});
+await call(fb+'/record',{body:{kind:'drive/files',id:'old-file',sourceHash:source.sourceHash,payloadId:newBlob,ciphertext:await encryptPrivate(key,{name:'SECRET.txt',mime:'text/plain',payloadId:newBlob},fileOrg,'drive/files','old-file')}});
+const rootSource=(await call(fb+'/source?kind=organization')).records[0];
+await call(fb+'/record',{body:{kind:'organization',id:fileOrg,sourceHash:rootSource.sourceHash,ciphertext:await encryptPrivate(key,rootSource.row,fileOrg,'organization',fileOrg)}});
+failDelete=true;
+await call(fb+'/finish',{body:{}},400);
+assert.equal((await call(fb)).state,'migrating');assert(objects.has(fileOrg+'/drive/files/old-file'));
+failDelete=false;await call(fb+'/finish',{body:{}});assert(!objects.has(fileOrg+'/drive/files/old-file'));
+assert(objects.has(fileOrg+'/drive/private/'+newBlob));
+failDelete=true;await call('/api/orgs/'+fileOrg+'/drive/files/old-file',{method:'DELETE',body:{id:'old-file',revision:1}},500);
+assert.equal(sql.prepare("SELECT deleting FROM org_private_records WHERE org_id=? AND kind='drive/files'").get(fileOrg).deleting,1);
+failDelete=false;await call('/api/orgs/'+fileOrg+'/drive/files/old-file',{method:'DELETE',body:{id:'old-file',revision:2}});
+assert(!objects.has(fileOrg+'/drive/private/'+newBlob));
+console.log('PASS: private storage, encryption integrity, roles, plaintext rejection, legacy write guard, file ciphertext, resumable migration and rollback');
+
+export { env, sql, db, call, tokens };

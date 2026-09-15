@@ -1,0 +1,35 @@
+{
+  "name": "bondfire-v2",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5174",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "npm run test:public && npm run test:security && npm run test:product-reliability",
+    "test:public": "node scripts/public-surface-regression.mjs",
+    "test:security": "node scripts/auth-hardening-regression.mjs && node scripts/private-storage-regression.mjs && node scripts/private-key-scopes-regression.mjs && node scripts/private-singleton-migration-regression.mjs && node scripts/private-submissions-regression.mjs && node scripts/private-publication-regression.mjs && node scripts/private-studio-regression.mjs && node scripts/security-boundary-regression.mjs && node scripts/security-data-integrity-regression.mjs && node scripts/emergency-protocol-regression.mjs",
+    "test:product-reliability": "node scripts/product-reliability-regression.mjs",
+    "smoke:thread1": "node scripts/thread1-emergency-smoke.mjs"
+  },
+  "dependencies": {
+    "colophon": "https://github.com/colophon-hub/colophon/archive/3c3eebf22cbc28703452250a3bad1d4ee7709be1.tar.gz",
+    "lucide-react": "^0.577.0",
+    "matrix-js-sdk": "^37.13.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-grid-layout": "^2.2.2",
+    "react-masonry-css": "^1.0.16",
+    "react-resizable": "^3.1.3",
+    "react-router-dom": "^6.30.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.2",
+    "vite-plugin-pwa": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,20 @@
+Bondfire v5 Home+Auth PATCH (overlay)
+
+Files included (relative to your project root):
+- src/pages/Home.jsx                 <-- new global Home (stats + create account + login)
+- src/pages/org/Public.jsx           <-- new org-scoped Public page
+- src/context/AuthContext.jsx        <-- login/register/logout + RequireAuth gate
+- src/components/AppHeader.jsx       <-- nav updates + Sign out
+- src/App.jsx                        <-- routes wired: Home + org public + auth gate
+- src/main.jsx                       <-- wraps <App/> with <AuthProvider>
+- src/index.css                      <-- small .linkbtn helper
+
+How to apply (pick one):
+
+1) Quick overwrite:
+   - Unzip this file directly into your project root (same folder that contains 'src').
+   - Allow overwrite on prompt.
+
+2) Scripted apply:
+   Unix:   cd /path/to/bondfire-v5-home-auth-patch && chmod +x apply_patch_unix.sh && ./apply_patch_unix.sh /path/to/bondfire-version-3-full-rebuild
+   WinPS:  cd C:\path\to\bondfire-v5-home-auth-patch ; .\apply_patch_win.ps1 -Target "C:\path\to\bondfire-version-3-full-rebuild"

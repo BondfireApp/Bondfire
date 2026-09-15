@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {sql,call} from './private-storage-regression.mjs';
+import {encryptPrivate,decryptPrivate} from '../src/lib/privateCrypto.js';
+
+const org=sql.prepare("SELECT org_id FROM org_private_mode WHERE state='enabled' AND org_id NOT IN ('legacy','file-legacy')").get().org_id;
+const base='/api/orgs/'+org+'/studio/state';
+const key=crypto.getRandomValues(new Uint8Array(32));
+const doc=async(id,text)=>({id,ciphertext:await encryptPrivate(key,{id,name:text,pages:[{elements:[{text}]}]},org,'studio/docs',id)});
+const first=await doc('doc-one','PRIVATE_STUDIO_SENTINEL');
+assert.equal((await call(base)).revision,0);
+await call(base,{user:'outsider'},403);
+await call(base,{user:'viewer',body:{revision:0,docs:[first],blocks:[]}},403);
+await call(base,{body:{revision:0,docs:[{...first,name:'PLAINTEXT'}],blocks:[]}},400);
+await call(base,{body:{revision:0,docs:[{id:'wrong-context',ciphertext:first.ciphertext}],blocks:[]}},400);
+const written=await call(base,{user:'member',body:{revision:0,docs:[first],blocks:[]}});
+assert.equal(written.revision,1);
+let fetched=await call(base,{user:'viewer'});
+assert.equal((await decryptPrivate(key,fetched.docs[0].ciphertext,org,'studio/docs','doc-one')).name,'PRIVATE_STUDIO_SENTINEL');
+const second=await doc('doc-two','PRIVATE_STUDIO_SECOND');
+await call(base,{body:{revision:1,docs:[first,second],blocks:[]}});
+// A stale complete-workspace save must neither delete doc-two nor update doc-one.
+const stale=await doc('doc-one','STALE EDIT');
+await call(base,{body:{revision:1,docs:[stale],blocks:[]}},409);
+fetched=await call(base);
+assert.equal(fetched.revision,2);assert.equal(fetched.docs.length,2);
+assert.equal(fetched.docs[0].ciphertext,first.ciphertext);
+await call('/api/orgs/'+org+'/studio/docs/doc-one',{method:'DELETE',body:{revision:1}},409);
+await call(base,{body:{revision:2,docs:[first,first],blocks:[]}},400);
+assert.equal((await call(base)).revision,2);
+await call(base,{body:{revision:2,docs:[],blocks:[]}});
+assert.equal((await call(base)).docs.length,0);
+assert(!JSON.stringify(sql.prepare('SELECT * FROM org_private_records').all()).includes('PRIVATE_STUDIO'));
+console.log('PASS: Studio encrypted snapshots, authorization, strict envelopes, stale save rollback, deletion, and no plaintext storage.');

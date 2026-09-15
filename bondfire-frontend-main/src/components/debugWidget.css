@@ -1,0 +1,107 @@
+.bf-debug-fab{
+  position:fixed;
+  right:14px;
+  bottom:14px;
+  z-index:999999;
+  height:44px;
+  width:44px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,0.16);
+  background:rgba(0,0,0,0.78);
+  color:#fff;
+  font-size:20px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+
+.bf-debug-panel{
+  position:fixed;
+  right:14px;
+  bottom:70px;
+  z-index:999999;
+  width:min(720px, 96vw);
+  max-height:70vh;
+  overflow:auto;
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(10,10,10,0.92);
+  color:#fff;
+  box-shadow:0 20px 60px rgba(0,0,0,0.55);
+}
+
+.bf-debug-top{
+  position:sticky;
+  top:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.10);
+  background:rgba(10,10,10,0.95);
+}
+
+.bf-debug-title{font-weight:900; letter-spacing:.2px;}
+
+.bf-debug-actions{display:flex; gap:8px; align-items:center;}
+
+.bf-debug-btn{
+  height:34px;
+  padding:0 10px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.06);
+  color:#fff;
+  cursor:pointer;
+  font-weight:700;
+}
+
+.bf-debug-btn.danger{border-color:rgba(255,0,0,0.30); background:rgba(255,0,0,0.10);}
+
+.bf-debug-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  padding:12px;
+}
+
+.bf-debug-card{
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:14px;
+  padding:10px;
+  background:rgba(255,255,255,0.03);
+}
+
+.bf-debug-card h4{margin:0 0 8px 0; font-size:14px;}
+
+.bf-debug-card pre{
+  margin:0;
+  font-size:12px;
+  line-height:1.35;
+  white-space:pre-wrap;
+  word-break:break-word;
+  opacity:0.95;
+}
+
+.bf-debug-span{grid-column:1 / -1;}
+
+.bf-debug-list{display:flex; flex-direction:column; gap:8px;}
+
+.bf-debug-item{
+  border:1px solid rgba(255,255,255,0.12);
+  background:rgba(0,0,0,0.25);
+  border-radius:12px;
+  padding:8px;
+}
+
+.bf-debug-item-top{display:flex; justify-content:space-between; gap:10px; font-size:12px; opacity:0.85; margin-bottom:6px;}
+.bf-debug-item-pre{margin:0; font-size:12px; opacity:0.98;}
+.bf-debug-empty{opacity:0.7; font-size:12px;}
+.bf-debug-help{margin:8px 0 0 0; opacity:0.75; font-size:12px;}
+.bf-debug-row{margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;}
+
+@media (max-width: 720px){
+  .bf-debug-grid{grid-template-columns:1fr;}
+}

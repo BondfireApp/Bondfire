@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import {env,sql,db,call} from './private-storage-regression.mjs';
+import {encryptPrivate,decryptPrivate} from '../src/lib/privateCrypto.js';
+import {registerDeviceKey} from '../functions/api/_lib/deviceKeys.js';
+import {KEY_SCOPES,canReadScope} from '../shared/privateKeyScopes.js';
+const b64=b=>Buffer.from(b).toString('base64url');
+const device=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+const pub=await crypto.subtle.exportKey('jwk',device.publicKey);
+const wrappedKey=JSON.stringify({v:1,sender_pub:pub,salt:b64(new Uint8Array(16)),iv:b64(new Uint8Array(12)),ct:b64(new Uint8Array(48))});
+const recovery={salt:b64(new Uint8Array(16)),iv:b64(new Uint8Array(12)),ct:b64(new Uint8Array(48))};
+const id=crypto.randomUUID(),legacy=crypto.getRandomValues(new Uint8Array(32)),base='/api/orgs/'+id;
+await call('/api/orgs/create',{body:{private_mode:true,id,wrappedKey,recovery,ciphertext:await encryptPrivate(legacy,{name:'SECRET'},id,'organization',id),keyCheck:await encryptPrivate(legacy,{check:'bondfire-private-mode'},id,'key-check',id)}});
+for(const role of ['member','viewer'])sql.prepare('INSERT INTO org_memberships(org_id,user_id,role,created_at) VALUES(?,?,?,0)').run(id,role,role);
+const deviceId=await registerDeviceKey(db,'owner',pub);
+await registerDeviceKey(db,'member',pub);await registerDeviceKey(db,'viewer',pub);
+let info=await call(base+'/privacy/keys');
+async function rotation(epoch,info) {
+ const keys=[],scopes={};
+ for(const scope of KEY_SCOPES) {
+  const raw=crypto.getRandomValues(new Uint8Array(32));scopes[scope]=raw;
+  keys.push({scope,check:await encryptPrivate(raw,{scope,epoch},id,'scope-check/'+scope,id),archive:await encryptPrivate(raw,{keys:{},legacy:b64(legacy)},id,'scope-archive/'+scope,id),wraps:info.roster.filter(r=>r.device_id&&canReadScope(r.role,scope)).map(r=>({user_id:r.user_id,device_id:r.device_id,wrapped_key:wrappedKey})),recovery});
+  raw.epoch=epoch;
+ }
+ scopes.viewer.scopes=scopes;scopes.viewer.legacy=legacy;
+ return {body:{epoch,rosterRevision:info.rosterRevision,keys},key:scopes.viewer};
+}
+const first=await rotation(1,info);
+const tampered=structuredClone(first.body);tampered.keys.find(k=>k.scope==='admin').wraps.push({user_id:'viewer',device_id:deviceId,wrapped_key:wrappedKey});
+await call(base+'/privacy/keys',{body:tampered},400);
+await call(base+'/privacy/keys',{body:first.body,user:'member'},403);
+await call(base+'/privacy/keys',{body:first.body});
+for(const [user,n] of [['viewer',1],['member',2],['owner',3]]) {
+ const result=await call(base+'/privacy/keys?device_id='+deviceId,{user});assert.equal(result.keys.length,n);assert(result.keys.every(k=>k.wrapped_key));
+}
+const ownBackup={epoch:1,device_id:deviceId,keys:first.body.keys.filter(k=>k.scope==='viewer').map(k=>({scope:k.scope,wrapped_key:wrappedKey,recovery}))};
+await call(base+'/privacy/keys/device',{body:ownBackup,user:'viewer'});
+await call(base+'/privacy/keys/device',{body:{...ownBackup,keys:[...ownBackup.keys,{scope:'admin',wrapped_key:wrappedKey,recovery}]},user:'viewer'},400);
+await call(base+'/privacy/keys/device',{body:{...ownBackup,epoch:2},user:'viewer'},409);
+const secret=await encryptPrivate(first.key,{note:'PRIVATE admin field'},id,'public/config',id);
+const viewer=first.key.slice();viewer.epoch=1;viewer.scopes={viewer};
+await assert.rejects(decryptPrivate(viewer,secret,id,'public/config',id));
+assert.deepEqual(await decryptPrivate(first.key,secret,id,'public/config',id),{note:'PRIVATE admin field'});
+await call(base+'/needs',{body:{id:'old',revision:0,ciphertext:await encryptPrivate(legacy,{title:'stale'},id,'needs','old')}},409);
+const cipher=await encryptPrivate(first.key,{title:'SECRET epoch one'},id,'needs','n1');
+await call(base+'/needs',{body:{id:'n1',revision:0,ciphertext:cipher}});
+sql.prepare('DELETE FROM org_memberships WHERE org_id=? AND user_id=?').run(id,'member');
+info=await call(base+'/privacy/keys');assert(info.rotationRequired);
+await call(base+'/needs',{body:{id:'n2',revision:0,ciphertext:await encryptPrivate(first.key,{title:'stale member epoch'},id,'needs','n2')}},409);
+await call(base+'/privacy/keys',{user:'member'},403);
+await call(base+'/privacy/keys',{body:{...first.body,epoch:2}},409);
+const second=await rotation(2,info);await call(base+'/privacy/keys',{body:second.body});
+const future=await encryptPrivate(second.key,{title:'SECRET epoch two'},id,'needs','n2');
+await call(base+'/needs',{body:{id:'n2',revision:0,ciphertext:future}});
+await assert.rejects(decryptPrivate(first.key,future,id,'needs','n2'));
+second.key.history={1:first.key};
+assert.deepEqual(await decryptPrivate(second.key,cipher,id,'needs','n1'),{title:'SECRET epoch one'});
+assert.equal(sql.prepare('SELECT COUNT(*) n FROM org_private_scope_wraps WHERE org_id=? AND user_id=?').get(id,'member').n,0);
+assert(!JSON.stringify(sql.prepare('SELECT * FROM org_private_records WHERE org_id=?').all(id)).includes('SECRET'));
+console.log('PASS: role-scoped ciphertext, recipient validation, membership rotation barrier, stale epoch rejection, old-key exclusion and historical decryption');

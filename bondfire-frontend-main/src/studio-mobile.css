@@ -1,0 +1,23 @@
+
+.mobile-studio .toolbar {
+  padding: 4px !important;
+  height: 36px !important;
+}
+
+.mobile-studio .sidebar,
+.mobile-studio .inspector {
+  display: none !important;
+}
+
+.mobile-studio .bottom-dock {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: #111;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 9999;
+}
