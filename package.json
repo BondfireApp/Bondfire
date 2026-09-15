@@ -12,7 +12,12 @@
     "test:security": "node scripts/auth-hardening-regression.mjs && node scripts/private-storage-regression.mjs && node scripts/private-key-scopes-regression.mjs && node scripts/private-singleton-migration-regression.mjs && node scripts/private-submissions-regression.mjs && node scripts/private-publication-regression.mjs && node scripts/private-studio-regression.mjs && node scripts/security-boundary-regression.mjs && node scripts/security-data-integrity-regression.mjs && node scripts/emergency-protocol-regression.mjs",
     "test:product-reliability": "node scripts/product-reliability-regression.mjs",
     "smoke:thread1": "node scripts/thread1-emergency-smoke.mjs",
-    "package:webapp": "node scripts/package-webapp.mjs"
+    "package:webapp": "node scripts/package-webapp.mjs",
+    "desktop": "electron .",
+    "desktop:dist": "electron-builder",
+    "desktop:dist:win": "electron-builder --win nsis --x64",
+    "desktop:dist:mac": "electron-builder --mac",
+    "desktop:dist:linux": "electron-builder --linux"
   },
   "dependencies": {
     "colophon": "https://github.com/colophon-hub/colophon/archive/3c3eebf22cbc28703452250a3bad1d4ee7709be1.tar.gz",
@@ -27,10 +32,62 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^37.10.3",
+    "electron-builder": "^26.15.3",
     "vite": "^5.4.2",
     "vite-plugin-pwa": "^1.2.0"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "main": "desktop/main.mjs",
+  "build": {
+    "appId": "org.bondfireapp.bondfire",
+    "productName": "Bondfire",
+    "asar": true,
+    "files": [
+      "desktop/**/*",
+      "package.json",
+      "LICENSE"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Bondfire-${version}-Windows-${arch}.${ext}",
+      "icon": "public/icons/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "icon": "public/icons/icon-512.png",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "Bondfire-${version}-macOS-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "public/icons/icon-512.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network",
+      "artifactName": "Bondfire-${version}-Linux-${arch}.${ext}"
+    }
   }
 }
