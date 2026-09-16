@@ -1,4 +1,6 @@
 import React from "react";
+import LaborHistoryArchive from "../components/LaborHistoryArchive.jsx";
+import { usePublicDocumentBrand } from "../lib/publicDocumentBrand.js";
 import "../styles/organizing-public.css";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
@@ -86,6 +88,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
     ? { loading: false, error: "", data: initialData }
     : { loading: true, error: "", data: null });
   const [meetings, setMeetings] = React.useState([]);
+  const [historyManifest, setHistoryManifest] = React.useState(null);
 
   React.useEffect(() => {
     let alive = true;
@@ -103,6 +106,22 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
     return () => { alive = false; };
   }, [publicSlug, initialData]);
 
+  React.useEffect(() => {
+    let alive = true;
+    const manifestUrl = `/${encodeURIComponent(publicSlug)}/labor-history/manifest.json`;
+    fetch(manifestUrl, { headers: { Accept: "application/json" } })
+      .then((response) => response.ok ? response.json() : null)
+      .then((manifest) => { if (alive) setHistoryManifest(manifest?.collections?.length ? manifest : null); })
+      .catch(() => { if (alive) setHistoryManifest(null); });
+    return () => { alive = false; };
+  }, [publicSlug]);
+
+  const documentPublic = state.data?.public || null;
+  usePublicDocumentBrand(
+    documentPublic?.title || documentPublic?.branch_label || "",
+    documentPublic?.logoDataUrl || documentPublic?.logoUrl || historyManifest?.siteIconUrl || "",
+  );
+
   if (state.loading) return <div className="bf-organizing-site"><div className="bf-organizing-empty">Loading organization site…</div></div>;
   if (state.error || !state.data?.public) return <div className="bf-organizing-site"><div className="bf-organizing-empty">This organization site is unavailable.</div></div>;
 
@@ -111,7 +130,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
   const title = pub.title || pub.branch_label || "Organization";
   const headline = pub.hero_headline || title;
   const lede = pub.hero_text || pub.about || "";
-  const logo = pub.logoDataUrl || pub.logoUrl || "";
+  const logo = pub.logoDataUrl || pub.logoUrl || historyManifest?.siteIconUrl || "";
   const accent = pub.accent_color || "#9a433a";
   const memberHref = `${APP_ORIGIN}/#/signin?org=${encodeURIComponent(orgId)}`;
   const publication = pub.connected_publication?.available && pub.connected_publication?.url ? pub.connected_publication : null;
@@ -188,6 +207,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
             {item.caption ? <p>{item.caption}</p> : null}
           </article>
         ))}</div> : null}
+        {historyManifest ? <LaborHistoryArchive manifest={historyManifest} /> : null}
       </section>
     ),
     events: (
@@ -232,6 +252,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
           <SectionButton id="about">About</SectionButton>
           {visible(pub, "membership") ? <SectionButton id="membership">Membership</SectionButton> : null}
           {visible(pub, "archive") && archiveItems.length ? <SectionButton id="archive">History</SectionButton> : null}
+          {historyManifest ? <SectionButton id="labor-history">Labor History</SectionButton> : null}
           {publication ? <a href={publication.url} target="_blank" rel="noopener noreferrer">{publication.publication_name || "Publication"}</a> : null}
           <a className="bf-organizing-signin" href={memberHref}>Member Sign In</a>
         </nav>

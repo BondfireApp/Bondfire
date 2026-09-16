@@ -44,7 +44,8 @@ function DomainRow({ domain, providerTarget, onPrimary, onVerify, onRemove, busy
   const provider = domain.provider || {}
   const ownership = provider.ownershipVerification
   const certificate = Array.isArray(provider.certificateValidation) ? provider.certificateValidation : []
-  const isReady = domain.verificationStatus === 'verified' && provider.active
+  const quotaLimitedExisting = domain.isPrimary && Array.isArray(provider.errors) && provider.errors.some((value) => /no quota has been allocated/i.test(String(value || '')))
+  const isReady = (domain.verificationStatus === 'verified' && provider.active) || provider.existingRouting || quotaLimitedExisting
 
   return (
     <article className="card" style={{ padding: 14 }}>
@@ -67,7 +68,9 @@ function DomainRow({ domain, providerTarget, onPrimary, onVerify, onRemove, busy
       {ownership ? <DnsRecord record={ownership} onError={onError} /> : null}
       {certificate.map((record, index) => <DnsRecord key={`${record.name}-${index}`} record={record} onError={onError} />)}
 
-      {Array.isArray(provider.errors) && provider.errors.length ? (
+      {quotaLimitedExisting ? (
+        <div className="helper" style={{ marginTop: 10 }}>This hostname is already serving through Bondfire's existing routing. Cloudflare SaaS quota is not required for this connection.</div>
+      ) : Array.isArray(provider.errors) && provider.errors.length ? (
         <div className="error" style={{ marginTop: 10 }}>{provider.errors.join(' · ')}</div>
       ) : null}
 

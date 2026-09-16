@@ -122,16 +122,42 @@
     "member_access_title": "Member area",
     "member_access_body": "Red Harbor members can sign in to the private Bondfire organization workspace for meetings, files, organizing work, chat, and branch administration.",
     "primary_actions": [
-      { "label": "Join Us", "url": "#membership" },
-      { "label": "Read the Bulletin", "url": "https://bulletin.redharbor.org/" },
-      { "label": "Contact", "url": "#contact" }
+      {
+        "label": "Join Us",
+        "url": "#membership"
+      },
+      {
+        "label": "Read the Bulletin",
+        "url": "https://bulletin.redharbor.org/"
+      },
+      {
+        "label": "Contact",
+        "url": "#contact"
+      }
     ],
     "get_involved_links": [
-      { "label": "Join the IWW", "url": "https://redcard.iww.org/" },
-      { "label": "Email Red Harbor", "url": "mailto:redharboriww@gmail.com" },
-      { "label": "Membership", "url": "#membership" }
+      {
+        "label": "Join the IWW",
+        "url": "https://redcard.iww.org/"
+      },
+      {
+        "label": "Email Red Harbor",
+        "url": "mailto:redharboriww@gmail.com"
+      },
+      {
+        "label": "Membership",
+        "url": "#membership"
+      }
     ],
-    "section_order": ["hero", "about", "join", "membership", "archive", "events", "contact"],
+    "section_order": [
+      "hero",
+      "about",
+      "join",
+      "membership",
+      "archive",
+      "events",
+      "contact"
+    ],
     "section_visibility": {
       "hero": true,
       "about": true,
@@ -140,6 +166,7 @@
       "archive": true,
       "events": true,
       "contact": true
-    }
+    },
+    "logo_url": "/red-harbor/red-harbor-logo.png"
   }
 }

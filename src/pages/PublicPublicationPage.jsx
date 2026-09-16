@@ -1,4 +1,5 @@
 import React from "react";
+import { usePublicDocumentBrand } from "../lib/publicDocumentBrand.js";
 import "../styles/publication-public.css";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
@@ -53,6 +54,27 @@ export default function PublicPublicationPage({ orgId }) {
       .catch((error) => alive && setState({ loading: false, error: String(error?.message || error), data: null }));
     return () => { alive = false; };
   }, [orgId, slug]);
+
+  const brandPublication = state.data?.publication || {};
+  const brandConfig = brandPublication.config || {};
+  const brandSite = brandConfig.site && typeof brandConfig.site === "object" ? brandConfig.site : {};
+  const [brandManifest, setBrandManifest] = React.useState(null);
+
+  React.useEffect(() => {
+    const organizationSlug = String(brandPublication.organizationSlug || "").trim();
+    if (!organizationSlug) { setBrandManifest(null); return undefined; }
+    let alive = true;
+    fetch(`/${encodeURIComponent(organizationSlug)}/brand.json`, { headers: { Accept: "application/json" } })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => { if (alive) setBrandManifest(data && typeof data === "object" ? data : null); })
+      .catch(() => { if (alive) setBrandManifest(null); });
+    return () => { alive = false; };
+  }, [brandPublication.organizationSlug]);
+
+  usePublicDocumentBrand(
+    brandPublication.name || brandManifest?.title || "",
+    brandPublication.logoUrl || brandSite.logoUrl || brandSite.logoURL || brandConfig.logoUrl || brandConfig.logoURL || brandManifest?.iconUrl || "",
+  );
 
   if (state.loading) return <main className="bf-publication-site"><p className="bf-publication-empty">Loading publication…</p></main>;
   if (state.error || !state.data) return <main className="bf-publication-site"><p className="bf-publication-empty">This publication is unavailable.</p></main>;

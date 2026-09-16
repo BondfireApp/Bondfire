@@ -20,6 +20,11 @@ const checks = [
   ["native Colophon keeps image logo upload", "src/modules/colophon/ColophonNativeModule.jsx", /NativeLogoUploadBridge/],
   ["native Colophon keeps publication-site routing separate", "src/modules/colophon/ColophonNativeModule.jsx", /ColophonPublicLinkGuard/],
   ["private organization boundary allows encrypted Colophon", "src/components/PrivateOrgBoundary.jsx", /studio\|colophon/],
+  ["public organization pages set organization browser branding", "src/pages/OrganizingPublicPage.jsx", /usePublicDocumentBrand/],
+  ["public publications set publication browser branding", "src/pages/PublicPublicationPage.jsx", /brandManifest[\s\S]*usePublicDocumentBrand/],
+  ["Red Harbor exposes the recovered labor-history archive", "src/pages/OrganizingPublicPage.jsx", /LaborHistoryArchive/],
+  ["Bulletin public theme forces readable heading contrast", "src/styles/publication-public.css", /bf-publication-main h1[\s\S]*color:#171717!important/],
+  ["verified routed domains suppress irrelevant SaaS quota errors", "src/components/PublicDomainCard.jsx", /quotaLimitedExisting[\s\S]*existing routing/],
   ["support exposes a maintainer contact", "src/pages/Support.jsx", /support@bondfireapp\.org/],
   ["support has safe network failure guidance", "src/pages/Support.jsx", /server could not be reached/i],
   ["PWA runs standalone", "public/manifest.webmanifest", /"display"\s*:\s*"standalone"/],
@@ -35,6 +40,16 @@ for (const [label, file, pattern] of checks) {
   } else {
     console.log(`PASS: ${label}`);
   }
+}
+
+
+const laborManifest = JSON.parse(read("public/red-harbor/labor-history/manifest.json"));
+const laborPages = (laborManifest.collections || []).reduce((sum, collection) => sum + (collection.pages || []).length, 0);
+if (laborManifest.collections?.length !== 5 || laborPages !== 203) {
+  failed = true;
+  console.error(`FAIL: Red Harbor labor archive completeness (collections=${laborManifest.collections?.length || 0}, pages=${laborPages})`);
+} else {
+  console.log("PASS: Red Harbor labor archive completeness (5 collections, 203 pages)");
 }
 
 if (failed) process.exit(1);

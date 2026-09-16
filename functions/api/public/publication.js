@@ -38,7 +38,10 @@ export async function onRequestGet(context) {
       const published = await readColophonPublication(context.env, orgId, String(url.searchParams.get('slug') || '').trim());
       const cfg = published.config || {};
       const site = cfg.site && typeof cfg.site === 'object' ? cfg.site : {};
-      const publicationName = String(site.title || cfg.title || 'Publication').trim() || 'Publication';
+      const orgCfg = await getPublicCfg(context.env, orgId);
+      const orgPublic = projectOrganizationPageConfig(orgCfg || {});
+      const publicationName = String(site.title || cfg.title || orgPublic?.title || 'Publication').trim() || 'Publication';
+      const logoUrl = String(site.logoUrl || site.logoURL || site.logo_url || cfg.logoUrl || cfg.logoURL || cfg.logo_url || orgPublic?.logoUrl || orgPublic?.logoDataUrl || '').trim();
       return json({
         ok: true,
         surface: 'publication',
@@ -47,6 +50,8 @@ export async function onRequestGet(context) {
         publication: {
           name: publicationName,
           description: String(site.description || cfg.description || '').trim(),
+          logoUrl,
+          organizationSlug: String(orgPublic?.slug || '').trim(),
           config: cfg,
         },
         item: published.item || null,
@@ -90,6 +95,8 @@ export async function onRequestGet(context) {
       publication: {
         name: publicationName,
         description: String(site?.config?.site?.description || site?.config?.description || '').trim(),
+        logoUrl: String(site?.config?.site?.logoUrl || site?.config?.site?.logoURL || site?.config?.logoUrl || site?.config?.logoURL || orgPublic?.logoUrl || orgPublic?.logoDataUrl || '').trim(),
+        organizationSlug: String(orgPublic?.slug || '').trim(),
         config: site?.config || {},
       },
       item: content?.item || null,

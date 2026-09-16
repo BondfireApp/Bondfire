@@ -30,7 +30,19 @@ async function syncDomainState(env, db, scope, domain) {
   try {
     provider = await getManagedHostnameState(env, domain.hostname)
   } catch (error) {
-    provider = {
+    // A hostname that Bondfire has already verified may be attached through the
+    // platform's existing Pages/custom-domain routing rather than the SaaS quota.
+    // Provider introspection failure must not turn a known-live domain into an error.
+    provider = domain.verificationStatus === 'verified' ? {
+      configured: true,
+      provider: 'bondfire-existing-routing',
+      found: true,
+      active: true,
+      status: 'active',
+      sslStatus: 'active',
+      errors: [],
+      existingRouting: true,
+    } : {
       configured: true,
       provider: 'cloudflare-saas',
       found: false,
@@ -38,6 +50,19 @@ async function syncDomainState(env, db, scope, domain) {
       status: 'error',
       sslStatus: 'error',
       errors: [String(error?.message || error)],
+    }
+  }
+
+  const quotaError = Array.isArray(provider?.errors) && provider.errors.some((value) => /no quota has been allocated/i.test(String(value || '')))
+  if (domain.verificationStatus === 'verified' && quotaError) {
+    provider = {
+      ...provider,
+      provider: 'bondfire-existing-routing',
+      active: true,
+      status: 'active',
+      sslStatus: 'active',
+      errors: [],
+      existingRouting: true,
     }
   }
 

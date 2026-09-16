@@ -1,0 +1,1304 @@
+{
+  "title": "The Labor History of the Harbor",
+  "subtitle": "Scanned newspapers, strike history, labor violence, and regional working class memory.",
+  "collections": [
+    {
+      "id": "aberdeen-free-speech",
+      "title": "Aberdeen Free Speech Fights",
+      "year": 1911,
+      "event": "IWW free speech fights",
+      "tags": [
+        "IWW",
+        "Aberdeen",
+        "free speech",
+        "labor"
+      ],
+      "description": "Coverage, retrospective essays, and related archive pages concerning the Aberdeen free speech fights.",
+      "pages": [
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part1/page-001.png",
+          "title": "Page 1",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part1/page-002.png",
+          "title": "Page 2",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part1/page-003.png",
+          "title": "Page 3",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part1/page-004.png",
+          "title": "Page 4",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part1/page-005.png",
+          "title": "Page 5",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part1/page-006.png",
+          "title": "Page 6",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part2/page-001.png",
+          "title": "Page 7",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part2/page-002.png",
+          "title": "Page 8",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part2/page-003.png",
+          "title": "Page 9",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part3/page-001.png",
+          "title": "Page 10",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part3/page-002.png",
+          "title": "Page 11",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part3/page-003.png",
+          "title": "Page 12",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part3/page-004.png",
+          "title": "Page 13",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part4/page-001.png",
+          "title": "Page 14",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part4/page-002.png",
+          "title": "Page 15",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part4/page-003.png",
+          "title": "Page 16",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part5/page-001.png",
+          "title": "Page 17",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part5/page-002.png",
+          "title": "Page 18",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part5/page-003.png",
+          "title": "Page 19",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part5/page-004.png",
+          "title": "Page 20",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part6/page-001.png",
+          "title": "Page 21",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part6/page-002.png",
+          "title": "Page 22",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part6/page-003.png",
+          "title": "Page 23",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part6/page-004.png",
+          "title": "Page 24",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part6/page-005.png",
+          "title": "Page 25",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part6/page-006.png",
+          "title": "Page 26",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part7/page-001.png",
+          "title": "Page 27",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part7/page-002.png",
+          "title": "Page 28",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part7/page-003.png",
+          "title": "Page 29",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part7/page-004.png",
+          "title": "Page 30",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part7/page-005.png",
+          "title": "Page 31",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part8/page-001.png",
+          "title": "Page 32",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part8/page-002.png",
+          "title": "Page 33",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part8/page-003.png",
+          "title": "Page 34",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part9/page-001.png",
+          "title": "Page 35",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part9/page-002.png",
+          "title": "Page 36",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part9/page-003.png",
+          "title": "Page 37",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part10/page-001.png",
+          "title": "Page 38",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part10/page-002.png",
+          "title": "Page 39",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part10/page-003.png",
+          "title": "Page 40",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part10/page-004.png",
+          "title": "Page 41",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part10/page-005.png",
+          "title": "Page 42",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part10/page-006.png",
+          "title": "Page 43",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part10/page-007.png",
+          "title": "Page 44",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-001.png",
+          "title": "Page 45",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-002.png",
+          "title": "Page 46",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-003.png",
+          "title": "Page 47",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-004.png",
+          "title": "Page 48",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-005.png",
+          "title": "Page 49",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-006.png",
+          "title": "Page 50",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-007.png",
+          "title": "Page 51",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-008.png",
+          "title": "Page 52",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-009.png",
+          "title": "Page 53",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-010.png",
+          "title": "Page 54",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-011.png",
+          "title": "Page 55",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-012.png",
+          "title": "Page 56",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-013.png",
+          "title": "Page 57",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-014.png",
+          "title": "Page 58",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-015.png",
+          "title": "Page 59",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-016.png",
+          "title": "Page 60",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-017.png",
+          "title": "Page 61",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-018.png",
+          "title": "Page 62",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-019.png",
+          "title": "Page 63",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part11/page-020.png",
+          "title": "Page 64",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-001.png",
+          "title": "Page 65",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-002.png",
+          "title": "Page 66",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-003.png",
+          "title": "Page 67",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-004.png",
+          "title": "Page 68",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-005.png",
+          "title": "Page 69",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-006.png",
+          "title": "Page 70",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-007.png",
+          "title": "Page 71",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-008.png",
+          "title": "Page 72",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-009.png",
+          "title": "Page 73",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-010.png",
+          "title": "Page 74",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-011.png",
+          "title": "Page 75",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-012.png",
+          "title": "Page 76",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-013.png",
+          "title": "Page 77",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part12/page-014.png",
+          "title": "Page 78",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part13/page-001.png",
+          "title": "Page 79",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part13/page-002.png",
+          "title": "Page 80",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part13/page-003.png",
+          "title": "Page 81",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part13/page-004.png",
+          "title": "Page 82",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part14/page-001.png",
+          "title": "Page 83",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part14/page-002.png",
+          "title": "Page 84",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part14/page-003.png",
+          "title": "Page 85",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part14/page-004.png",
+          "title": "Page 86",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part15/page-001.png",
+          "title": "Page 87",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part15/page-002.png",
+          "title": "Page 88",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part15/page-003.png",
+          "title": "Page 89",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part16/page-001.png",
+          "title": "Page 90",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part16/page-002.png",
+          "title": "Page 91",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/aberdeen-free-speech/full-bindersplit-part16/page-003.png",
+          "title": "Page 92",
+          "summary": "",
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "william-mckay",
+      "title": "Murder of William McKay",
+      "year": 1923,
+      "event": "Bay City Mill shooting",
+      "tags": [
+        "William McKay",
+        "Bay City Mill",
+        "strike violence"
+      ],
+      "description": "Material concerning the killing of William McKay and its aftermath in Grays Harbor labor history.",
+      "pages": [
+        {
+          "src": "/archive/william-mckay/full-bindersplit-part16/page-004.png",
+          "title": "Page 1",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/william-mckay/full-bindersplit-part16/page-005.png",
+          "title": "Page 2",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/william-mckay/full-bindersplit-part16/page-006.png",
+          "title": "Page 3",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/william-mckay/full-bindersplit-part16/page-007.png",
+          "title": "Page 4",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/william-mckay/full-bindersplit-part17/page-001.png",
+          "title": "Page 5",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/william-mckay/full-bindersplit-part17/page-002.png",
+          "title": "Page 6",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/william-mckay/full-bindersplit-part17/page-003.png",
+          "title": "Page 7",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/william-mckay/full-bindersplit-part17/page-004.png",
+          "title": "Page 8",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/william-mckay/full-bindersplit-part17/page-005.png",
+          "title": "Page 9",
+          "summary": "",
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "laura-law",
+      "title": "Murder of Laura Law",
+      "year": 1940,
+      "event": "Anti labor violence and civil rights struggle",
+      "tags": [
+        "Laura Law",
+        "civil rights",
+        "Grays Harbor"
+      ],
+      "description": "Materials on Laura Law's killing and the political violence surrounding labor and civil rights in Grays Harbor.",
+      "pages": [
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-006.png",
+          "title": "Page 1",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-007.png",
+          "title": "Page 2",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-008.png",
+          "title": "Page 3",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-009.png",
+          "title": "Page 4",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-010.png",
+          "title": "Page 5",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-011.png",
+          "title": "Page 6",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-012.png",
+          "title": "Page 7",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-013.png",
+          "title": "Page 8",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-014.png",
+          "title": "Page 9",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-015.png",
+          "title": "Page 10",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-016.png",
+          "title": "Page 11",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-017.png",
+          "title": "Page 12",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part17/page-018.png",
+          "title": "Page 13",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-001.png",
+          "title": "Page 14",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-002.png",
+          "title": "Page 15",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-003.png",
+          "title": "Page 16",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-004.png",
+          "title": "Page 17",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-005.png",
+          "title": "Page 18",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-006.png",
+          "title": "Page 19",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-007.png",
+          "title": "Page 20",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-008.png",
+          "title": "Page 21",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-009.png",
+          "title": "Page 22",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-010.png",
+          "title": "Page 23",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-011.png",
+          "title": "Page 24",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-012.png",
+          "title": "Page 25",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-013.png",
+          "title": "Page 26",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-014.png",
+          "title": "Page 27",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-015.png",
+          "title": "Page 28",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-016.png",
+          "title": "Page 29",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-017.png",
+          "title": "Page 30",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/laura-law/full-bindersplit-part18/page-018.png",
+          "title": "Page 31",
+          "summary": "",
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "everett-centralia-seattle",
+      "title": "Everett, Centralia, Seattle",
+      "year": null,
+      "event": "Infamous Labor Disputes",
+      "tags": [
+        "labor",
+        "history",
+        "massacre",
+        "washington"
+      ],
+      "description": "Various materials and documents related to the infamous labor disputes in Everett, Centralia, and Seattle.",
+      "pages": [
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-001.png",
+          "title": "Page 1",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-002.png",
+          "title": "Page 2",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-003.png",
+          "title": "Page 3",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-004.png",
+          "title": "Page 4",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-005.png",
+          "title": "Page 5",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-006.png",
+          "title": "Page 6",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-007.png",
+          "title": "Page 7",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-008.png",
+          "title": "Page 8",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-009.png",
+          "title": "Page 9",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-010.png",
+          "title": "Page 10",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-011.png",
+          "title": "Page 11",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part19/page-012.png",
+          "title": "Page 12",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-001.png",
+          "title": "Page 13",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-002.png",
+          "title": "Page 14",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-003.png",
+          "title": "Page 15",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-004.png",
+          "title": "Page 16",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-005.png",
+          "title": "Page 17",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-006.png",
+          "title": "Page 18",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-007.png",
+          "title": "Page 19",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-008.png",
+          "title": "Page 20",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-009.png",
+          "title": "Page 21",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-010.png",
+          "title": "Page 22",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-011.png",
+          "title": "Page 23",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-012.png",
+          "title": "Page 24",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-013.png",
+          "title": "Page 25",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-014.png",
+          "title": "Page 26",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-015.png",
+          "title": "Page 27",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-016.png",
+          "title": "Page 28",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-017.png",
+          "title": "Page 29",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-018.png",
+          "title": "Page 30",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part20/page-019.png",
+          "title": "Page 31",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part21/page-001.png",
+          "title": "Page 32",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/everett-centralia-seattle/full-bindersplit-part21/page-002.png",
+          "title": "Page 33",
+          "summary": "",
+          "keywords": []
+        }
+      ]
+    },
+    {
+      "id": "misc",
+      "title": "Miscellaneous Labor History Items",
+      "year": null,
+      "event": "General labor history topics",
+      "tags": [
+        "labor",
+        "history",
+        "Grays Harbor"
+      ],
+      "description": "Various materials and documents related to labor history in the PNW.",
+      "pages": [
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-003.png",
+          "title": "Page 1",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-004.png",
+          "title": "Page 2",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-005.png",
+          "title": "Page 3",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-006.png",
+          "title": "Page 4",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-007.png",
+          "title": "Page 5",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-008.png",
+          "title": "Page 6",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-009.png",
+          "title": "Page 7",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-010.png",
+          "title": "Page 8",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-011.png",
+          "title": "Page 9",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-012.png",
+          "title": "Page 10",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-013.png",
+          "title": "Page 11",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-014.png",
+          "title": "Page 12",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-015.png",
+          "title": "Page 13",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-016.png",
+          "title": "Page 14",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-017.png",
+          "title": "Page 15",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-018.png",
+          "title": "Page 16",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-019.png",
+          "title": "Page 17",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-020.png",
+          "title": "Page 18",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-021.png",
+          "title": "Page 19",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-022.png",
+          "title": "Page 20",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-023.png",
+          "title": "Page 21",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-024.png",
+          "title": "Page 22",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-025.png",
+          "title": "Page 23",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-026.png",
+          "title": "Page 24",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-027.png",
+          "title": "Page 25",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part21/page-028.png",
+          "title": "Page 26",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part22/page-001.png",
+          "title": "Page 27",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part22/page-002.png",
+          "title": "Page 28",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part22/page-003.png",
+          "title": "Page 29",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part22/page-004.png",
+          "title": "Page 30",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part22/page-005.png",
+          "title": "Page 31",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part22/page-006.png",
+          "title": "Page 32",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part22/page-007.png",
+          "title": "Page 33",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part22/page-008.png",
+          "title": "Page 34",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part23/page-001.png",
+          "title": "Page 35",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part23/page-002.png",
+          "title": "Page 36",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part23/page-003.png",
+          "title": "Page 37",
+          "summary": "",
+          "keywords": []
+        },
+        {
+          "src": "/archive/misc/full-bindersplit-part24/page-001.png",
+          "title": "Page 38",
+          "summary": "",
+          "keywords": []
+        }
+      ]
+    }
+  ],
+  "mirrorUrl": "https://maydayontheharbor.com/#/labor-history",
+  "assetOrigins": [
+    "https://maydayontheharbor.com",
+    "https://red-harbor.pages.dev"
+  ],
+  "sourceNote": "Archive manifest preserved from the Red Harbor labor-history site; scans are served from redundant public mirrors.",
+  "siteIconUrl": "/red-harbor/red-harbor-logo.png",
+  "organizationTitle": "Red Harbor IWW"
+}
