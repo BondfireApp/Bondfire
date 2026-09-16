@@ -23,6 +23,7 @@ const checks = [
   ["private organizations allow the real FireChat route", "src/components/PrivateOrgBoundary.jsx", /witness\|chat\|chat-module\|studio/],
   ["FireChat restores recovery-code-first verification", "src/pages/BondfireChat.jsx", /decodeRecoveryKey[\s\S]*verifyWithRecoveryKey[\s\S]*Verify with recovery code[\s\S]*Verify with emoji instead/],
   ["FireChat secret storage uses the entered recovery key", "src/pages/BondfireChat.jsx", /cryptoCallbacks:[\s\S]*getSecretStorageKey[\s\S]*recoveryKeyRef\.current/],
+  ["FireChat uses device-scoped Rust crypto storage", "src/pages/BondfireChat.jsx", /initRustCrypto\(\{[\s\S]*cryptoDatabasePrefix: `bf_mx_crypto_\$\{uidSafe\}_\$\{deviceSafe\}`[\s\S]*useIndexedDB: true/],
   ["FireChat recognizes Matrix cross-signing truth", "src/pages/BondfireChat.jsx", /res\.crossSigningVerified === true/],
   ["settings remain directly reachable", "src/components/AppHeader.jsx", /Organization settings/],
   ["support remains reachable from global navigation", "src/components/AppHeader.jsx", /\/support/],

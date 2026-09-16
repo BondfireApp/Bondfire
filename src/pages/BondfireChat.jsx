@@ -4,7 +4,6 @@ import { useParams } from "react-router-dom";
 import {
   createClient,
   IndexedDBStore,
-  IndexedDBCryptoStore,
 } from "matrix-js-sdk";
 
 import {
@@ -538,6 +537,7 @@ export default function BondfireChat() {
     const token = saved.accessToken;
     const did = saved.deviceId || "";
     const uidSafe = sanitizeForIdb(uid);
+    const deviceSafe = sanitizeForIdb(did || "unknown-device");
 
     setUserId(uid);
     setAccessToken(token);
@@ -545,7 +545,6 @@ export default function BondfireChat() {
 
     let client = null;
     let store = null;
-    let cryptoStore = null;
 
     const g = getGlobalMatrix();
     const sameDevice = !did || (g?.deviceId || "") === did;
@@ -570,18 +569,15 @@ export default function BondfireChat() {
         dbName: `bf_mx_store_${uidSafe}`,
       });
 
-      cryptoStore = new IndexedDBCryptoStore(
-        window.indexedDB,
-        `bf_mx_crypto_${uidSafe}`
-      );
-
       client = createClient({
         baseUrl,
         accessToken: token,
         userId: uid,
         deviceId: did || undefined,
         store,
-        cryptoStore,
+        timelineSupport: true,
+        useAuthorizationHeader: true,
+        verificationMethods: ["m.sas.v1"],
         cryptoCallbacks: {
           getSecretStorageKey: async ({ keys }) => {
             const privateKey = recoveryKeyRef.current;
@@ -654,9 +650,12 @@ export default function BondfireChat() {
 
         try {
           if (typeof client.initRustCrypto === "function") {
-            await client.initRustCrypto();
+            await client.initRustCrypto({
+              cryptoDatabasePrefix: `bf_mx_crypto_${uidSafe}_${deviceSafe}`,
+              useIndexedDB: true,
+            });
             persistSessionFromClient(client);
-            setCryptoReady(true);
+            setCryptoReady(await detectCryptoReady(client));
           } else if (typeof client.initCrypto === "function") {
             await client.initCrypto();
             persistSessionFromClient(client);
