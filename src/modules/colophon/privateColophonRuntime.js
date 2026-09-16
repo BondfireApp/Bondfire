@@ -311,8 +311,21 @@ export async function handlePrivateColophonFetch({ orgId, session, input, init =
   const path = String(suffix || url.pathname.replace(/^\/api\/?/, "")).replace(/^\/+|\/+$/g, "");
   const method = methodOf(input, init);
   if (path === "session") return response({ ...session, authenticated: true, mode: "bondfire-private" });
-  if (["native-content", "content"].includes(path)) return handleNativeContent(orgId, url, input, init, session);
-  if (["native-content-revisions", "content-revisions"].includes(path)) return handleRevisions(orgId, url, input, init, session);
+
+  const contentPath = path.match(/^(?:native-content|content)(?:\/([^/]+))?$/);
+  if (contentPath) {
+    const contentUrl = new URL(url.toString());
+    if (contentPath[1] && !contentUrl.searchParams.has("id")) contentUrl.searchParams.set("id", contentPath[1]);
+    return handleNativeContent(orgId, contentUrl, input, init, session);
+  }
+
+  const revisionsPath = path.match(/^(?:native-content-revisions|content-revisions)(?:\/([^/]+))?$/);
+  if (revisionsPath) {
+    const revisionsUrl = new URL(url.toString());
+    if (revisionsPath[1] && !revisionsUrl.searchParams.has("id")) revisionsUrl.searchParams.set("id", revisionsPath[1]);
+    return handleRevisions(orgId, revisionsUrl, input, init, session);
+  }
+
   if (path === "publishing-setup") return handleSingleton(orgId, input, init, session, KIND.setup, SINGLETON.setup, DEFAULT_SETUP, "setup", 2);
   if (path === "public-site-config" || path === "public-config") {
     if (method === "GET") return handleSingleton(orgId, input, init, session, KIND.config, SINGLETON.config, DEFAULT_CONFIG, "config", 2);
