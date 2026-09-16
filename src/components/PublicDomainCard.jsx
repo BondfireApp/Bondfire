@@ -84,7 +84,7 @@ function DomainRow({ domain, providerTarget, onPrimary, onVerify, onRemove, busy
   )
 }
 
-export function PublicDomainCard({ orgId: orgIdProp, slug = '', surface = 'organization' }) {
+export function PublicDomainCard({ orgId: orgIdProp, slug = '', surface = 'organization', compactWhenLive = false }) {
   const params = useParams()
   const orgId = String(orgIdProp || params?.orgId || '').trim()
   const [state, setState] = useState(null)
@@ -92,6 +92,7 @@ export function PublicDomainCard({ orgId: orgIdProp, slug = '', surface = 'organ
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [newDomain, setNewDomain] = useState('')
+  const [expanded, setExpanded] = useState(false)
 
   async function refresh() {
     if (!orgId) {
@@ -129,8 +130,29 @@ export function PublicDomainCard({ orgId: orgIdProp, slug = '', surface = 'organ
   }
 
   const primary = useMemo(() => state?.domains?.find((domain) => domain.isPrimary) || null, [state])
+  const primaryProvider = primary?.provider || {}
+  const primaryQuotaLimited = Array.isArray(primaryProvider.errors) && primaryProvider.errors.some((value) => /no quota has been allocated/i.test(String(value || '')))
+  const primaryReady = Boolean(primary && ((primary.verificationStatus === 'verified' && primaryProvider.active) || primaryProvider.existingRouting || primaryQuotaLimited))
   const surfaceLabel = surface === 'publication' ? 'Publication Site' : 'Organization Page'
   const previewUrl = slug && typeof window !== 'undefined' ? `${window.location.origin}/#/p/${encodeURIComponent(slug)}` : ''
+
+  if (compactWhenLive && primaryReady && !expanded && !error) {
+    return (
+      <section className="card" style={{ padding: '10px 14px' }}>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="row" style={{ gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
+            <strong>{surfaceLabel}</strong>
+            <a href={toHttpsUrl(primary.hostname)} target="_blank" rel="noreferrer">{primary.hostname}</a>
+            <span className="helper">Live{primary.isPrimary ? ' · primary' : ''}</span>
+          </div>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <a className="btn" href={toHttpsUrl(primary.hostname)} target="_blank" rel="noreferrer">Open site</a>
+            <button className="btn" type="button" onClick={() => setExpanded(true)}>Manage domain</button>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="card" style={{ padding: 16 }}>
@@ -139,7 +161,10 @@ export function PublicDomainCard({ orgId: orgIdProp, slug = '', surface = 'organ
           <h3 style={{ marginTop: 0 }}>{surfaceLabel} domain</h3>
           <p className="helper" style={{ marginBottom: 0 }}>Bring a domain you already own. Bondfire provisions the hostname and certificate; you only add the DNS records shown here.</p>
         </div>
-        {primary?.verificationStatus === 'verified' ? <a className="btn" href={toHttpsUrl(primary.hostname)} target="_blank" rel="noreferrer">Open live domain</a> : null}
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {primaryReady ? <a className="btn" href={toHttpsUrl(primary.hostname)} target="_blank" rel="noreferrer">Open live domain</a> : null}
+          {compactWhenLive && primaryReady ? <button className="btn" type="button" onClick={() => setExpanded(false)}>Hide domain settings</button> : null}
+        </div>
       </div>
 
       {surface === 'organization' && previewUrl ? <p className="helper">Bondfire preview: <a href={previewUrl} target="_blank" rel="noreferrer">{previewUrl}</a></p> : null}

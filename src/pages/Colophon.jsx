@@ -132,7 +132,7 @@ export default function Colophon() {
   return (
     <div className="bondfire-colophon-page">
       <section style={{ maxWidth: 1100, margin: "0 auto 18px", padding: "0 12px" }}>
-        <PublicDomainCard orgId={orgId} surface="publication" />
+        <PublicDomainCard orgId={orgId} surface="publication" compactWhenLive />
       </section>
       <NativeColophonBoundary>
         <ColophonNativeModule Workspace={ColophonWorkspace} />
