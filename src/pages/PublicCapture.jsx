@@ -1,6 +1,8 @@
 import React from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../utils/api.js";
+import { cacheOrgKey, encryptJsonWithOrgKey, getCachedOrgKey } from "../lib/zk.js";
+import { loadPrivateKey } from "../lib/privateCrypto.js";
 
 const CHUNK_MS = 3000;
 const REC_API_BASE = (import.meta.env.VITE_REC_API_BASE_URL || "https://rec.bjgarr.workers.dev").replace(/\/+$/, "");
@@ -356,16 +358,38 @@ export default function PublicCapture({ authed = false, embedded = false }) {
     saveHandoff(nextRecordingId, phrase);
 
     if (orgId) {
-      void api(`/api/orgs/${encodeURIComponent(orgId)}/witness`, {
-        method: "POST",
-        body: JSON.stringify({
-          title: `REC video ${new Date().toLocaleString()}`,
-          summary: "Encrypted REC video capture. Recovery is controlled by the recorder-held recovery sentence or a shared safety handoff.",
-          happened_at: new Date().toISOString(),
-          visibility: "private",
-          tags: ["rec", "video", `archive:${nextRecordingId}`],
-        }),
-      }).catch((archiveError) => console.warn("REC archive metadata save failed", archiveError));
+      void (async () => {
+        let encryptedRecovery = null;
+        if (authed) {
+          let orgKey = getCachedOrgKey(orgId);
+          if (!orgKey) {
+            try {
+              const privacy = await api(`/api/orgs/${encodeURIComponent(orgId)}/privacy`);
+              orgKey = await loadPrivateKey(orgId, privacy, api);
+              if (orgKey) cacheOrgKey(orgId, orgKey);
+            } catch {}
+          }
+          if (orgKey) {
+            encryptedRecovery = await encryptJsonWithOrgKey(orgKey, {
+              archiveId: nextRecordingId,
+              recoveryPhrase: phrase,
+            });
+          }
+        }
+        await api(`/api/orgs/${encodeURIComponent(orgId)}/witness`, {
+          method: "POST",
+          body: JSON.stringify({
+            title: `REC video ${new Date().toLocaleString()}`,
+            summary: "Encrypted REC video capture. Signed-in owners can manage it from the REC Archive; the recovery sentence remains available for emergency or off-device recovery.",
+            happened_at: new Date().toISOString(),
+            visibility: "private",
+            tags: ["rec", "video", `archive:${nextRecordingId}`],
+            rec_archive_id: nextRecordingId,
+            rec_management_token: session.managementToken || "",
+            encrypted_recovery: encryptedRecovery,
+          }),
+        });
+      })().catch((archiveError) => console.warn("REC managed archive registration failed", archiveError));
     }
 
     return { recordingId: nextRecordingId };
