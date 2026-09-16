@@ -3,6 +3,12 @@ import {
   normalizeConnectedPublication,
   projectOrganizationPageConfig,
 } from "../functions/api/_lib/publicSurface.js";
+import {
+  normalizeHostname,
+  normalizePublicSurface,
+  parsePublicDomainScope,
+  publicDomainScope,
+} from "../functions/api/_lib/publicSiteDomains.js";
 
 const connected = normalizeConnectedPublication({
   publication_id: "pub-1",
@@ -36,6 +42,36 @@ assert.deepEqual(projected.website_link, {
 assert.equal(projected.show_website_button, true);
 assert.equal(Object.hasOwn(projected, "private_notes"), false);
 
+const organizing = projectOrganizationPageConfig({
+  enabled: true,
+  template: "organizing",
+  branch_label: "Harbor Workers Local",
+  hero_headline: "Build worker power.",
+  hero_text: "Organize together.",
+  membership_title: "Join the union",
+  membership_url: "https://example.org/join",
+  membership_dues_items: ["Low income", "Regular", "Sustainer"],
+  archive_title: "Our history",
+  archive_items: [
+    { title: "Strike", image_url: "https://example.org/strike.jpg", caption: "Workers on the line." },
+  ],
+  section_order: ["hero", "membership", "archive"],
+  section_visibility: { hero: true, membership: true, archive: false },
+  private_member_roster: ["must never leak"],
+});
+assert.equal(organizing.template, "organizing");
+assert.equal(organizing.branch_label, "Harbor Workers Local");
+assert.equal(organizing.hero_headline, "Build worker power.");
+assert.equal(organizing.membership_url, "https://example.org/join");
+assert.deepEqual(organizing.membership_dues_items, ["Low income", "Regular", "Sustainer"]);
+assert.equal(organizing.archive_items[0].image_url, "https://example.org/strike.jpg");
+assert.deepEqual(organizing.section_order, ["hero", "membership", "archive"]);
+assert.equal(organizing.section_visibility.archive, false);
+assert.equal(Object.hasOwn(organizing, "private_member_roster"), false);
+
+const unknownTemplate = projectOrganizationPageConfig({ enabled: true, template: "red-harbor-special" });
+assert.equal(unknownTemplate.template, "default");
+
 const withExistingWebsite = projectOrganizationPageConfig({
   enabled: true,
   show_action_strip: false,
@@ -60,5 +96,15 @@ const unavailable = projectOrganizationPageConfig({
 });
 assert.equal(unavailable.connected_publication, null);
 assert.equal(unavailable.website_link, null);
+
+assert.equal(publicDomainScope("org-123", "organization"), "org:org-123:organization");
+assert.equal(publicDomainScope("org-123", "publication"), "org:org-123:publication");
+assert.deepEqual(parsePublicDomainScope("org:org-123:publication"), {
+  orgId: "org-123",
+  surface: "publication",
+  legacy: false,
+});
+assert.equal(normalizePublicSurface("not-real"), "organization");
+assert.equal(normalizeHostname("https://WWW.Example.org:443/path"), "www.example.org");
 
 console.log("public-surface regression checks passed");

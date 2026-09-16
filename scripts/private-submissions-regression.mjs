@@ -9,8 +9,8 @@ await ensureScopedKeys(db);await ensurePublicationSchema(db);
 const recipient=await makeSubmissionRecipient();
 sql.prepare('INSERT OR REPLACE INTO org_private_key_state VALUES(?,1,0,0)').run(orgId);
 sql.prepare('INSERT OR REPLACE INTO org_private_submission_keys VALUES(?,1,?)').run(orgId,JSON.stringify(recipient.publicKey));
-sql.prepare("INSERT OR REPLACE INTO org_public_projections VALUES(?,'public/config',?,1,?,0)").run(orgId,orgId,JSON.stringify({enabled:true,slug:'forms-test',newsletter_enabled:true,pledges_enabled:true}));
-env.BF_PUBLIC={get:async key=>key==='slug:forms-test'?orgId:null};
+let publicConfig={enabled:true,slug:'forms-test',newsletter_enabled:true,pledges_enabled:true};
+env.BF_PUBLIC={get:async key=>key==='slug:forms-test'?orgId:key===`org:${orgId}`?JSON.stringify(publicConfig):null};
 async function anonymous(tail,body,expected=200) {
  const request=new Request('https://example.test/api/public/forms-test/'+tail,{method:body?'POST':'GET',headers:{'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
  const res=await middleware({env,request,next:async()=>Response.json({legacyReached:true})});const data=await res.json();assert.equal(res.status,expected,JSON.stringify(data));return data;
@@ -38,6 +38,6 @@ await anonymous('intake',stale,409);
 const future=await sealSubmission(await anonymous('submission-key'),'intake',secret);await anonymous('intake',future);
 await assert.rejects(openSubmission(orgId,{...future,type:'intake'},recipient.privateKey));
 assert.deepEqual(await openSubmission(orgId,{...future,type:'intake'},next.privateKey),secret);
-sql.prepare("DELETE FROM org_public_projections WHERE org_id=? AND kind='public/config'").run(orgId);
+publicConfig={...publicConfig,enabled:false};
 await anonymous('intake',await sealSubmission({...pub,epoch:2,publicKey:next.publicKey},'intake',secret),404);
 console.log('PASS: anonymous encrypted intake, newsletter, pledges and RSVP; admin-only inbox; plaintext rejection; key rotation; unpublished forms closed');

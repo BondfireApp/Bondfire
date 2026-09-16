@@ -7,6 +7,10 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const checks = [
   ["builder selections persist across auth", "src/platform/pendingBuild.js", /PENDING_BUILD_NAME_KEY/],
   ["invite state persists across auth", "src/pages/SignIn.jsx", /bf_pending_invite_v1/],
+  ["validated org target survives sign-in", "src/pages/SignIn.jsx", /ORG_ID_RE[\s\S]*requestedOrgId[\s\S]*\/overview/],
+  ["global header hydrates encrypted organization identity", "src/components/AppHeader.jsx", /loadOrgIdentity\(orgId\)/],
+  ["settings hydrates encrypted organization identity", "src/pages/Settings.jsx", /loadOrgIdentity\(orgId\)/],
+  ["organization dashboard hydrates encrypted identities", "src/pages/OrgDash.jsx", /hydrateOrgList\(list\)/],
   ["global reliability styles are loaded", "src/AppRoot.jsx", /reliability\.css/],
   ["mobile overflow guard exists", "src/reliability.css", /overflow-x:\s*clip/],
   ["reduced motion is respected", "src/reliability.css", /prefers-reduced-motion:\s*reduce/],

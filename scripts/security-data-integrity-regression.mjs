@@ -133,7 +133,7 @@ async function privateStoreAndAuthorizationChecks() {
   assert.deepEqual(restored,needClear);
 
   await assert.rejects(()=>decryptPrivate(crypto.getRandomValues(new Uint8Array(32)),ciphertext,'org-sec','needs',needId));
-  const tampered=JSON.parse(ciphertext);tampered.ct=tampered.ct.slice(0,-1)+(tampered.ct.endsWith('A')?'B':'A');
+  const tampered=JSON.parse(ciphertext);const tamperedBytes=Buffer.from(tampered.ct,'base64url');tamperedBytes[0]^=1;tampered.ct=tamperedBytes.toString('base64url');
   await assert.rejects(()=>decryptPrivate(key,JSON.stringify(tampered),'org-sec','needs',needId));
   const unsupported={...JSON.parse(ciphertext),v:99};
   assert.equal(isCiphertext(JSON.stringify(unsupported),contentContext('org-sec','needs',needId)),false);

@@ -8,6 +8,7 @@ import {
   createColophonScopedEnv,
 } from '../functions/api/_lib/colophonScopedRuntime.js';
 import { privateRecords } from '../functions/api/_lib/privateStore.js';
+import { privateRequestGate } from '../functions/api/_lib/privateGate.js';
 import { signJwt } from '../functions/api/_lib/jwt.js';
 import { encryptPrivate } from '../src/lib/privateCrypto.js';
 import { clearDebugLogs, debugLog } from '../src/lib/debugBus.js';
@@ -22,6 +23,7 @@ const destruction = read('functions/api/_lib/destruction.js');
 const protocol = read('functions/api/_lib/privateProtocol.js');
 const privateClient = read('src/lib/privateClient.js');
 const privateStore = read('functions/api/_lib/privateStore.js');
+const privateGateSource = read('functions/api/_lib/privateGate.js');
 const debug = read('src/debug/initDebug.js');
 const debugBus = read('src/lib/debugBus.js');
 const gatewayRuntime = read('functions/api/_lib/colophonScopedRuntime.js');
@@ -30,6 +32,13 @@ const gatewayRouter = read('functions/api/orgs/[orgId]/colophon/[[path]].js');
 // Authentication credentials must not be accepted from URLs.
 assert.doesNotMatch(auth, /searchParams\.get\(\s*['"](?:token|access_token|auth|authorization)['"]/i);
 assert.doesNotMatch(auth, /[?&](?:token|access_token|authorization)=/i);
+
+// Organization Page settings are intentionally public configuration even when
+// the owning workspace is zero-knowledge. Private module data remains gated.
+assert.match(privateGateSource, /page\?\.\[1\]===['"]public['"][\s\S]*return null/);
+assert.match(privateGateSource, /route===['"]public\/get['"][\s\S]*route===['"]public\/save['"]/);
+assert.match(privateClient, /\['public\/get','public\/save','public\/publication','public\/domains'\]\.includes\(tail\)/);
+assert.doesNotMatch(privateClient, /dispatchPrivate\(`\/api\/orgs\/\$\{encodeURIComponent\(orgId\)\}\/public\/config/);
 
 // Colophon gateway sessions must be signed with a server-held secret. They must
 // also carry a real userId so Colophon does not treat them as bootstrap owners.

@@ -10,6 +10,8 @@ import { contentContext, isCiphertext } from '../shared/privateContent.js';
 import { migrationInventory } from '../functions/api/_lib/privateMigration.js';
 import { ensureDriveSchema } from '../functions/api/_lib/drive.js';
 import { onRequestGet as getCrypto } from '../functions/api/orgs/[orgId]/crypto.js';
+import { onRequestPost as savePublic } from '../functions/api/orgs/[orgId]/public/save.js';
+import { onRequestGet as getPublicPage } from '../functions/api/public/[slug].js';
 
 const sql=new DatabaseSync(':memory:');let failSql=null;
 const db={prepare(query){
@@ -27,11 +29,12 @@ CREATE TABLE people(id TEXT PRIMARY KEY,org_id TEXT,name TEXT NOT NULL,phone TEX
 sql.setAuthorizer((action,name,arg)=>action===constants.SQLITE_PRAGMA&&/^_cf_/i.test(arg)?constants.SQLITE_DENY:constants.SQLITE_OK);
 const objects=new Map();let failDelete=false;
 const bucket={async put(k,v){objects.set(k,typeof v==='string'?v:new TextDecoder().decode(v));},async get(k){if(!objects.has(k))return null;const s=objects.get(k);return{text:async()=>s,arrayBuffer:async()=>new TextEncoder().encode(s).buffer};},async delete(k){if(failDelete)throw new Error('storage failure');objects.delete(k);},async list({prefix}){return{objects:[...objects.keys()].filter(k=>k.startsWith(prefix)).map(key=>({key})),truncated:false};}};
-const env={BF_DB:db,JWT_SECRET:'private-test',BF_DRIVE_BUCKET:bucket};
+const publicKv=new Map();
+const env={BF_DB:db,JWT_SECRET:'private-test',BF_DRIVE_BUCKET:bucket,BF_PUBLIC:{get:async k=>publicKv.get(k)||null,put:async(k,v)=>publicKv.set(k,String(v)),delete:async k=>publicKv.delete(k)}};
 await ensureDriveSchema(env);
 const tokens={};for(const id of ['owner','member','viewer','outsider'])tokens[id]=await signJwt(env.JWT_SECRET,{sub:id},3600);
 const request=(path,{body,user='owner',method=body?'POST':'GET'}={})=>new Request('https://example.test'+path,{method,headers:{authorization:'Bearer '+tokens[user],'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
-async function call(path,options={},expected=200){const req=request(path,options);const res=await middleware({env,request:req,next:async()=>{if(path==='/api/orgs/create')return createOrg({env,request:req});if(path.endsWith('/crypto'))return getCrypto({env,request:req,params:{orgId:path.split('/')[3]}});return Response.json({legacyReached:true});}});const data=await res.json();if(res.status===500&&expected!==500)console.error('Unexpected middleware 500',{path,method:req.method,user:options.user||'owner',data});assert.equal(res.status,expected,JSON.stringify(data));return data;}
+async function call(path,options={},expected=200){const req=request(path,options);const res=await middleware({env,request:req,next:async()=>{if(path==='/api/orgs/create')return createOrg({env,request:req});if(path.endsWith('/crypto'))return getCrypto({env,request:req,params:{orgId:path.split('/')[3]}});if(path.endsWith('/public/save'))return savePublic({env,request:req,params:{orgId:path.split('/')[3]}});if(/^\/api\/public\/[^/]+$/.test(path))return getPublicPage({env,params:{slug:path.split('/')[3]}});return Response.json({legacyReached:true});}});const data=await res.json();if(res.status===500&&expected!==500)console.error('Unexpected middleware 500',{path,method:req.method,user:options.user||'owner',data});assert.equal(res.status,expected,JSON.stringify(data));return data;}
 const id=crypto.randomUUID(),key=crypto.getRandomValues(new Uint8Array(32));
 const b64=b=>Buffer.from(b).toString('base64url');
 const device=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
@@ -86,7 +89,10 @@ for(const [user,role]of [['member','member'],['viewer','viewer']])sql.prepare('I
 const base='/api/orgs/'+id;
 await call(base+'/privacy',{user:'outsider'},403);
 await call(base+'/crypto',{user:'viewer'});
-await call(base+'/public/save',{body:{title:'no'}},409);
+const publicSaved=await call(base+'/public/save',{body:{enabled:true,slug:'private-public-page',title:'Public title'}});
+assert.equal(publicSaved.public.title,'Public title');
+assert.equal(await env.BF_PUBLIC.get('slug:private-public-page'),id);
+assert.equal(JSON.parse(await env.BF_PUBLIC.get(`org:${id}`)).title,'Public title');
 await call(base+'/colophon/posts',{body:{body:'no'}},409);
 await call(base+'/drive/import',{body:{notes:[{body:'no'}]}},409);
 await call(base+'/needs',{body:{title:'secret'}},400);
