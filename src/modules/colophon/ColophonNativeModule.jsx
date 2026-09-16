@@ -6,6 +6,7 @@ import { createBondfireColophonAdapter } from "./bondfireAdapter.js";
 import { createColophonHostContext, colophonCapabilitiesForRole } from "./hostContract.js";
 import { handlePrivateColophonFetch } from "./privateColophonRuntime.js";
 import { api } from "../../utils/api.js";
+import { PublicDomainCard } from "../../components/PublicDomainCard.jsx";
 
 let originalFetch = null;
 let activeApiBase = "";
@@ -236,6 +237,53 @@ function NativeLogoUploadBridge() {
 
   if (!target.host || !target.input) return null;
   return createPortal(<NativeLogoUploadControl targetInput={target.input} />, target.host);
+}
+
+function NativePublicationDomainSettingsBridge({ orgId }) {
+  const location = useLocation();
+  const [target, setTarget] = React.useState(null);
+  const onSettingsPage = /\/wp-admin\/settings\/?$/.test(location.pathname);
+
+  React.useEffect(() => {
+    if (!onSettingsPage || typeof document === "undefined") {
+      setTarget(null);
+      return undefined;
+    }
+
+    let host = null;
+    const locate = () => {
+      const header = document.querySelector(
+        ".bondfire-colophon-native-shell .wp-admin-screen .wp-screen-header",
+      );
+      if (!header) return;
+      host = header.parentElement?.querySelector(
+        ":scope > [data-bondfire-publication-domain-settings]",
+      );
+      if (!host) {
+        host = document.createElement("div");
+        host.setAttribute("data-bondfire-publication-domain-settings", "true");
+        header.insertAdjacentElement("afterend", host);
+      }
+      setTarget((current) => (current === host ? current : host));
+    };
+
+    locate();
+    const observer = new MutationObserver(locate);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      host?.remove();
+      setTarget(null);
+    };
+  }, [onSettingsPage]);
+
+  if (!onSettingsPage || !target) return null;
+  return createPortal(
+    <div style={{ marginBottom: 16 }}>
+      <PublicDomainCard orgId={orgId} surface="publication" compactWhenLive />
+    </div>,
+    target,
+  );
 }
 
 function NativePublicAdminToolbarBridge({ routeBase, capabilities }) {
@@ -475,6 +523,7 @@ export default function ColophonNativeModule({ Workspace }) {
     <div className="bondfire-colophon-native-shell">
       <ColophonNativeStyles />
       <NativeLogoUploadBridge />
+      <NativePublicationDomainSettingsBridge orgId={orgId} />
       <NativePublicAdminToolbarBridge routeBase={host.routeBase} capabilities={host.capabilities} />
       <NativeColophonFooterLinkBridge />
       <ColophonPublicLinkGuard routeBase={host.routeBase} />

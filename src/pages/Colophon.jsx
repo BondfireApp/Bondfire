@@ -5,7 +5,6 @@ import {
 } from "react-router-dom";
 import { ColophonWorkspace } from "colophon/workspace";
 import ColophonNativeModule from "../modules/colophon/ColophonNativeModule.jsx";
-import { PublicDomainCard } from "../components/PublicDomainCard.jsx";
 
 const COLOPHON_ROUTE_RE = /^\/(?:wp-admin|post|piece|project|projects|archive|search|publications|reader|campaigns|collections|investigations|courses|feeds|gallery|press|about|security|contact|submit|support|updates|print|zine)(?:\/|$)/;
 
@@ -128,12 +127,8 @@ function NativeColophonBoundary({ children }) {
 }
 
 export default function Colophon() {
-  const { orgId } = useParams();
   return (
     <div className="bondfire-colophon-page">
-      <section style={{ maxWidth: 1100, margin: "0 auto 18px", padding: "0 12px" }}>
-        <PublicDomainCard orgId={orgId} surface="publication" compactWhenLive />
-      </section>
       <NativeColophonBoundary>
         <ColophonNativeModule Workspace={ColophonWorkspace} />
       </NativeColophonBoundary>
