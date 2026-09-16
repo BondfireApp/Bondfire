@@ -33,6 +33,10 @@ const checks = [
   ["custom-host resolver self-heals stale verification on live host", "functions/api/public/domain.js", /setPublicSiteDomainVerification[\s\S]*requestUrl\.hostname/],
   ["support exposes a maintainer contact", "src/pages/Support.jsx", /support@bondfireapp\.org/],
   ["support has safe network failure guidance", "src/pages/Support.jsx", /server could not be reached/i],
+  ["organization REC route reuses the real capture app", "src/App.jsx", /witness\/capture[\s\S]*PublicCapture[\s\S]*embedded/],
+  ["REC archive launches video capture", "src/pages/modules/WitnessArchive.jsx", /witness\/capture[\s\S]*New recording/],
+  ["REC capture requests camera and microphone", "src/pages/PublicCapture.jsx", /getUserMedia[\s\S]*audio: true[\s\S]*video:/],
+  ["organization REC stores archive locator without recovery phrase", "src/pages/PublicCapture.jsx", /tags: \["rec", "video", `archive:\$\{nextRecordingId\}`\]/],
   ["PWA runs standalone", "public/manifest.webmanifest", /"display"\s*:\s*"standalone"/],
   ["PWA manifest keeps install icons", "public/manifest.webmanifest", /icon-512-maskable\.png/],
 ];
@@ -48,6 +52,14 @@ for (const [label, file, pattern] of checks) {
   }
 }
 
+
+const recArchiveSource = read("src/pages/modules/WitnessArchive.jsx");
+if (/Create witness record|setDraft\(|placeholder="Summary"/.test(recArchiveSource)) {
+  failed = true;
+  console.error("FAIL: REC module still exposes the obsolete note-taking creator");
+} else {
+  console.log("PASS: REC module no longer exposes the obsolete note-taking creator");
+}
 
 const laborManifest = JSON.parse(read("public/red-harbor/labor-history/manifest.json"));
 const laborPages = (laborManifest.collections || []).reduce((sum, collection) => sum + (collection.pages || []).length, 0);

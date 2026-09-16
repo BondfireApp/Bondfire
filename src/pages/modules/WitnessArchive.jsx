@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../../utils/api.js";
 
 function getOrgIdFromHash() {
@@ -61,14 +61,17 @@ function formatWhen(value) {
 
 function normalizeItem(raw, index) {
   const id = raw?.id ?? raw?._id ?? null;
+  const tags = normalizeTags(raw?.tags ?? raw?.tags_json);
+  const archiveTag = tags.find((tag) => tag.startsWith("archive:"));
   return {
     id,
     key: id || `${safeText(raw?.title) || "record"}-${safeText(raw?.happened_at) || index}`,
-    title: safeText(raw?.title).trim() || "Untitled record",
-    summary: safeText(raw?.summary).trim() || "No summary yet.",
+    title: safeText(raw?.title).trim() || "Untitled recording",
+    summary: safeText(raw?.summary).trim() || "Encrypted REC capture.",
     happened_at: raw?.happened_at ?? null,
     visibility: safeText(raw?.visibility).trim() || "private",
-    tags: normalizeTags(raw?.tags ?? raw?.tags_json),
+    tags,
+    archive_id: archiveTag ? archiveTag.slice("archive:".length) : "",
   };
 }
 
@@ -81,16 +84,7 @@ export default function WitnessArchive() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [related, setRelated] = useState([]);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [formErr, setFormErr] = useState("");
   const reqSeq = useRef(0);
-  const [draft, setDraft] = useState({
-    title: "",
-    summary: "",
-    happened_at: "",
-    visibility: "private",
-  });
 
   async function refresh() {
     if (!orgId) return;
@@ -112,43 +106,6 @@ export default function WitnessArchive() {
     } finally {
       if (reqSeq.current !== requestId) return;
       setLoading(false);
-    }
-  }
-
-  async function createRecord() {
-    if (!orgId || saving) return;
-
-    const title = safeText(draft.title).trim();
-    const summary = safeText(draft.summary).trim();
-    const happenedAt = safeText(draft.happened_at).trim();
-    const visibility = safeText(draft.visibility).trim() || "private";
-
-    if (!title) {
-      setFormErr("Title is required.");
-      return;
-    }
-
-    setSaving(true);
-    setFormErr("");
-
-    try {
-      await api(`/api/orgs/${encodeURIComponent(orgId)}/witness`, {
-        method: "POST",
-        body: JSON.stringify({
-          title,
-          summary,
-          happened_at: happenedAt || null,
-          visibility,
-        }),
-      });
-
-      setDraft({ title: "", summary: "", happened_at: "", visibility: "private" });
-      setCreateOpen(false);
-      await refresh();
-    } catch (e) {
-      setFormErr(e?.message || "Unable to create witness record.");
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -203,15 +160,15 @@ export default function WitnessArchive() {
     <div className="card" style={{ margin: 16, padding: 12 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <h2 className="section-title" style={{ margin: 0, flex: 1 }}>
-          Witness Archive
+          REC Archive
         </h2>
-        <button className="btn" type="button" onClick={() => setCreateOpen((v) => !v)}>
-          {createOpen ? "Close" : "New record"}
-        </button>
+        <Link className="btn-red" to={`/org/${encodeURIComponent(orgId)}/witness/capture`} style={{ textDecoration: "none" }}>
+          New recording
+        </Link>
       </div>
 
       <div className="helper" style={{ marginTop: 8 }}>
-        Browse and create witness records for this organization.
+        Browse encrypted REC captures for this organization or start a new camera/microphone recording.
       </div>
 
       <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: "wrap" }}>
@@ -245,55 +202,6 @@ export default function WitnessArchive() {
         </div>
       ) : null}
 
-      {createOpen ? (
-        <div className="card" style={{ marginTop: 12, padding: 12 }}>
-          <div style={{ fontWeight: 800 }}>Create witness record</div>
-          <div className="grid" style={{ gap: 10, marginTop: 8 }}>
-            <input
-              className="input"
-              value={draft.title}
-              onChange={(e) => setDraft((prev) => ({ ...prev, title: e.target.value }))}
-              placeholder="Title"
-            />
-            <textarea
-              className="input"
-              value={draft.summary}
-              onChange={(e) => setDraft((prev) => ({ ...prev, summary: e.target.value }))}
-              placeholder="Summary"
-              rows={3}
-            />
-            <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
-              <input
-                className="input"
-                value={draft.happened_at}
-                onChange={(e) => setDraft((prev) => ({ ...prev, happened_at: e.target.value }))}
-                placeholder="When (ISO string or epoch)"
-                style={{ minWidth: 220, flex: 1 }}
-              />
-              <select
-                className="input"
-                value={draft.visibility}
-                onChange={(e) => setDraft((prev) => ({ ...prev, visibility: e.target.value }))}
-                style={{ minWidth: 160 }}
-              >
-                <option value="private">private</option>
-                <option value="internal">internal</option>
-                <option value="public">public</option>
-              </select>
-            </div>
-            {formErr ? <div className="error">{formErr}</div> : null}
-            <div className="row" style={{ gap: 10 }}>
-              <button className="btn" type="button" onClick={() => void createRecord()} disabled={saving}>
-                {saving ? "Saving..." : "Create"}
-              </button>
-              <button className="btn ghost" type="button" onClick={() => setCreateOpen(false)} disabled={saving}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {hasError ? (
         <div className="card" style={{ padding: 12, marginTop: 12 }}>
           <div style={{ fontWeight: 800 }}>Could not load witness records</div>
@@ -311,17 +219,17 @@ export default function WitnessArchive() {
 
         {!loading && !hasError && filtered.length === 0 ? (
           <div className="card" style={{ padding: 12 }}>
-            <div style={{ fontWeight: 800 }}>{hasSearch ? "No matching witness records" : "No witness records yet"}</div>
+            <div style={{ fontWeight: 800 }}>{hasSearch ? "No matching witness records" : "No REC recordings yet"}</div>
             <div className="helper" style={{ marginTop: 6 }}>
               {hasSearch
                 ? "Try a different search term."
-                : "Start the archive by creating your first witness record."}
+                : "Start the archive by making your first encrypted video recording."}
             </div>
             {!hasSearch ? (
               <div className="row" style={{ marginTop: 10 }}>
-                <button className="btn" type="button" onClick={() => setCreateOpen(true)}>
-                  Create first record
-                </button>
+                <Link className="btn-red" to={`/org/${encodeURIComponent(orgId)}/witness/capture`} style={{ textDecoration: "none" }}>
+                  Start recording
+                </Link>
               </div>
             ) : null}
           </div>
@@ -339,6 +247,13 @@ export default function WitnessArchive() {
               {item.tags.length ? (
                 <div className="helper" style={{ marginTop: 6 }}>
                   Tags: {item.tags.join(", ")}
+                </div>
+              ) : null}
+              {item.archive_id ? (
+                <div className="row" style={{ marginTop: 10 }}>
+                  <Link className="btn" to={`/org/${encodeURIComponent(orgId)}/witness/capture?retrieve=1&archiveId=${encodeURIComponent(item.archive_id)}`} style={{ textDecoration: "none" }}>
+                    Retrieve recording
+                  </Link>
                 </div>
               ) : null}
             </div>

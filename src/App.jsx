@@ -371,6 +371,7 @@ function Shell() {
 					<Route path="events" element={<ModuleRouteGate moduleId="events"><Events /></ModuleRouteGate>} />
 					<Route path="events/:eventId" element={<ModuleRouteGate moduleId="events"><EventDetail /></ModuleRouteGate>} />
 					<Route path="witness" element={<ModuleRouteGate moduleId="witness-archive"><WitnessArchive /></ModuleRouteGate>} />
+					<Route path="witness/capture" element={<ModuleRouteGate moduleId="witness-archive"><PublicCapture authed={state.authed} embedded /></ModuleRouteGate>} />
 					<Route path="chat-module" element={<ModuleRouteGate moduleId="module-chat"><ModuleChat /></ModuleRouteGate>} />
 					<Route path="chat" element={<ModuleRouteGate moduleId="bondfire-chat"><BondfireChat /></ModuleRouteGate>} />
 					<Route path="guard/*" element={<OrgSecretGuard />} />

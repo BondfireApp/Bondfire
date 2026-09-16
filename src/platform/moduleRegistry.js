@@ -106,9 +106,9 @@ const LIVE_MODULES = [
   {
     id: "witness-archive",
     label: "REC",
-    name: "REC / witness archive",
+    name: "REC",
     mark: "RC",
-    description: "Record and preserve what happened, what mattered, and what should not be erased.",
+    description: "Capture encrypted video and preserve recordings off-device for later retrieval.",
     routeBase: "witness",
     tier: "live",
     available: true,

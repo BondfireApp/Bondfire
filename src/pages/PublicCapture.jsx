@@ -1,5 +1,6 @@
 import React from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { api } from "../utils/api.js";
 
 const CHUNK_MS = 3000;
 const REC_API_BASE = (import.meta.env.VITE_REC_API_BASE_URL || "https://rec.bjgarr.workers.dev").replace(/\/+$/, "");
@@ -194,9 +195,13 @@ function saveHandoff(recordingId, phrase) {
   } catch {}
 }
 
-export default function PublicCapture({ authed = false }) {
+export default function PublicCapture({ authed = false, embedded = false }) {
   const navigate = useNavigate();
+  const { orgId: routeOrgId } = useParams();
   const [searchParams] = useSearchParams();
+  const orgId = embedded ? String(routeOrgId || "").trim() : "";
+  const captureRoute = orgId ? `/org/${encodeURIComponent(orgId)}/witness/capture` : "/capture";
+  const backRoute = orgId ? `/org/${encodeURIComponent(orgId)}/witness` : "/";
   const retrieveMode = searchParams.get("retrieve") === "1";
 
   const videoRef = React.useRef(null);
@@ -289,6 +294,18 @@ export default function PublicCapture({ authed = false }) {
       recordingIdRef.current = nextRecordingId;
       setRecordingId(nextRecordingId);
       saveHandoff(nextRecordingId, phrase);
+      if (orgId) {
+        void api(`/api/orgs/${encodeURIComponent(orgId)}/witness`, {
+          method: "POST",
+          body: JSON.stringify({
+            title: `REC video ${new Date().toLocaleString()}`,
+            summary: "Encrypted REC video capture. Retrieve it with REC and the recorder-held recovery phrase.",
+            happened_at: new Date().toISOString(),
+            visibility: "private",
+            tags: ["rec", "video", `archive:${nextRecordingId}`],
+          }),
+        }).catch((archiveError) => console.warn("REC archive metadata save failed", archiveError));
+      }
 
       const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
         ? "video/webm;codecs=vp9,opus"
@@ -423,7 +440,7 @@ export default function PublicCapture({ authed = false }) {
               </a>
             ) : null}
           </form>
-          <div style={{ marginTop: 18 }}><Link className="helper" to="/capture">Back to REC</Link></div>
+          <div style={{ marginTop: 18 }}><Link className="helper" to={captureRoute}>Back to REC</Link></div>
         </main>
       </div>
     );
@@ -436,7 +453,7 @@ export default function PublicCapture({ authed = false }) {
           <p className="bf-build-eyebrow">BONDFIRE // REC</p>
           <h1>Record first.</h1>
           <p className="bf-build-lede">
-            No account gate. REC encrypts each chunk on this device before upload and gives you the recovery path.
+            {orgId ? "REC encrypts each chunk on this device before upload and keeps the recovery phrase with the recorder." : "No account gate. REC encrypts each chunk on this device before upload and gives you the recovery path."}
           </p>
         </div>
         <div className="bf-build-counter" aria-live="polite">
@@ -473,8 +490,8 @@ export default function PublicCapture({ authed = false }) {
               {status === "stopped" ? (
                 <button className="btn" type="button" onClick={startCapture}>Start another recording</button>
               ) : null}
-              <Link className="btn" to="/capture?retrieve=1" style={{ textDecoration: "none" }}>Retrieve archive</Link>
-              <Link className="btn" to="/" style={{ textDecoration: "none" }}>Back</Link>
+              <Link className="btn" to={`${captureRoute}?retrieve=1`} style={{ textDecoration: "none" }}>Retrieve archive</Link>
+              <Link className="btn" to={backRoute} style={{ textDecoration: "none" }}>{orgId ? "Back to REC archive" : "Back"}</Link>
             </div>
 
             {error ? <div className="error" style={{ marginTop: 12 }}>{error}</div> : null}
@@ -542,7 +559,7 @@ export default function PublicCapture({ authed = false }) {
                 {!authed ? (
                   <button className="btn-red" type="button" onClick={signInWithCaptureReserved}>SIGN IN WITH THIS CAPTURE RESERVED</button>
                 ) : (
-                  <Link className="btn-red" to="/orgs" style={{ display: "inline-block", textDecoration: "none" }}>GO TO MY ORGANIZATIONS</Link>
+                  <Link className="btn-red" to={orgId ? backRoute : "/orgs"} style={{ display: "inline-block", textDecoration: "none" }}>{orgId ? "BACK TO REC ARCHIVE" : "GO TO MY ORGANIZATIONS"}</Link>
                 )}
               </div>
             ) : null}
