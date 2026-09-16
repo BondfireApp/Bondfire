@@ -125,14 +125,41 @@ export async function dispatchPrivate(path,opts,transport) {
   }
   if(tail==='dashboard'&&method==='GET') {
     const data={};
-    await Promise.all(['people','inventory','needs','meetings'].map(async kind=>{
-      const result=await dispatchPrivate(`/api/orgs/${encodeURIComponent(orgId)}/${kind}`,{},transport);
-      data[kind]=result.data[PRIVATE_CONTENT[kind].list];
-    }));
-    data.pledges=status.role==='viewer'?[]:(await dispatchPrivate(`/api/orgs/${encodeURIComponent(orgId)}/pledges`,{},transport)).data.pledges;
+    const loadKind=async(kind)=>{
+      const raw=await transport(`/api/orgs/${encodeURIComponent(orgId)}/${kind}`);
+      const rows=raw[PRIVATE_CONTENT[kind].list]||[];
+      return Promise.all(rows.map(row=>reveal(key,orgId,kind,row,transport)));
+    };
     const admin=['admin','owner'].includes(status.role);
-    data.subscribers=admin?(await dispatchPrivate(`/api/orgs/${encodeURIComponent(orgId)}/newsletter/subscribers`,{},transport)).data.subscribers:[];
-    data.publicInbox=admin?(await dispatchPrivate(`/api/orgs/${encodeURIComponent(orgId)}/public/inbox`,{},transport)).data.items:[];
+    const submissionPromise=admin?submissions():Promise.resolve([]);
+    const [peopleRows,inventoryRows,needsRows,meetingRows,pledgeRows,subscriberRows,inboxRows]=await Promise.all([
+      loadKind('people'),
+      loadKind('inventory'),
+      loadKind('needs'),
+      loadKind('meetings'),
+      status.role==='viewer'?Promise.resolve([]):loadKind('pledges'),
+      admin?(async()=>{
+        const [stored,incoming]=await Promise.all([
+          transport(`/api/orgs/${encodeURIComponent(orgId)}/newsletter/subscribers`),
+          submissionPromise,
+        ]);
+        const rows=await Promise.all((stored.subscribers||[]).map(row=>reveal(key,orgId,'newsletter/subscribers',row,transport)));
+        const newsletters=incoming.filter(row=>row.type==='newsletter');
+        return [...rows,...newsletters.filter(row=>!rows.some(existing=>existing.id===row.id))];
+      })():Promise.resolve([]),
+      admin?(async()=>{
+        const [originals,stored]=await Promise.all([
+          submissionPromise,
+          transport(`/api/orgs/${encodeURIComponent(orgId)}/intake/reviews`),
+        ]);
+        const reviews=await Promise.all((stored.items||[]).map(row=>reveal(key,orgId,'intake/reviews',row,transport)));
+        const overlays=new Map(reviews.map(row=>[row.id,row]));
+        const items=originals.map(row=>({...row,...overlays.get(row.id),title:row.source_kind||row.type,contact:row.contact||row.email||row.pledger_email||'',name:row.name||row.pledger_name||'',details:row.details||row.note||row.status||'',id:row.id}));
+        for(const row of reviews)if(!originals.some(original=>original.id===row.id))items.push(row);
+        return items;
+      })():Promise.resolve([]),
+    ]);
+    Object.assign(data,{people:peopleRows,inventory:inventoryRows,needs:needsRows,meetings:meetingRows,pledges:pledgeRows,subscribers:subscriberRows,publicInbox:inboxRows});
     const upcoming=data.meetings.filter(row=>Number(row.starts_at)>=Date.now()).sort((a,b)=>Number(a.starts_at)-Number(b.starts_at));
     data.counts={people:data.people.length,inventory:data.inventory.length,needs:data.needs.length,needsOpen:data.needs.filter(row=>row.status==='open').length,meetingsUpcoming:upcoming.length,pledges:data.pledges.length,pledgesActive:data.pledges.filter(row=>!['fulfilled','cancelled'].includes(row.status)).length,subscribers:data.subscribers.length,publicInbox:data.publicInbox.filter(row=>!['closed','done','archived','rejected'].includes(row.review_status)).length};
     return {handled:true,data:{ok:true,private_mode:true,role:status.role,...data,nextMeeting:upcoming[0]||null}};

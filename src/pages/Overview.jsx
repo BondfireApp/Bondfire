@@ -665,12 +665,12 @@ export default function Overview() {
       };
     };
     return [
-      mk("people", "People", "/logos/core.png", countsNormalized.people, "members", "people"),
+      mk("people", "People", "/logos/people.svg", countsNormalized.people, "members", "people"),
       mk("inventory", "Inventory", "/logos/inventory.png", countsNormalized.inventory, "items", "inventory"),
       mk("needsOpen", "Needs", "/logos/needs.png", countsNormalized.needsOpen, "open", "needs"),
       mk("meetingsUpcoming", "Meetings", "/logos/meetings.png", countsNormalized.meetingsUpcoming, "upcoming", "meetings"),
       mk("pledgesActive", "Pledges", "/logos/pledges.png", countsNormalized.pledgesActive, "active", "settings?tab=pledges"),
-      mk("subsTotal", "New Subs", "/logos/core.png", countsNormalized.subsTotal, "total", "settings?tab=newsletter"),
+      mk("subsTotal", "New Subs", "/logos/newsletter.svg", countsNormalized.subsTotal, "total", "settings?tab=newsletter"),
       mk("publicInbox", "Inbox", "/logos/intake.png", countsNormalized.publicInbox, "open items", "settings?tab=public-inbox"),
     ];
   }, [countsNormalized, deltas, historySeries]);
