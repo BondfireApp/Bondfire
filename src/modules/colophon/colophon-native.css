@@ -179,6 +179,47 @@ html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-p
   border-color: #39764a !important;
 }
 
+/*
+ * Native editor dark-mode contrast repair.
+ * Colophon's older admin sheets put --admin-ink directly on several labels,
+ * so the dark parent color cannot inherit into them. Keep the correction
+ * limited to the editor's genuinely dark surfaces instead of repainting the
+ * whole Colophon tree and creating white-on-white controls elsewhere.
+ */
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-edit-screen :where(
+  .wp-screen-header h1,
+  .native-content-editor__title-field,
+  .native-content-editor__title-field > span,
+  .native-content-editor__permalink > span,
+  .native-content-editor__field,
+  .native-content-editor__field > span,
+  .native-content-editor__check,
+  .native-content-editor__check > span,
+  .native-content-editor__code-language > span,
+  .native-bridge-sidebar .wp-meta-box > h2,
+  .native-bridge-sidebar .wp-meta-box > h3,
+  .native-bridge-sidebar legend,
+  .native-bridge-sidebar label,
+  .native-bridge-sidebar label > span
+) {
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-edit-screen :where(
+  .description,
+  small,
+  .native-content-editor__placeholder,
+  .native-content-editor__permalink .description,
+  .native-bridge-sidebar .description,
+  .native-bridge-sidebar small
+) {
+  color: #b9c3ca !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-edit-screen .native-content-editor__permalink code {
+  color: #8fc7f0 !important;
+}
+
 /* Bondfire-native logo upload restored beside the existing URL field. */
 .bondfire-colophon-logo-upload {
   display: grid;
