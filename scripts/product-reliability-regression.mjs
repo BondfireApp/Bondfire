@@ -25,6 +25,7 @@ const checks = [
   ["Red Harbor exposes the recovered labor-history archive", "src/pages/OrganizingPublicPage.jsx", /LaborHistoryArchive/],
   ["Bulletin public theme forces readable heading contrast", "src/styles/publication-public.css", /bf-publication-main h1[\s\S]*color:#171717!important/],
   ["verified routed domains suppress irrelevant SaaS quota errors", "src/components/PublicDomainCard.jsx", /quotaLimitedExisting[\s\S]*existing routing/],
+  ["custom-host resolver self-heals stale verification on live host", "functions/api/public/domain.js", /setPublicSiteDomainVerification[\s\S]*requestUrl\.hostname/],
   ["support exposes a maintainer contact", "src/pages/Support.jsx", /support@bondfireapp\.org/],
   ["support has safe network failure guidance", "src/pages/Support.jsx", /server could not be reached/i],
   ["PWA runs standalone", "public/manifest.webmanifest", /"display"\s*:\s*"standalone"/],

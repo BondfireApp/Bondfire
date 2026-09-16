@@ -1,5 +1,5 @@
 import { getPublicCfg } from '../_lib/publicPageStore.js'
-import { getPublicSiteDomainByHostname, normalizeHostname, parsePublicDomainScope } from '../_lib/publicSiteDomains.js'
+import { getPublicSiteDomainByHostname, normalizeHostname, parsePublicDomainScope, setPublicSiteDomainVerification } from '../_lib/publicSiteDomains.js'
 import { projectOrganizationPageConfig } from '../_lib/publicSurface.js'
 
 export async function onRequestGet({ env, request }) {
@@ -8,15 +8,20 @@ export async function onRequestGet({ env, request }) {
     return Response.json({ ok: true, mapped: false })
   }
 
-  const host = normalizeHostname(
-    request.headers.get('x-forwarded-host') || request.headers.get('host') || '',
-  )
+  const requestUrl = new URL(request.url)
+  const host = normalizeHostname(requestUrl.hostname || request.headers.get('host') || '')
   if (!host) return Response.json({ ok: true, mapped: false })
 
   try {
     const domain = await getPublicSiteDomainByHostname(db, host)
-    if (!domain || domain.verificationStatus !== 'verified') {
-      return Response.json({ ok: true, mapped: false })
+    if (!domain) return Response.json({ ok: true, mapped: false })
+
+    // Reaching this Function on the exact configured hostname proves the DNS/TLS
+    // route is live. Heal stale local verification state that may have been
+    // downgraded by optional provider introspection (for example SaaS quota).
+    if (domain.verificationStatus !== 'verified') {
+      await setPublicSiteDomainVerification(db, host, 'verified', domain.scope)
+      domain.verificationStatus = 'verified'
     }
 
     const scope = parsePublicDomainScope(domain.scope)
