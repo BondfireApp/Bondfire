@@ -29,6 +29,7 @@ const checks = [
   ["support remains reachable from global navigation", "src/components/AppHeader.jsx", /\/support/],
   ["native Colophon keeps image logo upload", "src/modules/colophon/ColophonNativeModule.jsx", /NativeLogoUploadBridge/],
   ["native Colophon keeps publication-site routing separate", "src/modules/colophon/ColophonNativeModule.jsx", /ColophonPublicLinkGuard/],
+  ["encrypted Colophon accepts hosted content aliases", "src/modules/colophon/privateColophonRuntime.js", /\["native-content", "content"\][\s\S]*\["native-content-revisions", "content-revisions"\]/],
   ["Colophon domain management lives in Settings", "src/modules/colophon/ColophonNativeModule.jsx", /NativePublicationDomainSettingsBridge[\s\S]*data-bondfire-publication-domain-settings[\s\S]*PublicDomainCard orgId=\{orgId\} surface="publication" compactWhenLive/],
   ["domain manager exposes an explicit live-domain toggle", "src/components/PublicDomainCard.jsx", /Manage domain[\s\S]*Hide domain settings/],
   ["private organization boundary allows encrypted Colophon", "src/components/PrivateOrgBoundary.jsx", /studio\|colophon/],

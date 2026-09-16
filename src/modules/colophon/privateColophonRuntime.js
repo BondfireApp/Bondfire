@@ -311,8 +311,8 @@ export async function handlePrivateColophonFetch({ orgId, session, input, init =
   const path = String(suffix || url.pathname.replace(/^\/api\/?/, "")).replace(/^\/+|\/+$/g, "");
   const method = methodOf(input, init);
   if (path === "session") return response({ ...session, authenticated: true, mode: "bondfire-private" });
-  if (path === "native-content") return handleNativeContent(orgId, url, input, init, session);
-  if (path === "native-content-revisions") return handleRevisions(orgId, url, input, init, session);
+  if (["native-content", "content"].includes(path)) return handleNativeContent(orgId, url, input, init, session);
+  if (["native-content-revisions", "content-revisions"].includes(path)) return handleRevisions(orgId, url, input, init, session);
   if (path === "publishing-setup") return handleSingleton(orgId, input, init, session, KIND.setup, SINGLETON.setup, DEFAULT_SETUP, "setup", 2);
   if (path === "public-site-config" || path === "public-config") {
     if (method === "GET") return handleSingleton(orgId, input, init, session, KIND.config, SINGLETON.config, DEFAULT_CONFIG, "config", 2);
