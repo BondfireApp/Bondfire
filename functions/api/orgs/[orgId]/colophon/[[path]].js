@@ -1,6 +1,7 @@
 import { json } from "../../../_lib/http.js";
 import { requireOrgRole } from "../../../_lib/auth.js";
 import { isOrgModuleEnabled } from "../../../_lib/orgModules.js";
+import { privateRequestGate } from "../../../_lib/privateGate.js";
 import {
   createColophonGatewayRequest,
   createColophonScopedEnv,
@@ -228,6 +229,16 @@ async function rewriteEmbeddedResponse(response, requestUrl, orgId) {
 async function dispatch(context) {
   const orgId = String(context.params?.orgId || "").trim();
   if (!orgId) return json({ ok: false, error: "MISSING_ORG_ID" }, 400);
+
+  // Internal Colophon storage traffic must never enter the readable Colophon
+  // gateway. Re-run the private gate here as a route-level backstop because
+  // this catch-all Function is more specific than the generic org routes.
+  const requestUrl = new URL(context.request.url);
+  if (requestUrl.searchParams.get("__bf_colophon_storage") === "1") {
+    const privateResponse = await privateRequestGate({ env: context.env, request: context.request });
+    if (privateResponse) return privateResponse;
+    return json({ ok: false, error: "PRIVATE_STORAGE_ROUTE_UNAVAILABLE" }, 409);
+  }
 
   const path = normalizedPath(context.params);
   const handlerModule = HANDLERS[path];

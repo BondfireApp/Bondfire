@@ -73,7 +73,8 @@ function ensureHostFetchBridge(apiBase, privateHost = null) {
       && url.searchParams.get("__bf_colophon_storage") === "1";
 
     if (internalPrivateStorage) {
-      url.searchParams.delete("__bf_colophon_storage");
+      // Keep the marker on the server-bound request. The specific Colophon
+      // gateway uses it to delegate back to Bondfire's ciphertext-only gate.
       const request = addCsrfHeader(
         input instanceof Request ? new Request(url.toString(), input) : url.toString(),
         init,

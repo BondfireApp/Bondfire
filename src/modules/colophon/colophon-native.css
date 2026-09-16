@@ -303,3 +303,33 @@ html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-edit-screen .nati
     font-size: clamp(1.9rem, 11vw, 3.4rem) !important;
   }
 }
+
+/* Native admin notices must stay readable in dark mode. */
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice {
+  background: #15191d !important;
+  color: #f0f3f5 !important;
+  border-top: 1px solid #38434c !important;
+  border-right: 1px solid #38434c !important;
+  border-bottom: 1px solid #38434c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice p {
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice--error {
+  background: #2a1416 !important;
+  color: #ffd7d7 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice--error p {
+  color: #ffd7d7 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice__dismiss {
+  color: #d7dee3 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice__dismiss:hover {
+  color: #ffffff !important;
+}
