@@ -296,7 +296,6 @@ export default function AppHeader({ onLogout, showLogout }) {
         { label: "Intake", to: `${base}/intake`, tourId: "nav-intake", moduleId: "intake" },
         { label: "Studio", to: `${base}/studio`, tourId: "nav-studio", moduleId: "studio" },
         { label: "Colophon", to: `${base}/colophon`, tourId: "nav-colophon", moduleId: "publishing-colophon" },
-        { label: "Module Chat", to: `${base}/chat-module`, tourId: "nav-chat-module", moduleId: "module-chat" },
       ].filter((item) => !enabledModules || enabledModules.has(item.moduleId))
     : [];
   const supportTo = "/support";

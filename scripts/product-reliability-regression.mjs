@@ -19,6 +19,8 @@ const checks = [
   ["reduced motion is respected", "src/reliability.css", /prefers-reduced-motion:\s*reduce/],
   ["global nav uses the approved core logo", "src/components/AppHeader.jsx", /\/logos\/core\.png/],
   ["organization pill returns to the current org dashboard", "src/components/AppHeader.jsx", /bf-globalOrgPill[\s\S]*\/org\/\$\{encodeURIComponent\(orgId\)\}\/overview/],
+  ["FireChat navigation targets the real chat route", "src/components/AppHeader.jsx", /label: "FireChat"[\s\S]*to: `\$\{base\}\/chat`[\s\S]*moduleId: "bondfire-chat"/],
+  ["private organizations allow the real FireChat route", "src/components/PrivateOrgBoundary.jsx", /witness\|chat\|chat-module\|studio/],
   ["settings remain directly reachable", "src/components/AppHeader.jsx", /Organization settings/],
   ["support remains reachable from global navigation", "src/components/AppHeader.jsx", /\/support/],
   ["native Colophon keeps image logo upload", "src/modules/colophon/ColophonNativeModule.jsx", /NativeLogoUploadBridge/],
@@ -68,6 +70,14 @@ for (const file of ["public/logos/people.svg", "public/logos/newsletter.svg"]) {
   }
 }
 
+
+const appHeaderSource = read("src/components/AppHeader.jsx");
+if (/label: "Module Chat"|nav-chat-module/.test(appHeaderSource)) {
+  failed = true;
+  console.error("FAIL: legacy Module Chat still appears in global navigation");
+} else {
+  console.log("PASS: legacy Module Chat is removed from global navigation");
+}
 
 const recArchiveSource = read("src/pages/modules/WitnessArchive.jsx");
 if (/Create witness record|setDraft\(|placeholder="Summary"/.test(recArchiveSource)) {
