@@ -1,6 +1,8 @@
 import * as React from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../utils/api.js";
+import { PublicSiteContentCard } from "./PublicSiteContentCard.jsx";
+import { PublicSiteProfileTransfer } from "./PublicSiteProfileTransfer.jsx";
 
 function normalizeHttpUrl(value) {
   let raw = String(value || "").trim();
@@ -38,6 +40,7 @@ export function AdminPublicConfigCard() {
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState("");
   const [canManageConnection, setCanManageConnection] = React.useState(true);
+  const [profileRevision, setProfileRevision] = React.useState(0);
 
   const relationPath = React.useMemo(
     () => `/api/orgs/${encodeURIComponent(orgId || "")}/public/publication`,
@@ -205,89 +208,82 @@ export function AdminPublicConfigCard() {
   const hasConnection = Boolean(connection.publication_id || connection.url);
 
   return (
-    <section className="card" style={{ padding: 16 }}>
-      <h2 style={{ marginTop: 0 }}>Organization Page</h2>
-      <p className="helper">
-        This is Bondfire&apos;s public mutual-aid surface. It remains useful on its own and does not become a Colophon site.
-      </p>
-      <p className="helper" style={{ marginTop: 8 }}>
-        Organization Page status, preview URL, and custom domain mapping are managed in the Public domain setup card.
-      </p>
-
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: 16, paddingTop: 16 }}>
-        <h3 style={{ margin: "0 0 6px" }}>Connected Publication</h3>
-        <p className="helper" style={{ marginTop: 0 }}>
-          Connect a separate Publication Site when this organization also publishes through Colophon. The relationship is explicit; matching names or slugs never create it automatically.
+    <>
+      <section className="card" style={{ padding: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Organization Page</h2>
+        <p className="helper">
+          This is Bondfire&apos;s public organization and mutual-aid surface. Choose the standard layout or build a richer organizing and membership site without changing code.
+        </p>
+        <p className="helper" style={{ marginTop: 8 }}>
+          Publication Sites remain separate and optional. Custom domains are managed in the domain setup card below these public-page settings.
         </p>
 
-        <div className="grid" style={{ gap: 10, marginTop: 12 }}>
-          <label className="grid" style={{ gap: 6 }}>
-            <span className="helper">Publication name</span>
-            <input
-              className="input"
-              value={connection.publication_name}
-              onChange={(event) => setConnection((current) => ({ ...current, publication_name: event.target.value }))}
-              placeholder="Publication name"
-              disabled={!canManageConnection || busy}
-            />
-          </label>
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: 16, paddingTop: 16 }}>
+          <h3 style={{ margin: "0 0 6px" }}>Connected Publication</h3>
+          <p className="helper" style={{ marginTop: 0 }}>
+            Connect a separate Publication Site when this organization also publishes through Colophon. The relationship is explicit; matching names or slugs never create it automatically.
+          </p>
 
-          <label className="grid" style={{ gap: 6 }}>
-            <span className="helper">Publication Site URL</span>
-            <input
-              className="input"
-              value={connection.url}
-              onChange={(event) => setConnection((current) => ({ ...current, url: event.target.value }))}
-              placeholder="https://publication.example.org"
-              disabled={!canManageConnection || busy}
-            />
-          </label>
+          <div className="grid" style={{ gap: 10, marginTop: 12 }}>
+            <label className="grid" style={{ gap: 6 }}>
+              <span className="helper">Publication name</span>
+              <input
+                className="input"
+                value={connection.publication_name}
+                onChange={(event) => setConnection((current) => ({ ...current, publication_name: event.target.value }))}
+                placeholder="Publication name"
+                disabled={!canManageConnection || busy}
+              />
+            </label>
 
-          <label className="row" style={{ gap: 8, alignItems: "center" }}>
-            <input
-              type="checkbox"
-              checked={!!connection.available}
-              onChange={(event) => setConnection((current) => ({ ...current, available: event.target.checked }))}
-              disabled={!canManageConnection || busy}
-            />
-            <span>Publication Site is publicly available</span>
-          </label>
+            <label className="grid" style={{ gap: 6 }}>
+              <span className="helper">Publication Site URL</span>
+              <input
+                className="input"
+                value={connection.url}
+                onChange={(event) => setConnection((current) => ({ ...current, url: event.target.value }))}
+                placeholder="https://publication.example.org"
+                disabled={!canManageConnection || busy}
+              />
+            </label>
 
-          {suggestion ? (
+            <label className="row" style={{ gap: 8, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={!!connection.available}
+                onChange={(event) => setConnection((current) => ({ ...current, available: event.target.checked }))}
+                disabled={!canManageConnection || busy}
+              />
+              <span>Publication Site is publicly available</span>
+            </label>
+
+            {suggestion ? (
+              <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button className="btn" type="button" onClick={useColophonIdentity} disabled={busy || !canManageConnection}>
+                  Use Colophon identity
+                </button>
+                <span className="helper">
+                  {suggestion.name || "Publication Site"}{suggestion.url ? ` · ${suggestion.url}` : ""}
+                </span>
+              </div>
+            ) : null}
+
             <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <button className="btn" type="button" onClick={useColophonIdentity} disabled={busy || !canManageConnection}>
-                Use Colophon identity
+              <button className="btn-red" type="button" onClick={saveConnection} disabled={busy || !canManageConnection}>
+                {busy ? "Saving…" : "Save Connected Publication"}
               </button>
-              <span className="helper">
-                {suggestion.name || "Publication Site"}{suggestion.url ? ` · ${suggestion.url}` : ""}
-              </span>
+              {hasConnection ? <button className="btn" type="button" onClick={disconnectPublication} disabled={busy || !canManageConnection}>Disconnect</button> : null}
+              {hasConnection ? <button className="btn" type="button" onClick={syncOrganizationPageBacklink} disabled={busy}>Sync Organization Page link to Publication Site</button> : null}
             </div>
-          ) : null}
 
-          <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button className="btn-red" type="button" onClick={saveConnection} disabled={busy || !canManageConnection}>
-              {busy ? "Saving…" : "Save Connected Publication"}
-            </button>
-            {hasConnection ? (
-              <button className="btn" type="button" onClick={disconnectPublication} disabled={busy || !canManageConnection}>
-                Disconnect
-              </button>
-            ) : null}
-            {hasConnection ? (
-              <button className="btn" type="button" onClick={syncOrganizationPageBacklink} disabled={busy}>
-                Sync Organization Page link to Publication Site
-              </button>
-            ) : null}
+            {hasConnection ? <div className="helper">Bondfire will show the Publication Site only while this connection is marked publicly available and its URL is valid.</div> : null}
+            {message ? <div className="helper">{message}</div> : null}
           </div>
-
-          {hasConnection ? (
-            <div className="helper">
-              Bondfire will show the Publication Site only while this connection is marked publicly available and its URL is valid.
-            </div>
-          ) : null}
-          {message ? <div className="helper">{message}</div> : null}
         </div>
-      </div>
-    </section>
+      </section>
+
+      <PublicSiteContentCard key={profileRevision} />
+      <PublicSiteProfileTransfer onImported={() => setProfileRevision((value) => value + 1)} />
+    </>
   );
 }

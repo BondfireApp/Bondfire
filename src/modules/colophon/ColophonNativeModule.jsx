@@ -3,10 +3,13 @@ import { createPortal } from "react-dom";
 import { Link, UNSAFE_RouteContext as RouteContext, useLocation, useParams } from "react-router-dom";
 import colophonNativeStyles from "./colophon-native.css?inline";
 import { createBondfireColophonAdapter } from "./bondfireAdapter.js";
-import { createColophonHostContext } from "./hostContract.js";
+import { createColophonHostContext, colophonCapabilitiesForRole } from "./hostContract.js";
+import { handlePrivateColophonFetch } from "./privateColophonRuntime.js";
+import { api } from "../../utils/api.js";
 
 let originalFetch = null;
 let activeApiBase = "";
+let activePrivateHost = null;
 
 const EMPTY_COLOPHON_ROUTE_CONTEXT = Object.freeze({
   outlet: null,
@@ -49,8 +52,9 @@ function addCsrfHeader(input, init) {
   return { input, init: { ...init, headers } };
 }
 
-function ensureHostFetchBridge(apiBase) {
+function ensureHostFetchBridge(apiBase, privateHost = null) {
   activeApiBase = String(apiBase || "").replace(/\/+$/, "");
+  activePrivateHost = privateHost || null;
   if (originalFetch || typeof window === "undefined" || typeof window.fetch !== "function") return;
 
   originalFetch = window.fetch.bind(window);
@@ -67,6 +71,22 @@ function ensureHostFetchBridge(apiBase) {
       url.pathname.startsWith("/api/orgs/") ||
       url.pathname.startsWith("/api/auth/") ||
       url.pathname.startsWith("/api/support/");
+
+    if (activePrivateHost && sameOrigin) {
+      const hostedPrefix = `${activeApiBase}/`;
+      let suffix = "";
+      if (url.pathname.startsWith(hostedPrefix)) suffix = url.pathname.slice(hostedPrefix.length);
+      else if (url.pathname.startsWith("/api/") && !isBondfireOwned) suffix = url.pathname.replace(/^\/api\/?/, "");
+      if (suffix) {
+        return handlePrivateColophonFetch({
+          orgId: activePrivateHost.orgId,
+          session: activePrivateHost.session,
+          input,
+          init,
+          suffix,
+        });
+      }
+    }
 
     if (!sameOrigin || !url.pathname.startsWith("/api/") || isBondfireOwned) {
       const request = addCsrfHeader(input, init);
@@ -369,6 +389,25 @@ export default function ColophonNativeModule({ Workspace }) {
 
     async function load() {
       try {
+        const modules = await api(`/api/orgs/${encodedOrgId}/modules`);
+        if (Array.isArray(modules?.enabled_modules) && !modules.enabled_modules.includes("publishing-colophon")) {
+          throw new Error("Colophon is not enabled for this organization.");
+        }
+        const privacy = await api(`/api/orgs/${encodedOrgId}/privacy`).catch(() => null);
+        if (privacy?.state === "enabled") {
+          const role = String(privacy.role || "viewer").toLowerCase();
+          const session = {
+            authenticated: true,
+            role,
+            capabilities: colophonCapabilitiesForRole(role),
+            user: { id: privacy.userId || "", userId: privacy.userId || "" },
+            privateMode: true,
+            mode: "bondfire-private",
+          };
+          if (alive) setState({ loading: false, session, error: "" });
+          return;
+        }
+
         const response = await fetch(`/api/orgs/${encodedOrgId}/colophon/session`, {
           credentials: "include",
           headers: { Accept: "application/json" },
@@ -398,9 +437,9 @@ export default function ColophonNativeModule({ Workspace }) {
 
   React.useEffect(() => {
     if (!host?.apiBase) return undefined;
-    ensureHostFetchBridge(host.apiBase);
-    return () => { activeApiBase = ""; };
-  }, [host?.apiBase]);
+    ensureHostFetchBridge(host.apiBase, state.session?.privateMode ? { orgId, session: state.session } : null);
+    return () => { activeApiBase = ""; activePrivateHost = null; };
+  }, [host?.apiBase, orgId, state.session]);
 
   if (state.loading) {
     return <main className="page"><p className="helper">Opening publishing workspace…</p></main>;
@@ -430,7 +469,7 @@ export default function ColophonNativeModule({ Workspace }) {
     );
   }
 
-  ensureHostFetchBridge(host.apiBase);
+  ensureHostFetchBridge(host.apiBase, state.session?.privateMode ? { orgId, session: state.session } : null);
 
   return (
     <div className="bondfire-colophon-native-shell">

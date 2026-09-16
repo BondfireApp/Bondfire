@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
+import HostedDomainEntry from "./components/HostedDomainEntry.jsx";
 import "./index.css";
 import "./v3-theme.css";
 import "./debug/initDebug.js";
@@ -31,6 +32,8 @@ try {
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <HostedDomainEntry>
+      <App />
+    </HostedDomainEntry>
   </React.StrictMode>
 );

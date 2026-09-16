@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { isDemoMode } from "../demo/demoMode.js";
 import { ensureDemoOrgList, resetDemoState } from "../demo/demoStore.js";
 import AccountDestructionPanel from "../components/AccountDestructionPanel.jsx";
+import { hydrateOrgList } from "../lib/orgIdentity.js";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const PENDING_INVITE_KEY = "bf_pending_invite_v1";
@@ -150,11 +151,7 @@ export default function OrgDash() {
       }
       const r = await authFetch("/api/orgs", { method: "GET" });
       const list = Array.isArray(r.orgs) ? r.orgs : [];
-      const revealed = await Promise.all(list.map(async org => {
-        if (org.name !== 'Private organization') return org;
-        try { const data = await api(`/api/orgs/${encodeURIComponent(org.id)}/organization`); return { ...org, name: data.organization?.name || 'Locked private organization' }; }
-        catch { return { ...org, name: 'Locked private organization' }; }
-      }));
+      const revealed = await hydrateOrgList(list);
       setOrgs(revealed);
     } catch (e) {
       setMsg(friendlyOrgError(e, "Could not load your organizations. Refresh to try again."));

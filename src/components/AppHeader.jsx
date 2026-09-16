@@ -2,6 +2,7 @@
 import React from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import "./AppHeader.css";
+import { loadOrgIdentity } from "../lib/orgIdentity.js";
 
 const homeHref = "/orgs";
 const NAV_MODULE_LOGOS = Object.freeze({
@@ -96,8 +97,16 @@ function Brand({ orgId }) {
   const [orgLogo, setOrgLogo] = React.useState(() => readOrgLogo(orgId));
 
   React.useEffect(() => {
+    let alive = true;
     setOrgName(readOrgName(orgId));
     setOrgLogo(readOrgLogo(orgId));
+    if (orgId) {
+      loadOrgIdentity(orgId)
+        .then((identity) => {
+          if (alive && identity?.name) setOrgName(identity.name);
+        })
+        .catch(() => {});
+    }
 
     const onChange = (event) => {
       const changedId = event?.detail?.orgId;
@@ -117,6 +126,7 @@ function Brand({ orgId }) {
     window.addEventListener("bf:org_settings_changed", onChange);
     window.addEventListener("storage", onStorage);
     return () => {
+      alive = false;
       window.removeEventListener("bf:org_settings_changed", onChange);
       window.removeEventListener("storage", onStorage);
     };

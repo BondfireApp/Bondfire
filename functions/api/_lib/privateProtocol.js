@@ -8,6 +8,7 @@ import { migrationInventory, migrationPage, migrateRecord, cleanupPrivateSources
 import { deletePrivateBlob, getPrivateBlob, putPrivateBlob } from './privateBlobs.js';
 import { contentContext, isCiphertext } from '../../../shared/privateContent.js';
 import {publishPrivateCopy,reservePublicSlug} from './privatePublication.js';
+import { publishColophonCopy } from './privateColophonPublication.js';
 
 export async function privateProtocol({env,request,orgId,path=''}) {
   if(path==='submissions')return readPrivateSubmissions({env,request,orgId});
@@ -16,9 +17,10 @@ export async function privateProtocol({env,request,orgId,path=''}) {
     if((await getPrivateMode(env,orgId))?.state!=='enabled')return bad(409,'PRIVATE_MODE_NOT_READY');
     return scopedKeys({env,request,orgId});
   }
-  if(path==='publish'||path==='public-slug') {
+  if(path==='publish'||path==='public-slug'||path==='colophon-publish') {
     const state=await getPrivateMode(env,orgId);
     if(state?.state!=='enabled')return bad(409,'PRIVATE_MODE_NOT_READY');
+    if(path==='colophon-publish') return publishColophonCopy({env,request,orgId});
     return path==='publish'?publishPrivateCopy({env,request,orgId}):reservePublicSlug({env,request,orgId});
   }
   const writing=request.method!=='GET';

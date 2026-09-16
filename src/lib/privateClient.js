@@ -102,6 +102,9 @@ export async function dispatchPrivate(path,opts,transport) {
   const status=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy`);
   if(status.state==='off') return null;
   if(status.state!=='enabled') throw new Error('Finish the encrypted-data conversion in Settings → Security before editing this organization.');
+  // Organization Page configuration and domain/publication identity are intentionally public.
+  // Let their role-protected server endpoints remain authoritative even for private orgs.
+  if(['public/get','public/save','public/publication','public/domains'].includes(tail)) return null;
   const key=await loadPrivateKey(orgId,status,transport);
   const method=String(opts.method||'GET').toUpperCase();
   if(method!=='GET'&&key.rotationRequired)throw new Error('Membership or devices changed. An owner must rotate encryption keys in Security before saving.');
@@ -183,22 +186,6 @@ export async function dispatchPrivate(path,opts,transport) {
       href:`/org/${encodeURIComponent(orgId)}/${kind==='events'?'events/'+encodeURIComponent(row.id):'witness'}`,tags:row.tags||[],
     })));
     return {handled:true,data:{ok:true,items,results:items}};
-  }
-  if(tail==='public/get'&&method==='GET') {
-    try {const result=await dispatchPrivate(`/api/orgs/${encodeURIComponent(orgId)}/public/config/${encodeURIComponent(orgId)}`,{},transport);return result;}
-    catch(e){if(e.status===404)return {handled:true,data:{ok:true,public:{enabled:false}}};throw e;}
-  }
-  if(tail==='public/save'&&method==='POST') {
-    if(!['admin','owner'].includes(status.role))throw new Error('An administrator must publish or change the public page.');
-    const draft=parseBody(opts.body);
-    if(draft.enabled) {
-      const route=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/public-slug`,{method:'POST',body:JSON.stringify({slug:draft.slug||orgId})});
-      draft.slug=route.slug;
-    }
-    const configPath=`/api/orgs/${encodeURIComponent(orgId)}/public/config/${encodeURIComponent(orgId)}`;
-    let exists=false;
-    try {await transport(configPath);exists=true;}catch(e){if(e.status!==404)throw e;}
-    return dispatchPrivate(configPath,{method:exists?'PUT':'POST',body:JSON.stringify(draft)},transport);
   }
   if(tail==='studio/state') {
     if(method==='GET') {

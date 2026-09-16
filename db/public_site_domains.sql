@@ -17,3 +17,6 @@ ON public_site_domains(scope);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_public_site_domains_primary_per_scope
 ON public_site_domains(scope)
 WHERE is_primary = 1;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_public_site_domains_hostname_unique
+ON public_site_domains(hostname);

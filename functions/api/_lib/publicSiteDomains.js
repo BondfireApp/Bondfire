@@ -1,3 +1,9 @@
+import { readPublicSiteConfig, writePublicSiteConfig } from './publicSiteConfig.js'
+
+const HOSTNAME_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))+$/i
+const STATUS_VALUES = new Set(['pending', 'verified', 'error'])
+const SURFACE_VALUES = new Set(['organization', 'publication'])
+
 export function normalizeSiteSlug(value = '') {
   return String(value || '')
     .trim()
@@ -7,10 +13,22 @@ export function normalizeSiteSlug(value = '') {
     .replace(/^-+|-+$/g, '')
 }
 
-import { readPublicSiteConfig, writePublicSiteConfig } from './publicSiteConfig.js'
+export function normalizePublicSurface(value = 'organization') {
+  const surface = String(value || 'organization').trim().toLowerCase()
+  return SURFACE_VALUES.has(surface) ? surface : 'organization'
+}
 
-const HOSTNAME_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))+$/i
-const STATUS_VALUES = new Set(['pending', 'verified'])
+export function publicDomainScope(orgId, surface = 'organization') {
+  const id = String(orgId || '').trim()
+  if (!id) throw new Error('missing organization id')
+  return `org:${id}:${normalizePublicSurface(surface)}`
+}
+
+export function parsePublicDomainScope(scope = '') {
+  const match = String(scope || '').match(/^org:(.+):(organization|publication)$/)
+  if (!match) return { orgId: '', surface: '', legacy: true }
+  return { orgId: match[1], surface: match[2], legacy: false }
+}
 
 export async function ensurePublicSiteDomainsTable(db) {
   await db
@@ -45,6 +63,14 @@ export async function ensurePublicSiteDomainsTable(db) {
     `)
     .run()
 
+  // A hostname can point at only one Bondfire surface. Without this index two
+  // organizations could both claim the same domain and host routing would be ambiguous.
+  await db
+    .prepare(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_public_site_domains_hostname_unique
+      ON public_site_domains(hostname);
+    `)
+    .run()
 }
 
 export async function listPublicSiteDomains(db, scope = 'global') {
@@ -61,6 +87,24 @@ export async function listPublicSiteDomains(db, scope = 'global') {
     .all()
 
   return (rows?.results || []).map(mapDomainRow)
+}
+
+export async function getPublicSiteDomainByHostname(db, rawHostname) {
+  await ensurePublicSiteDomainsTable(db)
+  const hostname = normalizeHostname(rawHostname)
+  if (!hostname) return null
+
+  const row = await db
+    .prepare(`
+      SELECT id, scope, hostname, verification_status, verification_token, is_primary, created_at, updated_at, verified_at
+      FROM public_site_domains
+      WHERE hostname = ?
+      LIMIT 1
+    `)
+    .bind(hostname)
+    .first()
+
+  return row ? mapDomainRow(row) : null
 }
 
 export async function getPublicSiteDomainState(db, scope = 'global', requestHost = '') {
@@ -106,6 +150,8 @@ export async function updatePublicSiteDomainState(db, input, scope = 'global') {
     await setPrimaryPublicSiteDomain(db, input.setPrimaryHostname, scope)
   }
 
+  // Retained for compatibility with the old global admin surface. New org-scoped
+  // routes verify provider state server-side and do not expose a "mark verified" action.
   if (input?.setVerifiedHostname) {
     await setPublicSiteDomainVerification(db, input.setVerifiedHostname, input?.verificationStatus || 'verified', scope)
   }
@@ -117,23 +163,15 @@ export async function addPublicSiteDomain(db, rawInput, scope = 'global') {
   await ensurePublicSiteDomainsTable(db)
 
   const parsed = parseDomainInput(rawInput)
-  if (!parsed.ok) {
-    throw new Error(parsed.error)
-  }
+  if (!parsed.ok) throw new Error(parsed.error)
 
-  const existing = await db
-    .prepare(`
-      SELECT id, scope, hostname, verification_status, verification_token, is_primary, created_at, updated_at, verified_at
-      FROM public_site_domains
-      WHERE scope = ? AND hostname = ?
-      LIMIT 1
-    `)
-    .bind(scope, parsed.hostname)
-    .first()
-
-  if (existing) {
-    return mapDomainRow(existing)
+  const claimed = await getPublicSiteDomainByHostname(db, parsed.hostname)
+  if (claimed && claimed.scope !== scope) {
+    const error = new Error('DOMAIN_IN_USE')
+    error.code = 'DOMAIN_IN_USE'
+    throw error
   }
+  if (claimed) return claimed
 
   const token = createVerificationToken(parsed.hostname, scope)
 
@@ -157,15 +195,10 @@ export async function addPublicSiteDomain(db, rawInput, scope = 'global') {
 export async function removePublicSiteDomain(db, rawInput, scope = 'global') {
   await ensurePublicSiteDomainsTable(db)
   const parsed = parseDomainInput(rawInput)
-  if (!parsed.ok) {
-    throw new Error(parsed.error)
-  }
+  if (!parsed.ok) throw new Error(parsed.error)
 
   await db
-    .prepare(`
-      DELETE FROM public_site_domains
-      WHERE scope = ? AND hostname = ?
-    `)
+    .prepare(`DELETE FROM public_site_domains WHERE scope = ? AND hostname = ?`)
     .bind(scope, parsed.hostname)
     .run()
 
@@ -178,9 +211,7 @@ export async function removePublicSiteDomain(db, rawInput, scope = 'global') {
 export async function setPrimaryPublicSiteDomain(db, rawInput, scope = 'global') {
   await ensurePublicSiteDomainsTable(db)
   const parsed = parseDomainInput(rawInput)
-  if (!parsed.ok) {
-    throw new Error(parsed.error)
-  }
+  if (!parsed.ok) throw new Error(parsed.error)
 
   await db
     .prepare(`
@@ -196,9 +227,7 @@ export async function setPrimaryPublicSiteDomain(db, rawInput, scope = 'global')
 export async function setPublicSiteDomainVerification(db, rawInput, status = 'verified', scope = 'global') {
   await ensurePublicSiteDomainsTable(db)
   const parsed = parseDomainInput(rawInput)
-  if (!parsed.ok) {
-    throw new Error(parsed.error)
-  }
+  if (!parsed.ok) throw new Error(parsed.error)
 
   const normalizedStatus = STATUS_VALUES.has(String(status || '').trim().toLowerCase())
     ? String(status).trim().toLowerCase()
@@ -224,14 +253,9 @@ export function resolveMappedDomain(domains, requestHost = '') {
 
 export function parseDomainInput(rawInput) {
   const hostname = normalizeHostname(rawInput)
-  if (!hostname) {
+  if (!hostname || !HOSTNAME_RE.test(hostname)) {
     return { ok: false, error: 'invalid hostname' }
   }
-
-  if (!HOSTNAME_RE.test(hostname)) {
-    return { ok: false, error: 'invalid hostname' }
-  }
-
   return { ok: true, hostname }
 }
 
@@ -242,17 +266,23 @@ export function normalizeHostname(value) {
     .replace(/^https?:\/\//, '')
     .replace(/\/.*$/, '')
     .replace(/:\d+$/, '')
-    .replace(/^www\./, '')
+    .replace(/\.$/, '')
 }
 
 function createVerificationToken(hostname, scope) {
-  return `verify-${scope}-${hostname.replace(/[^a-z0-9]/g, '-')}-${Date.now()}`
+  const entropy = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  return `bondfire-${String(scope).replace(/[^a-z0-9]/gi, '-')}-${hostname.replace(/[^a-z0-9]/g, '-')}-${entropy}`
 }
 
 function mapDomainRow(row) {
+  const parsedScope = parsePublicDomainScope(row.scope)
   return {
     id: Number(row.id),
     scope: row.scope,
+    orgId: parsedScope.orgId,
+    surface: parsedScope.surface,
     hostname: row.hostname,
     verificationStatus: row.verification_status || 'pending',
     verificationToken: row.verification_token || '',

@@ -1,5 +1,6 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, Route, Routes } from "react-router-dom";
+import PublicPage from "./PublicPage.jsx";
 
 const actionStyle = {
   display: "grid",
@@ -32,6 +33,63 @@ const titleStyle = {
 };
 
 export default function PublicStart() {
+  const [domainState, setDomainState] = React.useState({ checking: true, mappedSlug: "", publication: false });
+
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const response = await fetch("/api/public/domain", { headers: { Accept: "application/json" } });
+        const data = await response.json().catch(() => ({}));
+        if (!alive) return;
+
+        if (response.ok && data?.mapped && data?.surface === "organization" && data?.slug) {
+          setDomainState({ checking: false, mappedSlug: String(data.slug), publication: false });
+          return;
+        }
+
+        if (response.ok && data?.mapped && data?.surface === "publication" && data?.publicationUrl) {
+          try {
+            const target = new URL(data.publicationUrl, window.location.origin);
+            if (target.hostname !== window.location.hostname || target.pathname !== window.location.pathname) {
+              window.location.replace(target.toString());
+              return;
+            }
+          } catch {}
+          setDomainState({ checking: false, mappedSlug: "", publication: true });
+          return;
+        }
+      } catch {}
+
+      if (alive) setDomainState({ checking: false, mappedSlug: "", publication: false });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (domainState.checking) {
+    return <div style={{ padding: 24 }} className="helper">Loading site…</div>;
+  }
+
+  if (domainState.mappedSlug) {
+    const routedLocation = `/p/${encodeURIComponent(domainState.mappedSlug)}`;
+    return (
+      <Routes location={routedLocation}>
+        <Route path="/p/:slug" element={<PublicPage />} />
+      </Routes>
+    );
+  }
+
+  if (domainState.publication) {
+    return (
+      <div style={{ padding: 24 }}>
+        <h1>Publication Site</h1>
+        <p className="helper">This publication domain is connected, but its public publication route is not available at this URL yet.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="bf-build-page">
       <header className="bf-build-hero">

@@ -4,6 +4,7 @@ import {requireCookieCsrf} from './csrf.js';
 import {bad,json} from './http.js';
 import {PUBLIC_FIELDS,wantsPublication,validPublicFields} from '../../../shared/publicProjection.js';
 import {slugify,uniqueSlug} from './publicPageStore.js';
+import {projectOrganizationPageConfig} from './publicSurface.js';
 
 export async function reservePublicSlug({env,request,orgId}) {
   const gate=await requireOrgRole({env,request,orgId,minRole:'admin'});if(!gate.ok)return gate.resp;
@@ -44,9 +45,10 @@ export async function publishPrivateCopy({env,request,orgId}) {
 
 export async function publicPrivateResponse({env,request,orgId}) {
   const db=getDb(env);await ensurePublicationSchema(db);
-  const cfg=await db.prepare("SELECT payload FROM org_public_projections WHERE org_id=? AND kind='public/config' AND id=?").bind(orgId,orgId).first();
-  if(!cfg)return bad(404,'NOT_PUBLIC');
-  const config=JSON.parse(cfg.payload);
+  const raw=env.BF_PUBLIC?await env.BF_PUBLIC.get(`org:${orgId}`):null;
+  if(!raw)return bad(404,'NOT_PUBLIC');
+  let source;try{source=JSON.parse(raw);}catch{return bad(404,'NOT_PUBLIC');}
+  const config=projectOrganizationPageConfig(source);
   if(!config.enabled)return bad(404,'NOT_PUBLIC');
   const path=new URL(request.url).pathname;
   if(decodeURIComponent(path.split('/')[3])!==config.slug)return bad(404,'NOT_FOUND');

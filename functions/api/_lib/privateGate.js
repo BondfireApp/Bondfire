@@ -5,6 +5,7 @@ import { privateProtocol } from './privateProtocol.js';
 import { privateRoute } from '../../../shared/privateContent.js';
 import { privateStudio } from './privateStudio.js';
 import {publicPrivateResponse} from './privatePublication.js';
+import { isOrgModuleEnabled } from './orgModules.js';
 
 // A deny-by-default route boundary is essential: new or old modules cannot
 // silently bypass private storage by choosing another endpoint.
@@ -18,7 +19,13 @@ export async function privateRequestGate({env,request}) {
     let orgId='';
     if(form) orgId=(await getDb(env).prepare('SELECT org_id FROM drive_files WHERE id=?').bind(decodeURIComponent(form[1])).first())?.org_id;
     else if(page&&env.BF_PUBLIC) orgId=await env.BF_PUBLIC.get(`slug:${decodeURIComponent(page[2])}`);
-    if(orgId&&await getPrivateMode(env,orgId))return form?bad(404,'NOT_FOUND'):publicPrivateResponse({env,request,orgId});
+    if(orgId&&await getPrivateMode(env,orgId)) {
+      if(form) return bad(404,'NOT_FOUND');
+      // The Organization Page config is deliberately public and authoritative in BF_PUBLIC.
+      // Private module content still flows through explicit public projections below.
+      if(page?.[1]==='public' && /^\/api\/public\/[^/]+\/?$/.test(path)) return null;
+      return publicPrivateResponse({env,request,orgId});
+    }
     return null;
   }
   const orgId=decodeURIComponent(m[1]),route=(m[2]||'').replace(/\/+$/,'');
@@ -51,6 +58,10 @@ export async function privateRequestGate({env,request}) {
   }
   if(route==='modules') return null;
   if(mode.state==='migrating') return bad(409,'PRIVATE_MIGRATION_IN_PROGRESS');
+  // These endpoints only manage intentionally public configuration/hostnames.
+  // Their own handlers still enforce org roles and write lockdown.
+  if((route==='public/get'&&request.method==='GET')||(route==='public/save'&&request.method==='POST')||route==='public/publication'||route==='public/domains') return null;
+  if((route==='colophon'||route.startsWith('colophon/')) && !(await isOrgModuleEnabled(env,orgId,'publishing-colophon'))) return bad(403,'MODULE_DISABLED',{moduleId:'publishing-colophon'});
   if(request.method!=='GET') {
     const db=getDb(env),table=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='org_private_key_state'").first();
     if(table) {

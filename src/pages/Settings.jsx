@@ -9,6 +9,7 @@ import { demoHandle, getDemoSubscribersCsv, ensureDemoOrgList } from "../demo/de
 import { AdminPublicConfigCard } from "../components/AdminPublicConfigCard.jsx";
 import { PublicDomainCard } from "../components/PublicDomainCard.jsx";
 import BuildModules from "../components/BuildModules.jsx";
+import { cacheOrgName, loadOrgIdentity } from "../lib/orgIdentity.js";
 
 /* ---------- API helper ---------- */
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
@@ -217,11 +218,12 @@ export default function Settings({ privateMode = false }) {
     if (!orgId) return;
     setMembersMsg("");
     try {
-      // Members is an authenticated admin surface, so show plaintext when it exists.
-      // If a row is encrypted-only, we still attempt local decrypt via tryDecryptList().
-      const r = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/members?plaintext=1`, {
-        method: "GET",
-      });
+      // Member-only organizations must never request readable membership PII from the server.
+      // Legacy organizations may still use the plaintext admin view until they are converted.
+      const privacy = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/privacy`, { method: "GET" }).catch(() => null);
+      const privateActive = privacy && privacy.state !== "off";
+      const memberPath = `/api/orgs/${encodeURIComponent(orgId)}/members${privateActive ? "" : "?plaintext=1"}`;
+      const r = await authFetch(memberPath, { method: "GET" });
       const _mem = Array.isArray(r.members) ? r.members : [];
       setMembers(await tryDecryptList(orgId, _mem));
       setMembersAllowed(true);
@@ -304,9 +306,18 @@ export default function Settings({ privateMode = false }) {
   const [logoDataUrl, setLogoDataUrl] = React.useState(null);
 
   React.useEffect(() => {
+    let alive = true;
     const s = readJSON(orgSettingsKey(orgId));
     if (s.name) setOrgName(s.name);
     if (s.logoDataUrl || s.logoUrl) setLogoDataUrl(s.logoDataUrl || s.logoUrl);
+    if (orgId) {
+      loadOrgIdentity(orgId)
+        .then((identity) => {
+          if (alive && identity?.name) setOrgName(identity.name);
+        })
+        .catch(() => {});
+    }
+    return () => { alive = false; };
   }, [orgId]);
 
   const onLogo = (e) => {
@@ -320,7 +331,9 @@ export default function Settings({ privateMode = false }) {
   const saveBasics = () => {
     const key = orgSettingsKey(orgId);
     const prev = readJSON(key);
-    writeJSON(key, { ...prev, name: (orgName || "").trim(), logoDataUrl });
+    const nextName = (orgName || "").trim();
+    writeJSON(key, { ...prev, name: nextName, logoDataUrl });
+    if (nextName) cacheOrgName(orgId, nextName);
     window.dispatchEvent(
       new CustomEvent("bf:org_settings_changed", { detail: { orgId } })
     );

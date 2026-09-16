@@ -2,6 +2,7 @@ import { isDemoMode } from '../demo/demoMode.js';
 import React from 'react';
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { api } from '../utils/api.js';
+import { loadOrgIdentity } from '../lib/orgIdentity.js';
 import Settings from '../pages/Settings.jsx';
 
 export default function PrivateOrgBoundary({children}) {
@@ -10,7 +11,14 @@ export default function PrivateOrgBoundary({children}) {
   React.useEffect(()=>{
     if(isDemoMode()){setState({state:"off",orgId});return;}
     let live=true;
-    const refresh=()=>api(`/api/orgs/${encodeURIComponent(orgId)}/privacy`).then(s=>{if(live){setState({...s,orgId});setError('');}}).catch(e=>{if(live)setError(e.message);});
+    const refresh=()=>api(`/api/orgs/${encodeURIComponent(orgId)}/privacy`).then(async s=>{
+      if(!live)return;
+      setState({...s,orgId});
+      setError('');
+      if(s?.state==='enabled') {
+        try { await loadOrgIdentity(orgId); } catch {}
+      }
+    }).catch(e=>{if(live)setError(e.message);});
     refresh();window.addEventListener('bf-private-mode-changed',refresh);
     return()=>{live=false;window.removeEventListener('bf-private-mode-changed',refresh);};
   },[orgId]);

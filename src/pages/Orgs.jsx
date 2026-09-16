@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../utils/api.js";
+import { hydrateOrgList } from "../lib/orgIdentity.js";
 
 function loadOrgs() {
   try { return JSON.parse(localStorage.getItem("bf_orgs") || "[]"); }
@@ -24,7 +25,7 @@ export default function Orgs() {
     setLoading(true);
     try {
       const data = await api("/api/orgs");
-      const list = Array.isArray(data.orgs) ? data.orgs : [];
+      const list = await hydrateOrgList(Array.isArray(data.orgs) ? data.orgs : []);
       setOrgs(list);
       saveOrgs(list);
     } catch (e) {
@@ -36,6 +37,9 @@ export default function Orgs() {
 
   useEffect(() => {
     refresh().catch(console.error);
+    const onIdentity = () => setOrgs(loadOrgs());
+    window.addEventListener("bf:org_identity_changed", onIdentity);
+    return () => window.removeEventListener("bf:org_identity_changed", onIdentity);
   }, []);
 
   const items = useMemo(
