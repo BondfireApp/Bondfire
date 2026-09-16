@@ -7,6 +7,9 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const checks = [
   ["builder selections persist across auth", "src/platform/pendingBuild.js", /PENDING_BUILD_NAME_KEY/],
   ["invite state persists across auth", "src/pages/SignIn.jsx", /bf_pending_invite_v1/],
+  ["invite creator sends the selected role", "src/pages/Settings.jsx", /body: \{ role: inviteRole, expiresInDays: 14, maxUses: 1 \}/],
+  ["invite selector offers viewer member and admin", "src/pages/Settings.jsx", /option value="viewer"[\s\S]*option value="member"[\s\S]*option value="admin"/],
+  ["invite redemption applies the stored role", "functions/api/invites/redeem.js", /viewer","member","admin"[\s\S]*org_memberships\(org_id,user_id,role,created_at\)/],
   ["validated org target survives sign-in", "src/pages/SignIn.jsx", /ORG_ID_RE[\s\S]*requestedOrgId[\s\S]*\/overview/],
   ["global header hydrates encrypted organization identity", "src/components/AppHeader.jsx", /loadOrgIdentity\(orgId\)/],
   ["settings hydrates encrypted organization identity", "src/pages/Settings.jsx", /loadOrgIdentity\(orgId\)/],

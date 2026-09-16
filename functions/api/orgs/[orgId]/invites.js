@@ -89,7 +89,7 @@ export async function onRequest(ctx) {
         body = {};
       }
 
-      const role = (body.role || "member").toString();
+      const role = String(body.role || "member").trim().toLowerCase();
       if (!["viewer","member","admin"].includes(role)) return bad(400,"INVALID_INVITE_ROLE");
       const maxUses = toInt(body.maxUses ?? body.max_uses ?? body.maxUses, 1) || 1;
       const expiresInDays = toInt(body.expiresInDays, 14);

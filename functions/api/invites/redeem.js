@@ -40,7 +40,7 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, error: "Invite exhausted" }, 400);
     }
 
-    const role = String(invite.role || "member");
+    const role = String(invite.role || "member").trim().toLowerCase();
     if (!["viewer","member","admin"].includes(role)) return bad(400,"INVALID_INVITE_ROLE");
     const lockdown = await enforceOrgWriteLockdown({env,orgId:invite.org_id});
     if (!lockdown.ok) return lockdown.resp;

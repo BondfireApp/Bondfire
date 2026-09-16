@@ -90,6 +90,7 @@ export default function Settings({ privateMode = false }) {
   const [invites, setInvites] = React.useState([]);
   const [inviteMsg, setInviteMsg] = React.useState("");
   const [inviteBusy, setInviteBusy] = React.useState(false);
+  const [inviteRole, setInviteRole] = React.useState("member");
 
   const loadInvites = React.useCallback(async () => {
     if (!orgId) return;
@@ -111,12 +112,12 @@ export default function Settings({ privateMode = false }) {
     try {
       const r = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/invites`, {
         method: "POST",
-        body: { role: "member", expiresInDays: 14, maxUses: 1 },
+        body: { role: inviteRole, expiresInDays: 14, maxUses: 1 },
       });
 
       if (r?.invite) {
         setInvites((prev) => [r.invite, ...prev]);
-        setInviteMsg(`Invite created: ${r.invite.code}`);
+        setInviteMsg(`Invite created: ${r.invite.code} · role: ${r.invite.role || inviteRole}`);
       } else {
         await loadInvites();
         setInviteMsg("Invite created.");
@@ -1035,7 +1036,15 @@ React.useEffect(() => {
           <h2 style={{ marginTop: 0 }}>Invites</h2>
           <p className="helper">Generate invite codes so someone can join this org.</p>
 
-          <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="row" style={{ gap: 8, alignItems: "end", flexWrap: "wrap" }}>
+            <label className="grid" style={{ gap: 6, minWidth: 180 }}>
+              <span className="helper">Role for this invite</span>
+              <select className="input" value={inviteRole} onChange={(event) => setInviteRole(event.target.value)} disabled={inviteBusy}>
+                <option value="viewer">Viewer · read only</option>
+                <option value="member">Member · standard access</option>
+                <option value="admin">Admin · manage organization</option>
+              </select>
+            </label>
             <button className="btn-red" onClick={createInvite} disabled={inviteBusy}>
               {inviteBusy ? "Generating…" : "Generate invite"}
             </button>
