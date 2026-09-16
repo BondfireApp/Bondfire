@@ -33,6 +33,8 @@ const checks = [
   ["custom-host resolver self-heals stale verification on live host", "functions/api/public/domain.js", /setPublicSiteDomainVerification[\s\S]*requestUrl\.hostname/],
   ["support exposes a maintainer contact", "src/pages/Support.jsx", /support@bondfireapp\.org/],
   ["support has safe network failure guidance", "src/pages/Support.jsx", /server could not be reached/i],
+  ["dashboard metrics use module logos instead of abbreviations", "src/pages/Overview.jsx", /ModuleLogo[\s\S]*\/logos\/inventory\.png[\s\S]*\/logos\/needs\.png[\s\S]*\/logos\/meetings\.png[\s\S]*\/logos\/pledges\.png/],
+  ["dashboard metric abbreviations are removed", "src/pages/Overview.jsx", /mk\(\"people\", \"People\", \"\/logos\/core\.png\"/],
   ["organization REC route reuses the real capture app", "src/App.jsx", /witness\/capture[\s\S]*PublicCapture[\s\S]*embedded/],
   ["REC archive launches video capture", "src/pages/modules/WitnessArchive.jsx", /witness\/capture[\s\S]*New recording/],
   ["REC capture requests camera and microphone", "src/pages/PublicCapture.jsx", /getUserMedia[\s\S]*audio: true[\s\S]*video:/],

@@ -121,11 +121,15 @@ function readInvPar(orgId) {
   }
 }
 
-function ModuleGlyph({ label }) {
+function ModuleLogo({ src, label }) {
   return (
-    <span className="bf-module-glyph" aria-hidden="true">
-      {label}
-    </span>
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      title={label}
+      style={{ width: 52, height: 52, objectFit: "contain", flex: "0 0 52px" }}
+    />
   );
 }
 
@@ -204,11 +208,11 @@ function SkeletonBox({ w = "100%", h = 12, r = 10, style }) {
   );
 }
 
-function MetricCardSkeleton({ icon = "BF" }) {
+function MetricCardSkeleton() {
   return (
-    <div className="card bfDashCard" style={{ padding: 14, position: "relative", minHeight: 98 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div className="bf-metric-glyph">{icon}</div>
+    <div className="card bfDashCard" style={{ padding: 14, position: "relative", minHeight: 118 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <SkeletonBox w={52} h={52} r={12} />
         <SkeletonBox w={78} h={14} r={8} />
       </div>
       <div style={{ marginTop: 12 }}>
@@ -641,12 +645,12 @@ export default function Overview() {
   );
 
   const topCards = useMemo(() => {
-    const mk = (key, title, icon, value, sub, to) => {
+    const mk = (key, title, logo, value, sub, to) => {
       const db = deltaBadge(deltas[key]);
       return {
         key,
         title,
-        icon,
+        logo,
         value,
         sub,
         to,
@@ -661,13 +665,13 @@ export default function Overview() {
       };
     };
     return [
-      mk("people", "People", <ModuleGlyph label="PE" />, countsNormalized.people, "members", "people"),
-      mk("inventory", "Inventory", <ModuleGlyph label="IV" />, countsNormalized.inventory, "items", "inventory"),
-      mk("needsOpen", "Needs", <ModuleGlyph label="ND" />, countsNormalized.needsOpen, "open", "needs"),
-      mk("meetingsUpcoming", "Meetings", <ModuleGlyph label="MT" />, countsNormalized.meetingsUpcoming, "upcoming", "meetings"),
-      mk("pledgesActive", "Pledges", <ModuleGlyph label="PL" />, countsNormalized.pledgesActive, "active", "settings?tab=pledges"),
-      mk("subsTotal", "New Subs", <ModuleGlyph label="NS" />, countsNormalized.subsTotal, "total", "settings?tab=newsletter"),
-      mk("publicInbox", "Inbox", <ModuleGlyph label="IB" />, countsNormalized.publicInbox, "open items", "settings?tab=public-inbox"),
+      mk("people", "People", "/logos/core.png", countsNormalized.people, "members", "people"),
+      mk("inventory", "Inventory", "/logos/inventory.png", countsNormalized.inventory, "items", "inventory"),
+      mk("needsOpen", "Needs", "/logos/needs.png", countsNormalized.needsOpen, "open", "needs"),
+      mk("meetingsUpcoming", "Meetings", "/logos/meetings.png", countsNormalized.meetingsUpcoming, "upcoming", "meetings"),
+      mk("pledgesActive", "Pledges", "/logos/pledges.png", countsNormalized.pledgesActive, "active", "settings?tab=pledges"),
+      mk("subsTotal", "New Subs", "/logos/core.png", countsNormalized.subsTotal, "total", "settings?tab=newsletter"),
+      mk("publicInbox", "Inbox", "/logos/intake.png", countsNormalized.publicInbox, "open items", "settings?tab=public-inbox"),
     ];
   }, [countsNormalized, deltas, historySeries]);
 
@@ -847,16 +851,16 @@ export default function Overview() {
       <div className="bfTopMetricsRow">
         {!hasLoadedOnce && loading ? (
           <>
-            {["PE", "IV", "ND", "MT", "PL", "IB", "NS"].map((ic, i) => <div key={i}><MetricCardSkeleton icon={ic} /></div>)}
+            {Array.from({ length: 7 }).map((_, i) => <div key={i}><MetricCardSkeleton /></div>)}
           </>
         ) : (
           topCards.map((c) => (
             <button key={c.key} type="button" style={cardBtnStyle} onClick={() => go(c.to)}>
               <div className="card bfDashCard" style={{ padding: 14, position: "relative", minHeight: 118, overflow: "hidden" }}>
                 {c.badge ? <div style={{ position: "absolute", top: 12, right: 12 }}><span className="bf-delta-pill" style={c.badge.style}>{c.badge.txt}</span></div> : null}
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div className="bf-metric-glyph">{c.icon}</div>
-                  <div style={{ fontWeight: 900 }}>{c.title}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 54 }}>
+                  <ModuleLogo src={c.logo} label={c.title} />
+                  <div style={{ fontWeight: 900, fontSize: 15 }}>{c.title}</div>
                 </div>
                 <div style={{ marginTop: 10, fontSize: 34, fontWeight: 900, lineHeight: 1 }}>{c.value}</div>
                 <div className="helper" style={{ marginTop: 6 }}>{c.sub}</div>
