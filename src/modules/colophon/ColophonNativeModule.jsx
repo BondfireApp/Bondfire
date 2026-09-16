@@ -68,6 +68,19 @@ function ensureHostFetchBridge(apiBase, privateHost = null) {
     const raw = input instanceof Request ? input.url : String(input || "");
     const url = new URL(raw, window.location.origin);
     const sameOrigin = url.origin === window.location.origin;
+    const internalPrivateStorage = activePrivateHost
+      && sameOrigin
+      && url.searchParams.get("__bf_colophon_storage") === "1";
+
+    if (internalPrivateStorage) {
+      url.searchParams.delete("__bf_colophon_storage");
+      const request = addCsrfHeader(
+        input instanceof Request ? new Request(url.toString(), input) : url.toString(),
+        init,
+      );
+      return originalFetch(request.input, request.init);
+    }
+
     const isBondfireOwned =
       url.pathname.startsWith("/api/orgs/") ||
       url.pathname.startsWith("/api/auth/") ||

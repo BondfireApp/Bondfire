@@ -52,7 +52,8 @@ async function bodyForm(input, init = {}) {
 }
 function privatePath(orgId, kind, id = "") {
   const base = `/api/orgs/${encodeURIComponent(orgId)}/${kind}`;
-  return id ? `${base}/${encodeURIComponent(id)}` : base;
+  const path = id ? `${base}/${encodeURIComponent(id)}` : base;
+  return `${path}?__bf_colophon_storage=1`;
 }
 async function listRecords(orgId, kind) {
   const data = await api(privatePath(orgId, kind));

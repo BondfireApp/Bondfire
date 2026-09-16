@@ -30,6 +30,8 @@ const checks = [
   ["native Colophon keeps image logo upload", "src/modules/colophon/ColophonNativeModule.jsx", /NativeLogoUploadBridge/],
   ["native Colophon keeps publication-site routing separate", "src/modules/colophon/ColophonNativeModule.jsx", /ColophonPublicLinkGuard/],
   ["encrypted Colophon accepts hosted collection and item content aliases", "src/modules/colophon/privateColophonRuntime.js", /contentPath = path\.match\(\/\^\(\?:native-content\|content\)\(\?:\\\/\(\[\^\/\]\+\)\)\?\$\/[\s\S]*contentUrl\.searchParams\.set\("id", contentPath\[1\]\)[\s\S]*revisionsPath = path\.match\(\/\^\(\?:native-content-revisions\|content-revisions\)/],
+  ["encrypted Colophon marks internal ciphertext transport", "src/modules/colophon/privateColophonRuntime.js", /__bf_colophon_storage=1/],
+  ["Colophon bridge bypasses internal ciphertext transport", "src/modules/colophon/ColophonNativeModule.jsx", /internalPrivateStorage[\s\S]*__bf_colophon_storage[\s\S]*return originalFetch/],
   ["Colophon domain management lives in Settings", "src/modules/colophon/ColophonNativeModule.jsx", /NativePublicationDomainSettingsBridge[\s\S]*data-bondfire-publication-domain-settings[\s\S]*PublicDomainCard orgId=\{orgId\} surface="publication" compactWhenLive/],
   ["domain manager exposes an explicit live-domain toggle", "src/components/PublicDomainCard.jsx", /Manage domain[\s\S]*Hide domain settings/],
   ["private organization boundary allows encrypted Colophon", "src/components/PrivateOrgBoundary.jsx", /studio\|colophon/],
