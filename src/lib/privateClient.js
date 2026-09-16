@@ -4,6 +4,19 @@ import { PRIVATE_CONTENT, privateRoute } from '../../shared/privateContent.js';
 import { encryptPrivate, decryptPrivate, loadPrivateKey } from './privateCrypto.js';
 import {PUBLIC_FIELDS,selectPublicFields,wantsPublication} from '../../shared/publicProjection.js';
 
+function recArchiveId(record) {
+  const direct=String(record?.rec_archive_id||'').trim();
+  if(direct)return direct;
+  const tags=Array.isArray(record?.tags)?record.tags:[];
+  const tag=tags.find(item=>String(item||'').startsWith('archive:'));
+  return tag?String(tag).slice(8):'';
+}
+function enrichRecWitness(record,role) {
+  if(!record)return record;
+  const archiveId=recArchiveId(record);
+  return {...record,rec_archive_id:archiveId,can_manage_rec:['admin','owner'].includes(role),legacy_rec:Boolean(archiveId&&!record.rec_managed)};
+}
+
 function parseBody(body) {
   if(body==null) return {};
   if(typeof body==='string') return JSON.parse(body);
@@ -271,6 +284,12 @@ export async function dispatchPrivate(path,opts,transport) {
         delete clear.dataUrl;delete clear.textContent;
       }
     }
+    let recManagementToken='';
+    if(kind==='witness'&&method==='POST') {
+      recManagementToken=String(clear.rec_management_token||'').trim();
+      delete clear.rec_management_token;
+      if(recManagementToken&&recArchiveId(clear)) clear.rec_managed=true;
+    }
     const id=route.id||clear.id||crypto.randomUUID();
     let previous=null;
     if(method!=='POST') {
@@ -284,6 +303,10 @@ export async function dispatchPrivate(path,opts,transport) {
       clear.size=uploadBytes.length;
     }
     if(method==='DELETE') {
+      if(kind==='witness') {
+        const archiveId=recArchiveId(previous);
+        if(archiveId) await transport(`/api/orgs/${encodeURIComponent(orgId)}/rec/archive`,{method:'DELETE',body:JSON.stringify({archiveId,witnessId:id,legacy:!previous.rec_managed})});
+      }
       data=await transport(path,{method,body:JSON.stringify({id,revision:previous.revision})});
     } else {
       let combined;
@@ -300,6 +323,11 @@ export async function dispatchPrivate(path,opts,transport) {
         for(const k of ['ciphertext','encrypted_blob','encryptedBlob','revision','encrypted','previewUrl','downloadUrl','url','storage_key','storageKey']) delete combined[k];
         const ciphertext=await encryptPrivate(key,combined,orgId,kind,id);
         data=await transport(path,{method,body:JSON.stringify({id,ciphertext,revision:previous?.revision||0,...(contract.parent?{parentId:combined[contract.parent]||null}:{})})});
+        if(kind==='witness'&&method==='POST'&&recManagementToken) {
+          const archiveId=recArchiveId(combined);
+          if(!archiveId) throw new Error('REC archive ID is missing from the encrypted witness record.');
+          await transport(`/api/orgs/${encodeURIComponent(orgId)}/rec/claim`,{method:'POST',body:JSON.stringify({archiveId,witnessId:id,managementToken:recManagementToken})});
+        }
       } catch(error) {
         if(uploadedPayloadId)try {await deletePayload(orgId,uploadedPayloadId,id,transport);} catch {}
         throw error;
@@ -316,6 +344,10 @@ export async function dispatchPrivate(path,opts,transport) {
   const next={...data,private_mode:true};
   if(data[contract.one]) next[contract.one]=await reveal(key,orgId,kind,data[contract.one],transport,kind==='drive/files'&&!!route.id&&method==='GET');
   if(Array.isArray(data[contract.list])) next[contract.list]=await Promise.all(data[contract.list].map(row=>reveal(key,orgId,kind,row,transport)));
-  if(kind==='witness') next.records=next.items;
+  if(kind==='witness') {
+    if(next[contract.one]) next[contract.one]=enrichRecWitness(next[contract.one],status.role);
+    if(Array.isArray(next[contract.list])) next[contract.list]=next[contract.list].map(row=>enrichRecWitness(row,status.role));
+    next.records=next.items;
+  }
   return {handled:true,data:next};
 }
