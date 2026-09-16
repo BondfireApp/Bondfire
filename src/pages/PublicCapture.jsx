@@ -232,6 +232,15 @@ async function fetchAnonymousChunk(archiveId, phrase, sequence) {
   return response.arrayBuffer();
 }
 
+async function deleteAnonymousArchive(archiveId, phrase) {
+  const response = await fetch(`${REC_API_BASE}/api/retrieve/anonymous/archive`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ archiveId: archiveId.trim(), phrase: normalizedPhrase(phrase) }),
+  });
+  return readJson(response);
+}
+
 function formatClock(seconds) {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
@@ -259,6 +268,15 @@ function saveHandoff(recordingId, phrase) {
   } catch {}
 }
 
+function clearHandoff(recordingId) {
+  try {
+    const raw = sessionStorage.getItem(HANDOFF_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (!recordingId || saved?.recordingId === recordingId) sessionStorage.removeItem(HANDOFF_KEY);
+  } catch {}
+}
+
 export default function PublicCapture({ authed = false, embedded = false }) {
   const navigate = useNavigate();
   const { orgId: routeOrgId } = useParams();
@@ -278,6 +296,7 @@ export default function PublicCapture({ authed = false, embedded = false }) {
   const reviewObjectUrlRef = React.useRef("");
   const startedAtRef = React.useRef(0);
   const sessionReadyRef = React.useRef(null);
+  const deletingRef = React.useRef(false);
 
   const [status, setStatus] = React.useState("idle");
   const [recordingId, setRecordingId] = React.useState("");
@@ -298,6 +317,8 @@ export default function PublicCapture({ authed = false, embedded = false }) {
   const [retrieveBusy, setRetrieveBusy] = React.useState(false);
   const [retrieveNotice, setRetrieveNotice] = React.useState("");
   const [downloadUrl, setDownloadUrl] = React.useState("");
+  const [deleteBusy, setDeleteBusy] = React.useState(false);
+  const [deleteNotice, setDeleteNotice] = React.useState("");
 
   React.useEffect(() => {
     if (status !== "recording") return undefined;
@@ -364,9 +385,11 @@ export default function PublicCapture({ authed = false, embedded = false }) {
       const reported = Number(result?.safeSeconds);
       if (Number.isFinite(reported)) setSafeSeconds((current) => Math.max(current, reported));
     } catch (chunkError) {
-      console.error("REC chunk upload failed", chunkError);
-      setFailedChunks((count) => count + 1);
-      setError("One or more encrypted chunks did not reach the remote archive. Keep recording if needed; REC is preserving the local review copy on this device.");
+      if (!deletingRef.current) {
+        console.error("REC chunk upload failed", chunkError);
+        setFailedChunks((count) => count + 1);
+        setError("One or more encrypted chunks did not reach the remote archive. Keep recording if needed; REC is preserving the local review copy on this device.");
+      }
     } finally {
       setPendingChunks((count) => Math.max(0, count - 1));
     }
@@ -374,6 +397,8 @@ export default function PublicCapture({ authed = false, embedded = false }) {
 
   async function startCapture() {
     if (status === "preparing" || status === "recording") return;
+    deletingRef.current = false;
+    setDeleteNotice("");
     setError("");
     setFailedChunks(0);
     setPendingChunks(0);
@@ -495,6 +520,54 @@ export default function PublicCapture({ authed = false, embedded = false }) {
     navigate("/signin?mode=login&from=capture");
   }
 
+  async function removeOrgWitnessMetadata(archiveId) {
+    if (!orgId || !archiveId) return true;
+    try {
+      await api(`/api/orgs/${encodeURIComponent(orgId)}/witness?archiveId=${encodeURIComponent(archiveId)}`, {
+        method: "DELETE",
+      });
+      return true;
+    } catch (metadataError) {
+      console.warn("REC archive metadata cleanup failed", metadataError);
+      return false;
+    }
+  }
+
+  async function deleteCurrentRecording() {
+    const archiveId = recordingIdRef.current || recordingId;
+    const phrase = recoveryPhrase;
+    if (!archiveId || !phrase || deleteBusy) return;
+    if (!window.confirm("Delete this REC archive from remote storage?")) return;
+
+    deletingRef.current = true;
+    setDeleteBusy(true);
+    setDeleteNotice("Deleting encrypted archive…");
+    setError("");
+    try {
+      await deleteAnonymousArchive(archiveId, phrase);
+      const metadataRemoved = await removeOrgWitnessMetadata(archiveId);
+      clearHandoff(archiveId);
+      if (reviewObjectUrlRef.current) URL.revokeObjectURL(reviewObjectUrlRef.current);
+      reviewObjectUrlRef.current = "";
+      rawChunksRef.current = [];
+      keyRef.current = null;
+      recordingIdRef.current = "";
+      sessionReadyRef.current = null;
+      setReviewUrl("");
+      setRecordingId("");
+      setRecoveryPhrase("");
+      setSafeSeconds(0);
+      setFailedChunks(0);
+      setStatus("idle");
+      setDeleteNotice(metadataRemoved ? "Archive deleted." : "Archive deleted; its Bondfire list entry could not be removed.");
+    } catch (deleteError) {
+      deletingRef.current = false;
+      setDeleteNotice(deleteError?.message || "Could not delete this archive.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   async function retrieveRecording(event) {
     event.preventDefault();
     const archiveId = retrieveId.trim();
@@ -535,6 +608,29 @@ export default function PublicCapture({ authed = false, embedded = false }) {
     }
   }
 
+  async function deleteRecoveredRecording() {
+    const archiveId = retrieveId.trim();
+    const phrase = retrievePhrase.trim();
+    if (!archiveId || !phrase || deleteBusy) return;
+    if (!window.confirm("Delete this recovered REC archive from remote storage?")) return;
+
+    setDeleteBusy(true);
+    setDeleteNotice("Deleting encrypted archive…");
+    try {
+      await deleteAnonymousArchive(archiveId, phrase);
+      const metadataRemoved = await removeOrgWitnessMetadata(archiveId);
+      clearHandoff(archiveId);
+      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+      setDownloadUrl("");
+      setRetrieveNotice(metadataRemoved ? "Archive deleted." : "Archive deleted; its Bondfire list entry could not be removed.");
+      setDeleteNotice("");
+    } catch (deleteError) {
+      setDeleteNotice(deleteError?.message || "Could not delete this archive.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   if (retrieveMode) {
     const sharedHandoff = Boolean(searchParams.get("archiveId") && searchParams.get("phrase"));
     return (
@@ -570,8 +666,12 @@ export default function PublicCapture({ authed = false, embedded = false }) {
                 <a className="btn" href={downloadUrl} download={`rec-${retrieveId || "archive"}.webm`} style={{ textAlign: "center", textDecoration: "none" }}>
                   Download recovered recording
                 </a>
+                <button className="btn-red" type="button" onClick={deleteRecoveredRecording} disabled={deleteBusy}>
+                  {deleteBusy ? "Deleting…" : "Delete archive"}
+                </button>
               </>
             ) : null}
+            {deleteNotice ? <p className="error" style={{ margin: 0 }}>{deleteNotice}</p> : null}
           </form>
           <div style={{ marginTop: 18 }}><Link className="helper" to={captureRoute}>Back to REC</Link></div>
         </main>
@@ -665,14 +765,22 @@ export default function PublicCapture({ authed = false, embedded = false }) {
             ) : null}
 
             {error ? <div className="error" style={{ marginTop: 12 }}>{error}</div> : null}
+            {deleteNotice ? <div className="helper" style={{ marginTop: 12 }}>{deleteNotice}</div> : null}
 
             {reviewUrl ? (
               <div style={{ marginTop: 18 }}>
                 <p className="bf-build-label">LOCAL REVIEW COPY</p>
                 <video controls src={reviewUrl} style={{ width: "100%", maxHeight: 420, background: "#050606" }} />
-                <a className="btn" href={reviewUrl} download={`rec-${recordingId || "capture"}.webm`} style={{ display: "inline-block", marginTop: 10, textDecoration: "none" }}>
-                  Download local copy
-                </a>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+                  <a className="btn" href={reviewUrl} download={`rec-${recordingId || "capture"}.webm`} style={{ display: "inline-block", textDecoration: "none" }}>
+                    Download local copy
+                  </a>
+                  {recordingId ? (
+                    <button className="btn-red" type="button" onClick={deleteCurrentRecording} disabled={deleteBusy}>
+                      {deleteBusy ? "Deleting…" : "Delete archive"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </section>

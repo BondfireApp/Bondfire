@@ -120,3 +120,25 @@ export async function onRequestPost({ env, request, params }) {
 
   return json({ ok: true, id });
 }
+
+export async function onRequestDelete({ env, request, params }) {
+  const orgId = params.orgId;
+  const auth = await requireOrgRole({ env, request, orgId, minRole: "member" });
+  if (!auth.ok) return auth.resp;
+
+  await ensureWitnessTable(env.BF_DB);
+  const url = new URL(request.url);
+  const id = String(url.searchParams.get("id") || "").trim();
+  const archiveId = String(url.searchParams.get("archiveId") || "").trim();
+  if (!id && !archiveId) return bad(400, "MISSING_ID");
+
+  if (id) {
+    await env.BF_DB.prepare("DELETE FROM witness_records WHERE id = ? AND org_id = ?").bind(id, orgId).run();
+  } else {
+    await env.BF_DB.prepare("DELETE FROM witness_records WHERE org_id = ? AND tags_json LIKE ?")
+      .bind(orgId, `%archive:${archiveId}%`)
+      .run();
+  }
+
+  return json({ ok: true });
+}
