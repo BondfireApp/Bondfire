@@ -57,6 +57,16 @@ for (const [label, file, pattern] of checks) {
   }
 }
 
+for (const file of ["public/logos/people.svg", "public/logos/newsletter.svg"]) {
+  const content = read(file).trimStart();
+  if (!content.startsWith("<svg") || !content.includes("</svg>")) {
+    failed = true;
+    console.error(`FAIL: dashboard logo is not valid SVG markup (${file})`);
+  } else {
+    console.log(`PASS: dashboard logo contains SVG markup (${file})`);
+  }
+}
+
 
 const recArchiveSource = read("src/pages/modules/WitnessArchive.jsx");
 if (/Create witness record|setDraft\(|placeholder="Summary"/.test(recArchiveSource)) {
