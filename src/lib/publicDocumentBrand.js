@@ -15,6 +15,7 @@ export function usePublicDocumentBrand(title, iconUrl) {
       document.head.appendChild(icon);
     }
     const previousHref = icon.getAttribute("href");
+    const previousType = icon.getAttribute("type");
     const nextIcon = String(iconUrl || "").trim();
     if (nextIcon) {
       icon.type = "image/png";
@@ -24,8 +25,10 @@ export function usePublicDocumentBrand(title, iconUrl) {
     return () => {
       document.title = previousTitle;
       if (created) icon.remove();
-      else if (previousHref == null) icon.removeAttribute("href");
-      else icon.setAttribute("href", previousHref);
+      else {
+        if (previousHref == null) icon.removeAttribute("href"); else icon.setAttribute("href", previousHref);
+        if (previousType == null) icon.removeAttribute("type"); else icon.setAttribute("type", previousType);
+      }
     };
   }, [title, iconUrl]);
 }
