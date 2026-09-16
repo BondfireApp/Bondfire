@@ -4,11 +4,55 @@ import { api } from "../utils/api.js";
 
 const CHUNK_MS = 3000;
 const REC_API_BASE = (import.meta.env.VITE_REC_API_BASE_URL || "https://rec.bjgarr.workers.dev").replace(/\/+$/, "");
-const HANDOFF_KEY = "bf_rec_pending_capture_v1";
-const RECOVERY_WORDS = [
-  "river", "ghost", "iron", "storm", "velvet", "ember", "signal", "ash",
-  "cinder", "orchid", "marrow", "cedar", "fox", "light", "gate", "kite",
-  "field", "mirror", "thread", "harbor", "stone", "drift", "siren", "lamp",
+const HANDOFF_KEY = "bf_rec_pending_capture_v2";
+
+const RECOVERY_ADJECTIVES = [
+  "amber", "ancient", "autumn", "black", "blue", "bold", "bright", "bronze",
+  "calm", "cedar", "clear", "cold", "copper", "crimson", "distant", "dusky",
+  "early", "ember", "empty", "faint", "fern", "fierce", "golden", "gray",
+  "green", "hidden", "hollow", "iron", "ivory", "kind", "late", "little",
+  "lone", "low", "lunar", "misty", "mossy", "night", "northern", "old",
+  "open", "orange", "pale", "quiet", "red", "restless", "river", "rough",
+  "rust", "safe", "scarlet", "secret", "silver", "soft", "solar", "still",
+  "stormy", "strong", "swift", "tall", "velvet", "warm", "wild", "winter",
+];
+
+const RECOVERY_NOUNS = [
+  "badgers", "beacons", "bears", "bells", "birds", "boats", "bridges", "canyons",
+  "cedars", "clouds", "crows", "deer", "drums", "dunes", "eagles", "embers",
+  "fields", "fires", "foxes", "gardens", "gates", "ghosts", "hammers", "harbors",
+  "hawks", "hills", "islands", "keys", "kites", "lakes", "lamps", "lanterns",
+  "leaves", "lions", "maps", "mirrors", "moons", "mountains", "otters", "owls",
+  "paths", "pines", "rabbits", "radios", "ravens", "rivers", "roads", "rocks",
+  "roses", "seeds", "shores", "signals", "sparrows", "stars", "stones", "storms",
+  "towers", "trails", "trees", "valleys", "waves", "wells", "wolves", "woods",
+];
+
+const RECOVERY_VERBS = [
+  "answer", "arrive", "carry", "circle", "climb", "cross", "dance", "drift",
+  "enter", "follow", "gather", "glow", "guard", "guide", "hear", "hold",
+  "keep", "leave", "listen", "meet", "move", "open", "pass", "rest",
+  "return", "rise", "roam", "run", "sail", "search", "see", "share",
+  "shine", "sing", "stand", "stay", "step", "travel", "turn", "wait",
+  "wake", "walk", "wander", "watch", "welcome", "whisper", "write", "hide",
+  "mark", "reach", "remember", "secure", "send", "shelter", "signal", "speak",
+  "trace", "visit", "protect", "build", "notice", "rescue", "travel", "watch",
+];
+
+const RECOVERY_ADVERBS = [
+  "abroad", "ahead", "apart", "away", "boldly", "briefly", "calmly", "closely",
+  "deeply", "early", "easily", "evenly", "far", "freely", "gently", "gladly",
+  "here", "kindly", "late", "lightly", "loudly", "nearby", "openly", "outside",
+  "patiently", "plainly", "quietly", "rarely", "safely", "slowly", "softly", "steadily",
+  "swiftly", "there", "together", "truly", "upward", "warmly", "widely", "wildly",
+  "wisely", "bravely", "clearly", "closer", "downhill", "forward", "homeward", "inland",
+  "northward", "outward", "roughly", "secretly", "silently", "southward", "straight", "westward",
+  "eastward", "carefully", "firmly", "brightly", "honestly", "neatly", "patiently", "surely",
+];
+
+const RECOVERY_PREPOSITIONS = [
+  "above", "across", "after", "around", "before", "behind", "below", "beside",
+  "beyond", "inside", "near", "outside", "past", "through", "under", "within",
 ];
 
 function toArrayBuffer(bytes) {
@@ -36,10 +80,27 @@ function randomInt(max) {
   return values[0] % max;
 }
 
+function pick(values) {
+  return values[randomInt(values.length)];
+}
+
 function makeRecoveryPhrase() {
-  const words = Array.from({ length: 6 }, () => RECOVERY_WORDS[randomInt(RECOVERY_WORDS.length)]);
-  const suffix = String(randomInt(10000)).padStart(4, "0");
-  return `${words.join("-")}-${suffix}`;
+  const phrase = [
+    pick(RECOVERY_ADJECTIVES),
+    pick(RECOVERY_NOUNS),
+    pick(RECOVERY_ADVERBS),
+    pick(RECOVERY_VERBS),
+    pick(RECOVERY_ADJECTIVES),
+    pick(RECOVERY_NOUNS),
+    pick(RECOVERY_PREPOSITIONS),
+    pick(RECOVERY_ADJECTIVES),
+    pick(RECOVERY_NOUNS),
+  ].join(" ");
+  return `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)}.`;
+}
+
+function normalizedPhrase(value) {
+  return value.trim().toLowerCase().replace(/[.!?]+$/g, "").replace(/\s+/g, " ");
 }
 
 async function sha256Hex(value) {
@@ -115,15 +176,16 @@ async function readJson(response) {
 }
 
 async function startAnonymousSession(key, phrase) {
-  const wrapped = await wrapRecordingKey(key, phrase);
+  const secret = normalizedPhrase(phrase);
+  const wrapped = await wrapRecordingKey(key, secret);
   const response = await fetch(`${REC_API_BASE}/api/recordings/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
       accessMode: "anonymous",
       ...wrapped,
-      recoveryHashHex: await sha256Hex(phrase.trim().toLowerCase()),
-      retrievalHint: "Open Bondfire REC retrieval and enter the recovery phrase.",
+      recoveryHashHex: await sha256Hex(secret),
+      retrievalHint: "Open the Bondfire REC recovery link and use the memorable recovery sentence.",
     }),
   });
   return readJson(response);
@@ -152,7 +214,7 @@ async function fetchAnonymousManifest(archiveId, phrase) {
   const response = await fetch(`${REC_API_BASE}/api/retrieve/anonymous/manifest`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ archiveId: archiveId.trim(), phrase }),
+    body: JSON.stringify({ archiveId: archiveId.trim(), phrase: normalizedPhrase(phrase) }),
   });
   return readJson(response);
 }
@@ -161,7 +223,7 @@ async function fetchAnonymousChunk(archiveId, phrase, sequence) {
   const response = await fetch(`${REC_API_BASE}/api/retrieve/anonymous/chunk`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ archiveId, phrase, sequence }),
+    body: JSON.stringify({ archiveId, phrase: normalizedPhrase(phrase), sequence }),
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
@@ -176,9 +238,11 @@ function formatClock(seconds) {
   return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
-function recoveryLink(recordingId) {
+function recoveryLink(recordingId, phrase = "") {
   const base = `${window.location.origin}${window.location.pathname}`;
-  return `${base}#/capture?retrieve=1&archiveId=${encodeURIComponent(recordingId)}`;
+  const params = new URLSearchParams({ retrieve: "1", archiveId: recordingId });
+  if (phrase) params.set("phrase", phrase);
+  return `${base}#/capture?${params.toString()}`;
 }
 
 function saveHandoff(recordingId, phrase) {
@@ -188,7 +252,7 @@ function saveHandoff(recordingId, phrase) {
       JSON.stringify({
         recordingId,
         recoveryPhrase: phrase,
-        retrievalUrl: recoveryLink(recordingId),
+        retrievalUrl: recoveryLink(recordingId, phrase),
         savedAt: new Date().toISOString(),
       })
     );
@@ -213,10 +277,14 @@ export default function PublicCapture({ authed = false, embedded = false }) {
   const rawChunksRef = React.useRef([]);
   const reviewObjectUrlRef = React.useRef("");
   const startedAtRef = React.useRef(0);
+  const sessionReadyRef = React.useRef(null);
 
   const [status, setStatus] = React.useState("idle");
   const [recordingId, setRecordingId] = React.useState("");
   const [recoveryPhrase, setRecoveryPhrase] = React.useState("");
+  const [recoveryPromptOpen, setRecoveryPromptOpen] = React.useState(false);
+  const [recoveryShared, setRecoveryShared] = React.useState(false);
+  const [recoverySaved, setRecoverySaved] = React.useState(false);
   const [safeSeconds, setSafeSeconds] = React.useState(0);
   const [pendingChunks, setPendingChunks] = React.useState(0);
   const [failedChunks, setFailedChunks] = React.useState(0);
@@ -226,7 +294,7 @@ export default function PublicCapture({ authed = false, embedded = false }) {
   const [copied, setCopied] = React.useState("");
 
   const [retrieveId, setRetrieveId] = React.useState(() => searchParams.get("archiveId") || "");
-  const [retrievePhrase, setRetrievePhrase] = React.useState("");
+  const [retrievePhrase, setRetrievePhrase] = React.useState(() => searchParams.get("phrase") || "");
   const [retrieveBusy, setRetrieveBusy] = React.useState(false);
   const [retrieveNotice, setRetrieveNotice] = React.useState("");
   const [downloadUrl, setDownloadUrl] = React.useState("");
@@ -250,8 +318,57 @@ export default function PublicCapture({ authed = false, embedded = false }) {
       await navigator.clipboard.writeText(value);
       setCopied(label);
       window.setTimeout(() => setCopied(""), 1600);
+      return true;
     } catch {
       setCopied("");
+      return false;
+    }
+  }
+
+  async function initializeRemoteArchive(key, phrase) {
+    const session = await startAnonymousSession(key, phrase);
+    const nextRecordingId = String(session.recordingId || "");
+    if (!nextRecordingId) throw new Error("REC did not return an archive ID.");
+
+    recordingIdRef.current = nextRecordingId;
+    setRecordingId(nextRecordingId);
+    saveHandoff(nextRecordingId, phrase);
+
+    if (orgId) {
+      void api(`/api/orgs/${encodeURIComponent(orgId)}/witness`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: `REC video ${new Date().toLocaleString()}`,
+          summary: "Encrypted REC video capture. Recovery is controlled by the recorder-held recovery sentence or a shared safety handoff.",
+          happened_at: new Date().toISOString(),
+          visibility: "private",
+          tags: ["rec", "video", `archive:${nextRecordingId}`],
+        }),
+      }).catch((archiveError) => console.warn("REC archive metadata save failed", archiveError));
+    }
+
+    return { recordingId: nextRecordingId };
+  }
+
+  async function uploadChunkWhenReady(sequence, blob) {
+    setPendingChunks((count) => count + 1);
+    try {
+      const session = await sessionReadyRef.current;
+      if (!session?.recordingId || !keyRef.current) throw new Error("Remote archive is unavailable.");
+      const result = await uploadEncryptedChunk({
+        recordingId: session.recordingId,
+        sequence,
+        blob,
+        key: keyRef.current,
+      });
+      const reported = Number(result?.safeSeconds);
+      if (Number.isFinite(reported)) setSafeSeconds((current) => Math.max(current, reported));
+    } catch (chunkError) {
+      console.error("REC chunk upload failed", chunkError);
+      setFailedChunks((count) => count + 1);
+      setError("One or more encrypted chunks did not reach the remote archive. Keep recording if needed; REC is preserving the local review copy on this device.");
+    } finally {
+      setPendingChunks((count) => Math.max(0, count - 1));
     }
   }
 
@@ -263,17 +380,20 @@ export default function PublicCapture({ authed = false, embedded = false }) {
     setSafeSeconds(0);
     setElapsed(0);
     setReviewUrl("");
+    setRecordingId("");
+    setRecoveryShared(false);
+    setRecoverySaved(false);
+    setRecoveryPromptOpen(false);
+    recordingIdRef.current = "";
     rawChunksRef.current = [];
     sequenceRef.current = 0;
+    sessionReadyRef.current = null;
     setStatus("preparing");
 
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
         throw new Error("This browser cannot start camera recording here.");
       }
-
-      const phrase = makeRecoveryPhrase();
-      setRecoveryPhrase(phrase);
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -285,27 +405,10 @@ export default function PublicCapture({ authed = false, embedded = false }) {
         await videoRef.current.play();
       }
 
+      const phrase = makeRecoveryPhrase();
       const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+      setRecoveryPhrase(phrase);
       keyRef.current = key;
-      const session = await startAnonymousSession(key, phrase);
-      const nextRecordingId = String(session.recordingId || "");
-      if (!nextRecordingId) throw new Error("REC did not return an archive ID.");
-
-      recordingIdRef.current = nextRecordingId;
-      setRecordingId(nextRecordingId);
-      saveHandoff(nextRecordingId, phrase);
-      if (orgId) {
-        void api(`/api/orgs/${encodeURIComponent(orgId)}/witness`, {
-          method: "POST",
-          body: JSON.stringify({
-            title: `REC video ${new Date().toLocaleString()}`,
-            summary: "Encrypted REC video capture. Retrieve it with REC and the recorder-held recovery phrase.",
-            happened_at: new Date().toISOString(),
-            visibility: "private",
-            tags: ["rec", "video", `archive:${nextRecordingId}`],
-          }),
-        }).catch((archiveError) => console.warn("REC archive metadata save failed", archiveError));
-      }
 
       const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
         ? "video/webm;codecs=vp9,opus"
@@ -319,27 +422,12 @@ export default function PublicCapture({ authed = false, embedded = false }) {
         const blob = event.data;
         const sequence = sequenceRef.current++;
         rawChunksRef.current.push(blob);
-        setPendingChunks((count) => count + 1);
-        void uploadEncryptedChunk({
-          recordingId: recordingIdRef.current,
-          sequence,
-          blob,
-          key: keyRef.current,
-        })
-          .then((result) => {
-            const reported = Number(result?.safeSeconds);
-            if (Number.isFinite(reported)) setSafeSeconds((current) => Math.max(current, reported));
-          })
-          .catch((chunkError) => {
-            console.error("REC chunk upload failed", chunkError);
-            setFailedChunks((count) => count + 1);
-            setError("One or more encrypted chunks did not reach the archive. Keep this tab open and preserve the local review copy.");
-          })
-          .finally(() => setPendingChunks((count) => Math.max(0, count - 1)));
+        void uploadChunkWhenReady(sequence, blob);
       };
       recorder.onerror = () => setError("The browser recorder reported an error.");
       recorder.onstop = () => {
         setStatus("stopped");
+        setRecoveryPromptOpen(false);
         const blob = new Blob(rawChunksRef.current, { type: mimeType });
         if (reviewObjectUrlRef.current) URL.revokeObjectURL(reviewObjectUrlRef.current);
         const url = URL.createObjectURL(blob);
@@ -351,10 +439,18 @@ export default function PublicCapture({ authed = false, embedded = false }) {
       startedAtRef.current = Date.now();
       recorder.start(CHUNK_MS);
       setStatus("recording");
+      setRecoveryPromptOpen(true);
+
+      sessionReadyRef.current = initializeRemoteArchive(key, phrase).catch((archiveError) => {
+        console.error("REC archive initialization failed", archiveError);
+        setError(`${archiveError?.message || "Could not create the remote archive."} Recording is continuing locally.`);
+        throw archiveError;
+      });
     } catch (captureError) {
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
       setStatus("idle");
+      setRecoveryPromptOpen(false);
       setError(captureError?.message || "Could not start REC.");
     }
   }
@@ -367,6 +463,33 @@ export default function PublicCapture({ authed = false, embedded = false }) {
     startedAtRef.current = 0;
   }
 
+  async function saveRecoveryPhrase() {
+    const copiedOkay = await copyValue("phrase", recoveryPhrase);
+    if (copiedOkay) setRecoverySaved(true);
+    setRecoveryPromptOpen(false);
+  }
+
+  async function shareSafetyHandoff() {
+    if (!recordingId || !recoveryPhrase) return;
+    const url = recoveryLink(recordingId, recoveryPhrase);
+    const text = `Bondfire REC safety handoff\n\nA recording is active or was recently active. This link contains the recovery capability for the encrypted footage already received by REC.\n\n${url}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Bondfire REC safety handoff", text, url });
+      } else {
+        const copiedOkay = await copyValue("handoff", text);
+        if (!copiedOkay) throw new Error("Could not open the share sheet or copy the handoff.");
+      }
+      setRecoveryShared(true);
+      setRecoverySaved(true);
+      setRecoveryPromptOpen(false);
+    } catch (shareError) {
+      if (shareError?.name === "AbortError") return;
+      setError(shareError?.message || "Could not share the recovery handoff.");
+    }
+  }
+
   function signInWithCaptureReserved() {
     if (recordingId && recoveryPhrase) saveHandoff(recordingId, recoveryPhrase);
     navigate("/signin?mode=login&from=capture");
@@ -377,7 +500,7 @@ export default function PublicCapture({ authed = false, embedded = false }) {
     const archiveId = retrieveId.trim();
     const phrase = retrievePhrase.trim();
     if (!archiveId || !phrase) {
-      setRetrieveNotice("Archive ID and recovery phrase are required.");
+      setRetrieveNotice("The recovery link or both the archive ID and recovery sentence are required.");
       return;
     }
 
@@ -386,7 +509,7 @@ export default function PublicCapture({ authed = false, embedded = false }) {
     setError("");
     try {
       const manifest = await fetchAnonymousManifest(archiveId, phrase);
-      const key = await unwrapRecordingKey(manifest, phrase);
+      const key = await unwrapRecordingKey(manifest, normalizedPhrase(phrase));
       const decrypted = [];
       const chunks = [...(manifest.chunks || [])].sort((a, b) => Number(a.sequence) - Number(b.sequence));
 
@@ -404,7 +527,7 @@ export default function PublicCapture({ authed = false, embedded = false }) {
       const blob = new Blob(decrypted, { type: "video/webm" });
       const url = URL.createObjectURL(blob);
       setDownloadUrl(url);
-      setRetrieveNotice(`Recovered ${chunks.length} encrypted chunk${chunks.length === 1 ? "" : "s"}.`);
+      setRetrieveNotice(`Recovered ${chunks.length} encrypted chunk${chunks.length === 1 ? "" : "s"}. If the source recording is still active, repeat retrieval later for newer chunks.`);
     } catch (retrieveError) {
       setRetrieveNotice(retrieveError?.message || "Could not retrieve this archive.");
     } finally {
@@ -413,31 +536,41 @@ export default function PublicCapture({ authed = false, embedded = false }) {
   }
 
   if (retrieveMode) {
+    const sharedHandoff = Boolean(searchParams.get("archiveId") && searchParams.get("phrase"));
     return (
       <div className="bf-build-page">
         <header className="bf-build-hero">
           <div>
             <p className="bf-build-eyebrow">BONDFIRE // REC</p>
-            <h1>Retrieve an anonymous archive.</h1>
-            <p className="bf-build-lede">The archive ID locates the encrypted recording. The recovery phrase unlocks it on this device.</p>
+            <h1>{sharedHandoff ? "Safety handoff received." : "Retrieve an anonymous archive."}</h1>
+            <p className="bf-build-lede">
+              {sharedHandoff
+                ? "This recovery link carries the archive location and recovery sentence. Retrieval and decryption happen on this device."
+                : "Use a REC recovery link when possible. Older captures can still be recovered with their archive ID and recovery phrase."}
+            </p>
           </div>
         </header>
         <main style={{ width: "min(760px, calc(100% - 32px))", margin: "0 auto", padding: "42px 0 72px" }}>
           <form className="card" style={{ padding: 20, display: "grid", gap: 14 }} onSubmit={retrieveRecording}>
+            {!sharedHandoff ? (
+              <label style={{ display: "grid", gap: 6 }}>
+                <span className="bf-build-label">ARCHIVE ID</span>
+                <input className="input" value={retrieveId} onChange={(event) => setRetrieveId(event.target.value)} autoComplete="off" />
+              </label>
+            ) : null}
             <label style={{ display: "grid", gap: 6 }}>
-              <span className="bf-build-label">ARCHIVE ID</span>
-              <input className="input" value={retrieveId} onChange={(event) => setRetrieveId(event.target.value)} autoComplete="off" />
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span className="bf-build-label">RECOVERY PHRASE</span>
+              <span className="bf-build-label">RECOVERY SENTENCE</span>
               <input className="input" value={retrievePhrase} onChange={(event) => setRetrievePhrase(event.target.value)} autoComplete="off" />
             </label>
             <button className="btn-red" disabled={retrieveBusy}>{retrieveBusy ? "Retrieving…" : "Retrieve recording"}</button>
             {retrieveNotice ? <p className="helper" style={{ margin: 0 }}>{retrieveNotice}</p> : null}
             {downloadUrl ? (
-              <a className="btn" href={downloadUrl} download={`rec-${retrieveId || "archive"}.webm`} style={{ textAlign: "center", textDecoration: "none" }}>
-                Download recovered recording
-              </a>
+              <>
+                <video controls src={downloadUrl} style={{ width: "100%", maxHeight: 420, background: "#050606" }} />
+                <a className="btn" href={downloadUrl} download={`rec-${retrieveId || "archive"}.webm`} style={{ textAlign: "center", textDecoration: "none" }}>
+                  Download recovered recording
+                </a>
+              </>
             ) : null}
           </form>
           <div style={{ marginTop: 18 }}><Link className="helper" to={captureRoute}>Back to REC</Link></div>
@@ -446,6 +579,12 @@ export default function PublicCapture({ authed = false, embedded = false }) {
     );
   }
 
+  const recoveryStateLabel = recoveryShared
+    ? "Recovery shared"
+    : recoverySaved
+      ? "Recovery saved"
+      : "Recovery not shared";
+
   return (
     <div className="bf-build-page">
       <header className="bf-build-hero">
@@ -453,7 +592,9 @@ export default function PublicCapture({ authed = false, embedded = false }) {
           <p className="bf-build-eyebrow">BONDFIRE // REC</p>
           <h1>Record first.</h1>
           <p className="bf-build-lede">
-            {orgId ? "REC encrypts each chunk on this device before upload and keeps the recovery phrase with the recorder." : "No account gate. REC encrypts each chunk on this device before upload and gives you the recovery path."}
+            {orgId
+              ? "Tap REC and capture starts as soon as camera permission is available. Recovery and safety handoff come second."
+              : "No account gate. Tap REC first; recovery and safety handoff are offered after the timer is already moving."}
           </p>
         </div>
         <div className="bf-build-counter" aria-live="polite">
@@ -473,26 +614,55 @@ export default function PublicCapture({ authed = false, embedded = false }) {
                   <div>
                     <p className="bf-build-label">CAMERA + MICROPHONE</p>
                     <h2 style={{ margin: "8px 0" }}>Ready when you are.</h2>
-                    <p className="helper" style={{ margin: 0 }}>Permission is requested only when you start REC.</p>
+                    <p className="helper" style={{ margin: 0 }}>Nothing to fill out first. Browser permission is requested only when you tap REC.</p>
                   </div>
                 </div>
               ) : null}
             </div>
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
-              {status === "idle" ? (
-                <button className="btn-red" type="button" onClick={startCapture}>START REC</button>
-              ) : null}
-              {status === "preparing" ? <button className="btn-red" type="button" disabled>Preparing encrypted archive…</button> : null}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14, alignItems: "center" }}>
+              {status === "idle" ? <button className="btn-red" type="button" onClick={startCapture}>START REC</button> : null}
+              {status === "preparing" ? <button className="btn-red" type="button" disabled>OPENING CAMERA…</button> : null}
+              {status === "recording" ? <button className="btn-red" type="button" onClick={stopCapture}>STOP REC</button> : null}
               {status === "recording" ? (
-                <button className="btn-red" type="button" onClick={stopCapture}>STOP REC</button>
+                <button className="btn" type="button" onClick={() => setRecoveryPromptOpen(true)}>
+                  {recoveryStateLabel}
+                </button>
               ) : null}
-              {status === "stopped" ? (
-                <button className="btn" type="button" onClick={startCapture}>Start another recording</button>
-              ) : null}
+              {status === "stopped" ? <button className="btn" type="button" onClick={startCapture}>Start another recording</button> : null}
               <Link className="btn" to={`${captureRoute}?retrieve=1`} style={{ textDecoration: "none" }}>Retrieve archive</Link>
               <Link className="btn" to={backRoute} style={{ textDecoration: "none" }}>{orgId ? "Back to REC archive" : "Back"}</Link>
             </div>
+
+            {status === "recording" && recoveryPromptOpen ? (
+              <div
+                role="region"
+                aria-label="Protect this recording"
+                className="card"
+                style={{ marginTop: 14, padding: 16, border: "1px solid var(--bf-v3-line)", display: "grid", gap: 12 }}
+              >
+                <div>
+                  <p className="bf-build-label" style={{ margin: 0 }}>PROTECT THIS RECORDING</p>
+                  <h2 style={{ margin: "6px 0 8px" }}>Recording is already underway.</h2>
+                  <p className="helper" style={{ margin: 0 }}>Keep this sentence or hand recovery to someone away from the scene. Neither action stops recording.</p>
+                </div>
+                <div style={{ padding: 14, border: "1px solid var(--bf-v3-line)", borderRadius: 8 }}>
+                  <span className="bf-build-label">YOUR RECOVERY SENTENCE</span>
+                  <strong style={{ display: "block", marginTop: 8, fontSize: "clamp(18px, 3vw, 26px)", lineHeight: 1.35 }}>
+                    {recoveryPhrase}
+                  </strong>
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button className="btn-red" type="button" onClick={shareSafetyHandoff} disabled={!recordingId}>
+                    {recordingId ? "SEND TO SOMEONE I TRUST" : "SECURING REMOTE ARCHIVE…"}
+                  </button>
+                  <button className="btn" type="button" onClick={saveRecoveryPhrase}>
+                    {copied === "phrase" ? "COPIED" : "KEEP THIS SENTENCE"}
+                  </button>
+                  <button className="btn" type="button" onClick={() => setRecoveryPromptOpen(false)}>LATER</button>
+                </div>
+              </div>
+            ) : null}
 
             {error ? <div className="error" style={{ marginTop: 12 }}>{error}</div> : null}
 
@@ -509,35 +679,47 @@ export default function PublicCapture({ authed = false, embedded = false }) {
 
           <aside className="card" style={{ padding: 18, minWidth: 0 }}>
             <p className="bf-build-label">RECOVERY</p>
-            <h2 style={{ margin: "8px 0 12px" }}>{recordingId ? "Archive reserved." : "Recovery appears before capture starts."}</h2>
+            <h2 style={{ margin: "8px 0 12px" }}>
+              {status === "recording"
+                ? "Capture first. Recovery second."
+                : recordingId
+                  ? "This capture has a recovery path."
+                  : "Recovery is created automatically."}
+            </h2>
             <p className="helper">
-              {recordingId
-                ? "Keep both values. The archive can be recovered without a Bondfire account."
-                : "REC will create a recovery phrase and anonymous archive before the recorder begins writing chunks."}
+              {status === "recording"
+                ? "The recorder is already running. REC is securing encrypted chunks remotely while you decide whether to save or share recovery."
+                : "New captures use one memorable recovery sentence. A shared safety link carries the archive location automatically."}
             </p>
 
-            {recordingId ? (
+            {recoveryPhrase ? (
               <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
                 <div style={{ borderTop: "1px solid var(--bf-v3-line)", paddingTop: 12 }}>
-                  <span className="bf-build-label">ARCHIVE ID</span>
-                  <code style={{ display: "block", marginTop: 6, overflowWrap: "anywhere", color: "var(--bf-v3-cream)" }}>{recordingId}</code>
-                  <button className="btn" type="button" onClick={() => copyValue("id", recordingId)} style={{ marginTop: 8 }}>
-                    {copied === "id" ? "Copied" : "Copy archive ID"}
-                  </button>
+                  <span className="bf-build-label">RECOVERY SENTENCE</span>
+                  <strong style={{ display: "block", marginTop: 8, lineHeight: 1.45 }}>{recoveryPhrase}</strong>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                    <button className="btn" type="button" onClick={() => copyValue("phrase", recoveryPhrase)}>
+                      {copied === "phrase" ? "Copied" : "Copy sentence"}
+                    </button>
+                    {recordingId ? (
+                      <button className="btn" type="button" onClick={shareSafetyHandoff}>
+                        {recoveryShared ? "Shared" : "Send safety handoff"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-                <div style={{ borderTop: "1px solid var(--bf-v3-line)", paddingTop: 12 }}>
-                  <span className="bf-build-label">RECOVERY PHRASE</span>
-                  <code style={{ display: "block", marginTop: 6, overflowWrap: "anywhere", color: "var(--bf-v3-cream)" }}>{recoveryPhrase}</code>
-                  <button className="btn" type="button" onClick={() => copyValue("phrase", recoveryPhrase)} style={{ marginTop: 8 }}>
-                    {copied === "phrase" ? "Copied" : "Copy recovery phrase"}
-                  </button>
-                </div>
-                <div style={{ borderTop: "1px solid var(--bf-v3-line)", paddingTop: 12 }}>
-                  <span className="bf-build-label">RETRIEVAL LINK</span>
-                  <button className="btn" type="button" onClick={() => copyValue("link", recoveryLink(recordingId))} style={{ marginTop: 8 }}>
-                    {copied === "link" ? "Copied" : "Copy retrieval link"}
-                  </button>
-                </div>
+                {recordingId ? (
+                  <details style={{ borderTop: "1px solid var(--bf-v3-line)", paddingTop: 12 }}>
+                    <summary className="helper" style={{ cursor: "pointer" }}>Advanced recovery details</summary>
+                    <div style={{ marginTop: 10 }}>
+                      <span className="bf-build-label">ARCHIVE ID</span>
+                      <code style={{ display: "block", marginTop: 6, overflowWrap: "anywhere", color: "var(--bf-v3-cream)" }}>{recordingId}</code>
+                      <button className="btn" type="button" onClick={() => copyValue("id", recordingId)} style={{ marginTop: 8 }}>
+                        {copied === "id" ? "Copied" : "Copy archive ID"}
+                      </button>
+                    </div>
+                  </details>
+                ) : null}
               </div>
             ) : null}
 
@@ -553,8 +735,8 @@ export default function PublicCapture({ authed = false, embedded = false }) {
               <div style={{ borderTop: "1px solid var(--bf-v3-line)", marginTop: 18, paddingTop: 14 }}>
                 <p className="helper" style={{ marginTop: 0 }}>
                   {authed
-                    ? "You are already signed in to Bondfire. This REC archive remains protected by its recovery phrase."
-                    : "The recording is already reserved anonymously. Signing in is optional and will not discard this recovery path."}
+                    ? "You are signed in to Bondfire. This REC archive still requires its recovery sentence or safety handoff."
+                    : "The recording is already reserved anonymously. Signing in is optional and does not discard this recovery path."}
                 </p>
                 {!authed ? (
                   <button className="btn-red" type="button" onClick={signInWithCaptureReserved}>SIGN IN WITH THIS CAPTURE RESERVED</button>
