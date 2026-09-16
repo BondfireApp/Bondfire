@@ -42,6 +42,19 @@
   color: rgba(255,255,255,.9);
   font-size: 13px;
   font-weight: 750;
+  text-decoration: none;
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.bf-globalOrgPill:hover {
+  background: rgba(255,255,255,.10);
+  border-color: rgba(255,255,255,.24);
+  color: #fff;
+}
+
+.bf-globalOrgPill:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
 }
 
 .bf-globalOrgPill img {

@@ -152,7 +152,12 @@ function Brand({ orgId }) {
       </Link>
 
       {orgId ? (
-        <span className="bf-globalOrgPill" title={label}>
+        <Link
+          className="bf-globalOrgPill"
+          to={`/org/${encodeURIComponent(orgId)}/overview`}
+          title={`Open ${label} dashboard`}
+          aria-label={`Open ${label} dashboard`}
+        >
           {orgLogo ? (
             <img
               src={orgLogo}
@@ -163,7 +168,7 @@ function Brand({ orgId }) {
             />
           ) : null}
           <span>{label}</span>
-        </span>
+        </Link>
       ) : null}
     </div>
   );

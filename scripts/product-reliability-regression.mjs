@@ -18,6 +18,7 @@ const checks = [
   ["mobile overflow guard exists", "src/reliability.css", /overflow-x:\s*clip/],
   ["reduced motion is respected", "src/reliability.css", /prefers-reduced-motion:\s*reduce/],
   ["global nav uses the approved core logo", "src/components/AppHeader.jsx", /\/logos\/core\.png/],
+  ["organization pill returns to the current org dashboard", "src/components/AppHeader.jsx", /bf-globalOrgPill[\s\S]*\/org\/\$\{encodeURIComponent\(orgId\)\}\/overview/],
   ["settings remain directly reachable", "src/components/AppHeader.jsx", /Organization settings/],
   ["support remains reachable from global navigation", "src/components/AppHeader.jsx", /\/support/],
   ["native Colophon keeps image logo upload", "src/modules/colophon/ColophonNativeModule.jsx", /NativeLogoUploadBridge/],
