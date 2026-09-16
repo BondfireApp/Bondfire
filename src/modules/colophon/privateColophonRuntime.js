@@ -109,6 +109,26 @@ function forbidden(message = "This publishing action requires a higher organizat
   return response({ ok: false, error: message }, 403);
 }
 
+const contentWriteLocks = new Map();
+const recentContentWrites = new Map();
+
+async function withContentWriteLock(key, task) {
+  const previous = contentWriteLocks.get(key) || Promise.resolve();
+  const run = previous.catch(() => {}).then(task);
+  contentWriteLocks.set(key, run);
+  try { return await run; }
+  finally { if (contentWriteLocks.get(key) === run) contentWriteLocks.delete(key); }
+}
+
+function recentContentWrite(key) {
+  const entry = recentContentWrites.get(key);
+  if (!entry || Date.now() - entry.at > 15_000) {
+    recentContentWrites.delete(key);
+    return null;
+  }
+  return entry;
+}
+
 const DEFAULT_SETUP = Object.freeze({
   firstRunComplete: false,
   preset: "simple",
@@ -135,40 +155,61 @@ async function handleNativeContent(orgId, url, input, init, session) {
     if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) return response({ ok: false, error: "INVALID_CONTENT" }, 400);
     if (String(incoming.status || "").toLowerCase() === "published" && rank < 2) return forbidden("Editor capability required to publish.");
     const id = String(incoming.id || makeId("native"));
-    const existing = await recordExists(orgId, KIND.content, id);
-    if (existing && body.expectedUpdatedAt && String(existing.updatedAt || "") !== String(body.expectedUpdatedAt)) {
-      return response({ ok: false, conflict: true, error: "This content changed since you opened it. Reload the latest version before saving over it.", current: existing }, 409);
-    }
-    const now = nowIso();
-    const requestedStatus = String(incoming.status || existing?.status || "draft");
-    const status = rank < 2 && String(existing?.status || "").toLowerCase() === "published" ? "draft" : requestedStatus;
-    const item = {
-      ...(existing || {}), ...incoming,
-      id,
-      slug: String(incoming.slug || existing?.slug || slugify(incoming.title || id)),
-      type: String(incoming.type || incoming.contentType || existing?.type || "article"),
-      status,
-      createdAt: String(existing?.createdAt || incoming.createdAt || now),
-      updatedAt: now,
-      ...(status.toLowerCase() === "published" ? { publishedAt: String(incoming.publishedAt || existing?.publishedAt || now) } : {}),
-    };
-    const saved = await saveRecord(orgId, KIND.content, item, id);
-    const revision = {
-      id: makeId("revision"),
-      nativeContentId: id,
-      snapshot: item,
-      revisionNote: String(body.revisionNote || "save"),
-      createdAt: now,
-    };
-    try { await saveRecord(orgId, KIND.revisions, revision, revision.id); } catch {}
-    if (rank >= 2) {
-      try {
-        await publish(orgId, { kind: "content", id, public: status.toLowerCase() === "published" ? item : null });
-      } catch (error) {
-        return response({ ok: false, saved: true, item: saved, error: `Encrypted draft saved, but the public copy could not be updated: ${error.message}` }, 502);
+    const writeKey = `${orgId}:${id}`;
+    return withContentWriteLock(writeKey, async () => {
+      const existing = await recordExists(orgId, KIND.content, id);
+      const expectedUpdatedAt = String(body.expectedUpdatedAt || "");
+      const currentUpdatedAt = String(existing?.updatedAt || "");
+      const recent = recentContentWrite(writeKey);
+      if (existing && expectedUpdatedAt && currentUpdatedAt !== expectedUpdatedAt) {
+        const note = String(body.revisionNote || "save").toLowerCase();
+        const locallyAdvanced = recent
+          && String(recent.previousUpdatedAt || "") === expectedUpdatedAt
+          && String(recent.updatedAt || "") === currentUpdatedAt;
+        if (note === "autosave" && recent && String(recent.updatedAt || "") === currentUpdatedAt) {
+          return response({ ok: true, item: existing, saved: false, skipped: true, mode: "member-only" });
+        }
+        if (!locallyAdvanced) {
+          return response({ ok: false, conflict: true, error: "This content changed since you opened it. Reload the latest version before saving over it.", current: existing }, 409);
+        }
       }
-    }
-    return response({ ok: true, item: saved, saved: true, mode: "member-only" });
+      const now = nowIso();
+      const requestedStatus = String(incoming.status || existing?.status || "draft");
+      const status = rank < 2 && String(existing?.status || "").toLowerCase() === "published" ? "draft" : requestedStatus;
+      const item = {
+        ...(existing || {}), ...incoming,
+        id,
+        slug: String(incoming.slug || existing?.slug || slugify(incoming.title || id)),
+        type: String(incoming.type || incoming.contentType || existing?.type || "article"),
+        status,
+        createdAt: String(existing?.createdAt || incoming.createdAt || now),
+        updatedAt: now,
+        ...(status.toLowerCase() === "published" ? { publishedAt: String(incoming.publishedAt || existing?.publishedAt || now) } : {}),
+      };
+      const saved = await saveRecord(orgId, KIND.content, item, id);
+      recentContentWrites.set(writeKey, {
+        previousUpdatedAt: expectedUpdatedAt || currentUpdatedAt,
+        updatedAt: String(saved?.updatedAt || item.updatedAt || ""),
+        revisionNote: String(body.revisionNote || "save"),
+        at: Date.now(),
+      });
+      const revision = {
+        id: makeId("revision"),
+        nativeContentId: id,
+        snapshot: item,
+        revisionNote: String(body.revisionNote || "save"),
+        createdAt: now,
+      };
+      try { await saveRecord(orgId, KIND.revisions, revision, revision.id); } catch {}
+      if (rank >= 2) {
+        try {
+          await publish(orgId, { kind: "content", id, public: status.toLowerCase() === "published" ? item : null });
+        } catch (error) {
+          return response({ ok: false, saved: true, item: saved, error: `Encrypted draft saved, but the public copy could not be updated: ${error.message}` }, 502);
+        }
+      }
+      return response({ ok: true, item: saved, saved: true, mode: "member-only" });
+    });
   }
   if (method === "DELETE") {
     if (rank < 2) return forbidden("Editor capability required for deletion.");
