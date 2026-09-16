@@ -300,6 +300,97 @@ function NativePublicationDomainSettingsBridge({ orgId }) {
   );
 }
 
+function NativePostsTrashBridge() {
+  const location = useLocation();
+  const onPostsPage = /\/wp-admin\/posts\/?$/.test(location.pathname);
+
+  React.useEffect(() => {
+    if (!onPostsPage || typeof document === "undefined") return undefined;
+    const shell = document.querySelector(".bondfire-colophon-native-shell");
+    if (!shell) return undefined;
+
+    let deleting = false;
+    const sync = () => {
+      const activeTab = shell.querySelector(".wp-view-tab.is-active");
+      shell.dataset.bfPostsTab = String(activeTab?.textContent || "all").trim().toLowerCase();
+      shell.querySelectorAll(".wp-posts-table tbody tr").forEach((row) => {
+        if (row.classList.contains("wp-quick-edit-row")) return;
+        const status = String(row.children?.[2]?.textContent || "").trim().split("/")[0].trim().toLowerCase();
+        if (status) row.dataset.bfPostStatus = status;
+      });
+    };
+
+    async function emptyServerTrash(button) {
+      if (deleting) return;
+      deleting = true;
+      const previousText = button.textContent;
+      button.disabled = true;
+      button.textContent = "Emptying…";
+      try {
+        const listResponse = await fetch("/api/native-content?status=trash", {
+          credentials: "same-origin",
+          headers: { accept: "application/json" },
+        });
+        const listData = await listResponse.json().catch(() => ({}));
+        if (!listResponse.ok || listData?.ok === false) throw new Error(listData?.error || `Trash load failed (${listResponse.status})`);
+        for (const item of Array.isArray(listData?.items) ? listData.items : []) {
+          const id = String(item?.id || "").trim();
+          if (!id) continue;
+          const deleteResponse = await fetch(`/api/native-content?id=${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            credentials: "same-origin",
+            headers: { accept: "application/json" },
+          });
+          const deleteData = await deleteResponse.json().catch(() => ({}));
+          if (!deleteResponse.ok || deleteData?.ok === false) throw new Error(deleteData?.error || `Delete failed (${deleteResponse.status})`);
+        }
+        window.location.reload();
+      } catch (error) {
+        deleting = false;
+        button.disabled = false;
+        button.textContent = previousText;
+        const notices = shell.querySelector(".wp-admin-notices") || shell.querySelector(".wp-screen-header")?.parentElement;
+        if (notices) {
+          const notice = document.createElement("div");
+          notice.className = "wp-notice wp-notice--error";
+          notice.setAttribute("role", "alert");
+          const message = document.createElement("p");
+          message.textContent = `Empty Trash failed: ${String(error?.message || error)}`;
+          notice.appendChild(message);
+          notices.appendChild(notice);
+        }
+      }
+    }
+
+    const onClick = (event) => {
+      const button = event.target?.closest?.("button");
+      if (!button || !shell.contains(button)) return;
+      const text = String(button.textContent || "").trim().toLowerCase();
+      const controls = button.closest(".wp-list-controls");
+      const selectedAction = String(controls?.querySelector("select")?.value || "");
+      const directEmpty = text === "empty trash";
+      const bulkEmpty = text === "apply" && selectedAction === "empty-trash";
+      if (!directEmpty && !bulkEmpty) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      void emptyServerTrash(button);
+    };
+
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(shell, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class"] });
+    document.addEventListener("click", onClick, true);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("click", onClick, true);
+      delete shell.dataset.bfPostsTab;
+    };
+  }, [onPostsPage]);
+
+  return null;
+}
+
 function NativePublicAdminToolbarBridge({ routeBase, capabilities }) {
   const location = useLocation();
   const [target, setTarget] = React.useState(null);
@@ -538,6 +629,7 @@ export default function ColophonNativeModule({ Workspace }) {
       <ColophonNativeStyles />
       <NativeLogoUploadBridge />
       <NativePublicationDomainSettingsBridge orgId={orgId} />
+      <NativePostsTrashBridge />
       <NativePublicAdminToolbarBridge routeBase={host.routeBase} capabilities={host.capabilities} />
       <NativeColophonFooterLinkBridge />
       <ColophonPublicLinkGuard routeBase={host.routeBase} />

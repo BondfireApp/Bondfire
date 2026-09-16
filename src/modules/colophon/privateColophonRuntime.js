@@ -158,11 +158,15 @@ async function handleNativeContent(orgId, url, input, init, session) {
     const writeKey = `${orgId}:${id}`;
     return withContentWriteLock(writeKey, async () => {
       const existing = await recordExists(orgId, KIND.content, id);
+      const note = String(body.revisionNote || "save").toLowerCase();
+      const statusOnlyMutation = ["trash", "bulk trash", "restore", "bulk restore"].includes(note);
+      if (statusOnlyMutation && !existing) {
+        return response({ ok: false, error: "CONTENT_NOT_FOUND" }, 404);
+      }
       const expectedUpdatedAt = String(body.expectedUpdatedAt || "");
       const currentUpdatedAt = String(existing?.updatedAt || "");
       const recent = recentContentWrite(writeKey);
-      if (existing && expectedUpdatedAt && currentUpdatedAt !== expectedUpdatedAt) {
-        const note = String(body.revisionNote || "save").toLowerCase();
+      if (existing && expectedUpdatedAt && currentUpdatedAt !== expectedUpdatedAt && !statusOnlyMutation) {
         const locallyAdvanced = recent
           && String(recent.previousUpdatedAt || "") === expectedUpdatedAt
           && String(recent.updatedAt || "") === currentUpdatedAt;
@@ -176,15 +180,22 @@ async function handleNativeContent(orgId, url, input, init, session) {
       const now = nowIso();
       const requestedStatus = String(incoming.status || existing?.status || "draft");
       const status = rank < 2 && String(existing?.status || "").toLowerCase() === "published" ? "draft" : requestedStatus;
+      const incomingForSave = statusOnlyMutation && existing
+        ? {
+            status,
+            workflowState: status.toLowerCase() === "trash" ? "trash" : status.toLowerCase() === "draft" ? "draft" : String(existing.workflowState || incoming.workflowState || status),
+          }
+        : incoming;
+      const derivedSource = statusOnlyMutation && existing ? existing : incoming;
       const item = {
-        ...(existing || {}), ...incoming,
+        ...(existing || {}), ...incomingForSave,
         id,
-        slug: String(incoming.slug || existing?.slug || slugify(incoming.title || id)),
-        type: String(incoming.type || incoming.contentType || existing?.type || "article"),
+        slug: String(derivedSource.slug || existing?.slug || slugify(derivedSource.title || id)),
+        type: String(derivedSource.type || derivedSource.contentType || existing?.type || "article"),
         status,
-        createdAt: String(existing?.createdAt || incoming.createdAt || now),
+        createdAt: String(existing?.createdAt || derivedSource.createdAt || now),
         updatedAt: now,
-        ...(status.toLowerCase() === "published" ? { publishedAt: String(incoming.publishedAt || existing?.publishedAt || now) } : {}),
+        ...(status.toLowerCase() === "published" ? { publishedAt: String(derivedSource.publishedAt || existing?.publishedAt || now) } : {}),
       };
       const saved = await saveRecord(orgId, KIND.content, item, id);
       recentContentWrites.set(writeKey, {

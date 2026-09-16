@@ -333,3 +333,37 @@ html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp
 html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice__dismiss:hover {
   color: #ffffff !important;
 }
+
+
+/* Keep the Posts list controls legible and compact in Bondfire dark mode. */
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-list-controls :where(select, input),
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-quick-edit :where(select, input) {
+  background: #0f1316 !important;
+  color: #f0f3f5 !important;
+  border: 1px solid #53616c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-list-controls select option,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-quick-edit select option {
+  background: #15191d !important;
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-view-tab,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-row-actions :where(a, button) {
+  color: #8fc7f0 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-view-tab.is-active {
+  color: #ffffff !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-list-controls {
+  align-items: stretch;
+}
+
+
+/* WordPress-style behavior: trashed posts do not remain in the All view. */
+.bondfire-colophon-native-shell[data-bf-posts-tab="all"] .wp-posts-table tbody tr[data-bf-post-status="trash"] {
+  display: none !important;
+}
