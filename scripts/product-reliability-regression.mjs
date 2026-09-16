@@ -19,6 +19,7 @@ const checks = [
   ["support remains reachable from global navigation", "src/components/AppHeader.jsx", /\/support/],
   ["native Colophon keeps image logo upload", "src/modules/colophon/ColophonNativeModule.jsx", /NativeLogoUploadBridge/],
   ["native Colophon keeps publication-site routing separate", "src/modules/colophon/ColophonNativeModule.jsx", /ColophonPublicLinkGuard/],
+  ["private organization boundary allows encrypted Colophon", "src/components/PrivateOrgBoundary.jsx", /studio\|colophon/],
   ["support exposes a maintainer contact", "src/pages/Support.jsx", /support@bondfireapp\.org/],
   ["support has safe network failure guidance", "src/pages/Support.jsx", /server could not be reached/i],
   ["PWA runs standalone", "public/manifest.webmanifest", /"display"\s*:\s*"standalone"/],
