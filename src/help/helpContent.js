@@ -337,7 +337,7 @@ export const HELP_TOPICS = [
         "h": "Verification and encryption (practical version)",
         "p": [
           "If the room is encrypted, verify your Element session so new devices cannot silently impersonate you.",
-          "Element will guide you through verifying using a security phrase or emoji comparison between devices. Do that once, then you are usually set."
+          "In FireChat, use your saved recovery code/key first. It can verify a new session without another device. If you do not have or remember it, use emoji comparison with another trusted Matrix session as the fallback."
         ]
       }
     ]

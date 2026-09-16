@@ -12,6 +12,7 @@ import {
   VerifierEvent,
   canAcceptVerificationRequest,
 } from "matrix-js-sdk/lib/crypto-api";
+import { decodeRecoveryKey } from "matrix-js-sdk/lib/crypto-api/recovery-key.js";
 
 const GLOBAL_MATRIX_KEY = "__bf_matrix_client__";
 const MATRIX_SESSION_KEY = "bf_matrix_session";
@@ -265,9 +266,11 @@ async function getDeviceVerifiedTruth(client) {
       if (res === true) return true;
       if (res === false) return false;
       if (res && typeof res === "object") {
+        if (res.crossSigningVerified === true) return true;
         if (res.isVerified === true) return true;
         if (res.verified === true) return true;
         if (res.isCrossSigningVerified === true) return true;
+        if (res.crossSigningVerified === false) return false;
         if (res.isVerified === false) return false;
         if (res.verified === false) return false;
       }
@@ -322,6 +325,8 @@ export default function BondfireChat() {
   const [verificationReq, setVerificationReq] = useState(null);
   const [sasData, setSasData] = useState(null);
   const [verifyMsg, setVerifyMsg] = useState("");
+  const [recoveryKey, setRecoveryKey] = useState("");
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
 
   const [rooms, setRooms] = useState([]);
   const [activeRoomId, setActiveRoomId] = useState(null);
@@ -338,6 +343,7 @@ export default function BondfireChat() {
 
   const clientRef = useRef(null);
   const verifierRef = useRef(null);
+  const recoveryKeyRef = useRef(null);
   const activeRoomIdRef = useRef(null);
   const stoppedRef = useRef(false);
 
@@ -576,6 +582,14 @@ export default function BondfireChat() {
         deviceId: did || undefined,
         store,
         cryptoStore,
+        cryptoCallbacks: {
+          getSecretStorageKey: async ({ keys }) => {
+            const privateKey = recoveryKeyRef.current;
+            if (!privateKey) return null;
+            const keyId = Object.keys(keys || {})[0];
+            return keyId ? [keyId, privateKey] : null;
+          },
+        },
       });
 
       setGlobalMatrix({
@@ -721,6 +735,64 @@ export default function BondfireChat() {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [refreshRooms, refreshVerificationTruth]);
+
+  async function verifyWithRecoveryKey() {
+    const client = clientRef.current;
+    const crypto = client?.getCrypto?.();
+    const entered = recoveryKey.trim();
+    if (!client || !crypto || !entered || recoveryBusy) return;
+
+    setRecoveryBusy(true);
+    setVerifyMsg("Unlocking encrypted identity with your recovery code…");
+    try {
+      recoveryKeyRef.current = decodeRecoveryKey(entered);
+
+      const hasCrossSigning = await crypto.userHasCrossSigningKeys?.(client.getUserId?.(), true);
+      if (hasCrossSigning === false) {
+        throw new Error(
+          "This Matrix account has no recoverable cross-signing identity. Use emoji verification from a trusted device instead."
+        );
+      }
+
+      if (typeof crypto.bootstrapCrossSigning === "function") {
+        await crypto.bootstrapCrossSigning({});
+      }
+      if (typeof crypto.crossSignDevice === "function") {
+        await crypto.crossSignDevice(client.getDeviceId?.());
+      }
+      try {
+        await crypto.loadSessionBackupPrivateKeyFromSecretStorage?.();
+      } catch {}
+
+      let verified = false;
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        const truth = await getDeviceVerifiedTruth(client);
+        if (truth === true) {
+          verified = true;
+          break;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 300));
+      }
+
+      if (!verified) {
+        throw new Error(
+          "The recovery code was accepted, but Matrix did not confirm this device as cross-signed."
+        );
+      }
+
+      markThisDeviceVerified();
+      setRecoveryKey("");
+      setVerifyMsg("Verified with recovery code ✅");
+      setVerificationReq(null);
+      setSasData(null);
+      verifierRef.current = null;
+    } catch (e) {
+      recoveryKeyRef.current = null;
+      setVerifyMsg(`Recovery failed: ${e?.message || String(e)} You can use emoji verification below instead.`);
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }
 
   async function requestOwnVerification() {
     const client = clientRef.current;
@@ -904,6 +976,8 @@ export default function BondfireChat() {
     } catch {}
 
     setDeviceVerified(false);
+    recoveryKeyRef.current = null;
+    setRecoveryKey("");
 
     const client = clientRef.current;
     clientRef.current = null;
@@ -960,6 +1034,8 @@ export default function BondfireChat() {
     setMsg("");
     cleanupVerification("");
     setDeviceVerified(false);
+    recoveryKeyRef.current = null;
+    setRecoveryKey("");
 
     window.location.replace(window.location.href);
   };
@@ -1080,88 +1156,83 @@ export default function BondfireChat() {
               Crypto isn’t ready yet, so verification can’t start.
             </div>
           ) : deviceVerified && !verificationReq ? (
-            <>
-              <div className="helper">
-                This device is verified for this account. You should be able to read and send E2EE messages in encrypted rooms. 🔒
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                <button className="btn" onClick={requestOwnVerification}>
-                  Re-verify (optional)
-                </button>
-              </div>
-            </>
-          ) : verificationReq ? (
-            <>
-              <div className="helper">
-                From: {verificationReq.otherUserId} · {verificationReq.otherDeviceId}
-              </div>
-
-              {sasData?.emoji || sasData?.decimal ? (
-                <>
-                  {sasData.emoji ? (
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 12,
-                        flexWrap: "wrap",
-                        alignItems: "center",
-                        marginTop: 12,
-                      }}
-                    >
-                      {sasData.emoji.map(([emoji, name], i) => (
-                        <div
-                          key={i}
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            minWidth: 56,
-                          }}
-                        >
-                          <div style={{ fontSize: 28, lineHeight: 1 }}>{emoji}</div>
-                          <div style={{ fontSize: 11, opacity: 0.8 }}>{name}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="helper" style={{ marginTop: 12 }}>
-                      Code: {Array.isArray(sasData.decimal) ? sasData.decimal.join(" ") : ""}
-                    </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                    <button className="btn" onClick={confirmSas}>
-                      Confirm match
-                    </button>
-                    <button className="btn" onClick={mismatchSas}>
-                      Doesn’t match
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                  <button className="btn" onClick={acceptVerification}>
-                    Accept
-                  </button>
-                  <button className="btn" onClick={startSas}>
-                    Start SAS
-                  </button>
-                </div>
-              )}
-            </>
+            <div className="helper">
+              This device is verified for this account. You should be able to read and send E2EE messages in encrypted rooms. 🔒
+            </div>
           ) : (
             <>
               <div className="helper">
-                No active verification request. If you have another device (or Element) signed in, start verification from either side.
+                Enter the recovery code you saved for this Matrix account. This is the normal verification method and does not require another device.
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                <button className="btn" onClick={requestOwnVerification}>
-                  Request verification
-                </button>
-                <button className="btn" onClick={checkPendingVerification}>
-                  Check pending
+                <input
+                  className="input"
+                  type="password"
+                  autoComplete="off"
+                  value={recoveryKey}
+                  onChange={(e) => setRecoveryKey(e.target.value)}
+                  placeholder="Recovery code / key"
+                  aria-label="Recovery code"
+                  style={{ flex: "1 1 280px" }}
+                />
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={verifyWithRecoveryKey}
+                  disabled={!recoveryKey.trim() || recoveryBusy}
+                >
+                  {recoveryBusy ? "Verifying…" : "Verify with recovery code"}
                 </button>
               </div>
+
+              <div className="helper" style={{ marginTop: 14 }}>
+                Don’t have or remember the recovery code? Use emoji verification with another trusted Matrix session instead.
+              </div>
+
+              {verificationReq ? (
+                <>
+                  <div className="helper" style={{ marginTop: 10 }}>
+                    Emoji verification with: {verificationReq.otherUserId} · {verificationReq.otherDeviceId}
+                  </div>
+
+                  {sasData?.emoji || sasData?.decimal ? (
+                    <>
+                      {sasData.emoji ? (
+                        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+                          {sasData.emoji.map(([emoji, name], i) => (
+                            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56 }}>
+                              <div style={{ fontSize: 28, lineHeight: 1 }}>{emoji}</div>
+                              <div style={{ fontSize: 11, opacity: 0.8 }}>{name}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="helper" style={{ marginTop: 12 }}>
+                          Code: {Array.isArray(sasData.decimal) ? sasData.decimal.join(" ") : ""}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                        <button className="btn" onClick={confirmSas}>Confirm match</button>
+                        <button className="btn" onClick={mismatchSas}>Doesn’t match</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                      <button className="btn" onClick={acceptVerification}>Accept</button>
+                      <button className="btn" onClick={startSas}>Start emoji verification</button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                  <button className="btn" type="button" onClick={requestOwnVerification}>
+                    Verify with emoji instead
+                  </button>
+                  <button className="btn" type="button" onClick={checkPendingVerification}>
+                    Check pending emoji request
+                  </button>
+                </div>
+              )}
             </>
           )}
 
