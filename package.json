@@ -28,7 +28,7 @@
   "dependencies": {
     "colophon": "https://github.com/colophon-hub/colophon/archive/639561cd7a56d6c6d410767b43c0f0f4a28442eb.tar.gz",
     "lucide-react": "^0.577.0",
-    "matrix-js-sdk": "^37.13.0",
+    "matrix-js-sdk": "^38.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-grid-layout": "^2.2.2",
