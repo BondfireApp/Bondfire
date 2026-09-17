@@ -105,9 +105,12 @@ export function createPublicColophonFetchBridge({ orgId, baseFetch = fetch, orig
       });
     }
 
-    // The custom-domain Colophon runtime is intentionally read-only. Unknown
-    // canonical Colophon endpoints stay inside this namespace and fail closed
-    // instead of falling through to Bondfire's private/general API surface.
+    if (["/native-content", "/public-site-config"].includes(endpoint) && !["GET", "HEAD", "OPTIONS"].includes(method)) {
+      return responseJson({ ok: false, error: "PUBLICATION_READ_ONLY" }, 405);
+    }
+
+    // Unknown canonical Colophon endpoints stay inside this namespace and fail
+    // closed instead of falling through to Bondfire's private/general API surface.
     return responseJson({ ok: false, error: "PUBLICATION_RUNTIME_ENDPOINT_UNAVAILABLE" }, 404);
   };
 }
