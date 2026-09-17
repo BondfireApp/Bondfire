@@ -13,7 +13,8 @@ export async function loadScopedKeys(orgId,transport,passphrase) {
     let key;
     if(passphrase&&row.recovery)key=await unwrapOrgKeyFromRecovery(JSON.parse(row.recovery),passphrase);
     else if(row.wrapped_key)key=await unwrapOrgKey(row.wrapped_key);
-    else throw new Error('This device needs its current scoped keys. An owner must provision it in Security.');
+    else if(row.recovery)throw new Error('This browser does not have the current scoped keys. Open Settings → Security → Role-based encryption keys and choose Restore keys on this device.');
+    else throw new Error('This browser does not have the current scoped keys. An owner must provision this device in Security.');
     const check=await decryptPrivate(key,row.key_check,orgId,'scope-check/'+row.scope,orgId);
     if(check.scope!==row.scope||check.epoch!==info.epoch)throw new Error('Scoped key verification failed.');
     const archive=await decryptPrivate(key,row.archive,orgId,'scope-archive/'+row.scope,orgId);
