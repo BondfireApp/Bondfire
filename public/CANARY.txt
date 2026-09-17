@@ -1,0 +1,20 @@
+BONDFIRE CANARY
+STATUS: NO CURRENT SIGNED STATEMENT
+
+This file is a publication template, not a signed canary.
+
+A human-reviewed issue must include:
+- exact statement text
+- issued date
+- expiration date
+- contemporary public reference
+- OpenPGP signature
+- signing-key fingerprint
+
+Target manual review dates: February 1, May 1, August 1, November 1.
+
+Do not automatically generate or sign future statements.
+The canary applies to hosted Bondfire infrastructure only.
+Self-hosted deployments are controlled by their respective operators.
+
+An expired or missing canary is not proof of any particular event.
