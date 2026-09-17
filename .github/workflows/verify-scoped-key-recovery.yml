@@ -1,0 +1,29 @@
+name: Verify scoped key recovery
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/verify-scoped-key-recovery.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.10.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run product reliability checks
+        run: npm run test:product-reliability
+      - name: Build production bundle
+        run: npm run build
