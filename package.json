@@ -34,7 +34,7 @@
     "react-grid-layout": "^2.2.2",
     "react-masonry-css": "^1.0.16",
     "react-resizable": "^3.1.3",
-    "react-router-dom": "^6.30.6"
+    "react-router-dom": "7.18.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.1",
@@ -44,7 +44,10 @@
     "vite-plugin-pwa": "^1.2.0"
   },
   "overrides": {
-    "fast-xml-parser": "5.11.1"
+    "colophon": {
+      "fast-xml-parser": "5.11.1",
+      "react-router-dom": "7.18.4"
+    }
   },
   "engines": {
     "node": ">=18.0.0"
