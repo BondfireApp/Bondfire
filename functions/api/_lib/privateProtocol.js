@@ -1,5 +1,6 @@
 import {readPrivateSubmissions} from './privateSubmissions.js';
 import { scopedKeys, provisionOwnScopedDevice } from './privateKeyScopes.js';
+import { privateEncryptionReset } from './privateReset.js';
 import { installPrivateWriteGuards } from './privateWriteGuards.js';
 import { getDb, requireOrgRole } from './auth.js';
 import { bad, json } from './http.js';
@@ -12,6 +13,7 @@ import { publishColophonCopy } from './privateColophonPublication.js';
 
 export async function privateProtocol({env,request,orgId,path=''}) {
   if(path==='submissions')return readPrivateSubmissions({env,request,orgId});
+  if(path==='reset')return privateEncryptionReset({env,request,orgId});
   if(path==='keys/device')return provisionOwnScopedDevice({env,request,orgId});
   if(path==='keys') {
     if((await getPrivateMode(env,orgId))?.state!=='enabled')return bad(409,'PRIVATE_MODE_NOT_READY');
@@ -78,7 +80,6 @@ export async function privateProtocol({env,request,orgId,path=''}) {
       await cleanupPrivateSources(env,orgId);
       const inventory=await migrationInventory(env,orgId);
       if(inventory.remaining||inventory.blockers.length) return bad(409,'PRIVATE_MIGRATION_INCOMPLETE',{inventory});
-      // Ordinary writes are denied throughout migration, including legacy endpoints.
       await db.prepare("UPDATE org_private_mode SET state='enabled',completed_at=? WHERE org_id=? AND state='migrating'").bind(Date.now(),orgId).run();
       return json({ok:true,state:'enabled'});
     }
