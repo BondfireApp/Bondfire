@@ -1,0 +1,74 @@
+name: Dependency security validation
+
+on:
+  push:
+    branches:
+      - security/finalize-dependency-alerts-2026-09-17
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/security-dependency-validation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out security branch
+        uses: actions/checkout@v6
+        with:
+          ref: security/finalize-dependency-alerts-2026-09-17
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.10.0
+
+      - name: Regenerate lockfile from package manifest
+        run: |
+          rm -f package-lock.json
+          npm install --package-lock-only --ignore-scripts
+
+      - name: Verify patched dependency graph
+        run: |
+          node - <<'NODE'
+          const lock = require('./package-lock.json');
+          const packages = lock.packages || {};
+          const electron = packages['node_modules/electron']?.version;
+          const router = packages['node_modules/react-router-dom']?.version;
+          const xml = packages['node_modules/fast-xml-parser']?.version;
+          const extractZip = packages['node_modules/extract-zip']?.version;
+          console.log({ electron, router, fastXmlParser: xml, extractZip });
+          if (!electron || Number(electron.split('.')[0]) < 44) throw new Error(`Electron is not patched: ${electron}`);
+          if (router !== '6.30.6') throw new Error(`react-router-dom is not pinned to patched 6.30.6: ${router}`);
+          if (xml !== '5.11.1') throw new Error(`fast-xml-parser override did not apply: ${xml}`);
+          if (extractZip) throw new Error(`vulnerable extract-zip is still present: ${extractZip}`);
+          NODE
+
+      - name: Commit regenerated lockfile
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json is already current"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "Regenerate lockfile for dependency security fixes"
+            git push origin HEAD:security/finalize-dependency-alerts-2026-09-17
+          fi
+
+      - name: Install exact dependency graph
+        run: npm ci
+
+      - name: Run regression suite
+        run: npm test
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Audit all npm dependencies
+        run: npm audit --audit-level=low
