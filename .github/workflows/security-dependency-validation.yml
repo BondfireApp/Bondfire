@@ -38,12 +38,14 @@ jobs:
           const lock = require('./package-lock.json');
           const packages = lock.packages || {};
           const electron = packages['node_modules/electron']?.version;
-          const router = packages['node_modules/react-router-dom']?.version;
+          const routerDom = packages['node_modules/react-router-dom']?.version;
+          const router = packages['node_modules/react-router']?.version;
           const xml = packages['node_modules/fast-xml-parser']?.version;
           const extractZip = packages['node_modules/extract-zip']?.version;
-          console.log({ electron, router, fastXmlParser: xml, extractZip });
+          console.log({ electron, reactRouterDom: routerDom, reactRouter: router, fastXmlParser: xml, extractZip });
           if (!electron || Number(electron.split('.')[0]) < 44) throw new Error(`Electron is not patched: ${electron}`);
-          if (router !== '6.30.6') throw new Error(`react-router-dom is not pinned to patched 6.30.6: ${router}`);
+          if (routerDom !== '7.18.4') throw new Error(`react-router-dom is not pinned to 7.18.4: ${routerDom}`);
+          if (router !== '7.18.4') throw new Error(`react-router is not pinned to 7.18.4: ${router}`);
           if (xml !== '5.11.1') throw new Error(`fast-xml-parser override did not apply: ${xml}`);
           if (extractZip) throw new Error(`vulnerable extract-zip is still present: ${extractZip}`);
           NODE
