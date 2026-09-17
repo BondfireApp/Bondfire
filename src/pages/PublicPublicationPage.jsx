@@ -32,7 +32,7 @@ export default function PublicPublicationPage({ orgId }) {
     embedded: true,
     standalone: false,
     routeBase: "",
-    apiBase: "/api",
+    apiBase: "/api/public/colophon-runtime",
     session: PUBLIC_SESSION,
   }), []);
 
