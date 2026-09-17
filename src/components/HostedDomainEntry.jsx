@@ -1,5 +1,5 @@
 import React from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 import PublicPage from "../pages/PublicPage.jsx";
 import PublicPublicationPage from "../pages/PublicPublicationPage.jsx";
 
@@ -43,7 +43,11 @@ export default function HostedDomainEntry({ children }) {
   if (state.error || !state.data?.mapped) return <main style={{ padding: 24 }}><h1>Site not configured</h1><p>This domain is not connected to an active Bondfire public site.</p></main>;
 
   if (state.data.surface === "publication" && state.data.orgId) {
-    return <PublicPublicationPage orgId={state.data.orgId} />;
+    return (
+      <BrowserRouter>
+        <PublicPublicationPage orgId={state.data.orgId} />
+      </BrowserRouter>
+    );
   }
 
   if (state.data.surface === "organization" && state.data.slug) {
