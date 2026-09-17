@@ -1,28 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { VitePWA } from "vite-plugin-pwa";
 
 const commitSha =
   process.env.CF_PAGES_COMMIT_SHA ||
   process.env.GITHUB_SHA ||
   "development";
-
-export default defineConfig({
-  define: {
-    __BONDFIRE_COMMIT_SHA__: JSON.stringify(commitSha),
-  },
-
-  plugins: [
-    react(),
-
-    VitePWA({
-      // existing config
-    }),
-  ],
-});
 
 // Key change:
 // - Do NOT precache index.html (or any HTML) in the service worker.
@@ -32,6 +15,9 @@ export default defineConfig({
 //   always serve /index.html without the SW trying to be clever.
 
 export default defineConfig({
+  define: {
+    __BONDFIRE_COMMIT_SHA__: JSON.stringify(commitSha),
+  },
   plugins: [
     react(),
     VitePWA({
