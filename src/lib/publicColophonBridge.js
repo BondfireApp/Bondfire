@@ -1,4 +1,4 @@
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+const API_BASE = (import.meta.env?.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 
 function responseJson(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
