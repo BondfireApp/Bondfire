@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - fix/public-colophon-routing
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
