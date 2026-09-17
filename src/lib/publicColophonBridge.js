@@ -26,7 +26,7 @@ function runtimeEndpoint(pathname) {
   return pathname.slice(PUBLIC_RUNTIME_PREFIX.length);
 }
 
-export function createPublicColophonProjectionLoader({ orgId, baseFetch = fetch } = {}) {
+export function createPublicColophonProjectionLoader({ orgId, baseFetch = fetch, onProjection = null } = {}) {
   const normalizedOrgId = String(orgId || "").trim();
   let cachedPromise = null;
 
@@ -45,6 +45,7 @@ export function createPublicColophonProjectionLoader({ orgId, baseFetch = fetch 
         cachedPromise = null;
         throw new Error(data?.error || `Publication projection failed (${response.status})`);
       }
+      if (typeof onProjection === "function") onProjection(data);
       return data;
     });
 
@@ -52,8 +53,8 @@ export function createPublicColophonProjectionLoader({ orgId, baseFetch = fetch 
   };
 }
 
-export function createPublicColophonFetchBridge({ orgId, baseFetch = fetch, origin = window.location.origin } = {}) {
-  const loadProjection = createPublicColophonProjectionLoader({ orgId, baseFetch });
+export function createPublicColophonFetchBridge({ orgId, baseFetch = fetch, origin = window.location.origin, onProjection = null } = {}) {
+  const loadProjection = createPublicColophonProjectionLoader({ orgId, baseFetch, onProjection });
 
   return async function publicColophonFetch(input, init) {
     let url;
