@@ -9,6 +9,8 @@ import {
   parsePublicDomainScope,
   publicDomainScope,
 } from "../functions/api/_lib/publicSiteDomains.js";
+import { shouldServePublicationShellRequest } from "../functions/_middleware.js";
+import { createPublicColophonFetchBridge } from "../src/lib/publicColophonBridge.js";
 
 const connected = normalizeConnectedPublication({
   publication_id: "pub-1",
@@ -106,5 +108,70 @@ assert.deepEqual(parsePublicDomainScope("org:org-123:publication"), {
 });
 assert.equal(normalizePublicSurface("not-real"), "organization");
 assert.equal(normalizeHostname("https://WWW.Example.org:443/path"), "www.example.org");
+
+const htmlHeaders = { Accept: "text/html,application/xhtml+xml" };
+assert.equal(shouldServePublicationShellRequest(new Request("https://publication.example.org/post/test", { headers: htmlHeaders })), true);
+assert.equal(shouldServePublicationShellRequest(new Request("https://publication.example.org/post/missing", { headers: htmlHeaders })), true);
+assert.equal(shouldServePublicationShellRequest(new Request("https://publication.example.org/archive", { headers: htmlHeaders })), true);
+assert.equal(shouldServePublicationShellRequest(new Request("https://publication.example.org/", { headers: htmlHeaders })), false);
+assert.equal(shouldServePublicationShellRequest(new Request("https://publication.example.org/api/public/domain", { headers: htmlHeaders })), false);
+assert.equal(shouldServePublicationShellRequest(new Request("https://publication.example.org/assets/app.js", { headers: htmlHeaders })), false);
+assert.equal(shouldServePublicationShellRequest(new Request("https://publication.example.org/post/test", { headers: { Accept: "application/json" } })), false);
+
+const bridgeCalls = [];
+const publicProjection = {
+  ok: true,
+  publication: {
+    config: {
+      schemaVersion: 4,
+      identity: { publicationName: "Field Notes" },
+      navigation: { items: [{ label: "Archive", href: "/archive" }] },
+    },
+  },
+  items: [{ id: "post-1", slug: "test", title: "Test", status: "published" }],
+};
+const baseFetch = async (input, init = {}) => {
+  bridgeCalls.push({ url: String(input), method: String(init?.method || "GET").toUpperCase() });
+  return new Response(JSON.stringify(publicProjection), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+};
+const bridge = createPublicColophonFetchBridge({
+  orgId: "00000000-0000-4000-8000-000000000001",
+  baseFetch,
+  origin: "https://publication.example.org",
+});
+
+const contentResponse = await bridge("https://publication.example.org/api/public/colophon-runtime/native-content", { method: "GET" });
+const contentPayload = await contentResponse.json();
+assert.equal(contentResponse.status, 200);
+assert.equal(contentPayload.mode, "d1");
+assert.equal(contentPayload.publicProjection, true);
+assert.equal(contentPayload.items[0].slug, "test");
+
+const configResponse = await bridge("https://publication.example.org/api/public/colophon-runtime/public-site-config", { method: "GET" });
+const configPayload = await configResponse.json();
+assert.equal(configResponse.status, 200);
+assert.equal(configPayload.canEdit, false);
+assert.equal(configPayload.config.identity.publicationName, "Field Notes");
+assert.equal(configPayload.config.navigation.items[0].href, "/archive");
+
+const writeResponse = await bridge("https://publication.example.org/api/public/colophon-runtime/native-content", { method: "POST" });
+assert.equal(writeResponse.status, 405);
+assert.equal((await writeResponse.json()).error, "PUBLICATION_READ_ONLY");
+
+const unknownRuntimeResponse = await bridge("https://publication.example.org/api/public/colophon-runtime/users", { method: "GET" });
+assert.equal(unknownRuntimeResponse.status, 404);
+assert.equal((await unknownRuntimeResponse.json()).error, "PUBLICATION_RUNTIME_ENDPOINT_UNAVAILABLE");
+
+const beforePrivatePassthrough = bridgeCalls.length;
+await bridge("https://publication.example.org/api/orgs/private-org/members", { method: "GET" });
+assert.equal(bridgeCalls.length, beforePrivatePassthrough + 1);
+assert.equal(bridgeCalls.at(-1).url, "https://publication.example.org/api/orgs/private-org/members");
+
+// The public projection loader is cached, so canonical content + config reads
+// do not fan out into repeated publication projection calls.
+assert.equal(bridgeCalls.filter((call) => call.url.includes("/api/public/publication?")).length, 1);
 
 console.log("public-surface regression checks passed");
