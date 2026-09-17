@@ -88,7 +88,7 @@ export default function ScopedKeysPanel({orgId}) {
       if(!ok)return;
       await resetPrivateEncryption({orgId,name:resetName,passphrase:resetPass});
       setResetPass('');setResetAgain('');setResetConfirmation('');setResetOpen(false);setResetInventory(null);
-      await refresh();
+      window.dispatchEvent(new Event('bf-private-mode-changed'));
       window.location.reload();
     }catch(e){setError(e.message);}finally{setBusy(false);}
   }
@@ -99,53 +99,62 @@ export default function ScopedKeysPanel({orgId}) {
   const recoveryAvailable=readableKeys.length>0&&readableKeys.every(row=>!!row.recovery);
   const canReset=state.privacy.role==='owner'&&missingCurrentDevice;
 
-  return <section className="card" style={{padding:16,marginTop:16}}>
-    <h2>Role-based encryption keys</h2>
-    <p>{state.epoch?`Key version ${state.epoch}.`:'Separate reading, member, and administrator keys have not been enabled yet.'} {state.rotationRequired?'Membership or devices changed. Rotate keys before saving more private content.':''}</p>
+  return <section className="card" style={{padding:16,marginTop:16}} aria-labelledby="scoped-keys-title">
+    <h2 id="scoped-keys-title" style={{marginTop:0}}>Encryption keys & recovery</h2>
+    <p>These are the organization’s current private-content keys. Bondfire separates access into three scopes so members receive only the keys their role can use.</p>
+    <ul>
+      <li><strong>Reader key:</strong> ordinary private organization content.</li>
+      <li><strong>Member key:</strong> member-level protected content in addition to reader access.</li>
+      <li><strong>Administrator key:</strong> admin-only material such as private intake, newsletter settings, and private publication configuration.</li>
+    </ul>
+    <p><strong>{state.epoch?`Key version ${state.epoch}.`:'Role-based keys have not been enabled yet.'}</strong> {state.rotationRequired?'Membership or registered devices changed. An owner must rotate keys before new private writes can continue.':''}</p>
 
     {missingCurrentDevice&&<div role="alert" style={{padding:12,border:'1px solid #d97706',borderRadius:8,marginBottom:12}}>
-      <strong>This browser is not provisioned for the current scoped keys.</strong>
-      <p style={{marginBottom:8}}>Restore the existing keys with the recovery passphrase. This does not rotate or replace the organization keys.</p>
+      <strong>This browser does not have the current organization keys.</strong>
+      <p style={{marginBottom:8}}>If you know the recovery passphrase, restore the existing keys to this browser. This does not rotate or replace them.</p>
       {recoveryAvailable?<>
-        <label style={{display:'grid',gap:6,maxWidth:520}}>Recovery passphrase<input type="password" autoComplete="current-password" minLength={20} value={restorePass} onChange={e=>setRestorePass(e.target.value)} disabled={busy}/></label>
-        <button type="button" disabled={busy||restorePass.length<20} onClick={restoreCurrentDevice} style={{marginTop:8}}>{busy?'Restoring keys…':'Restore keys on this device'}</button>
+        <label style={{display:'grid',gap:6,maxWidth:520}}>Recovery passphrase<input className="input" type="password" autoComplete="current-password" minLength={20} value={restorePass} onChange={e=>setRestorePass(e.target.value)} disabled={busy}/></label>
+        <button className="btn-red" type="button" disabled={busy||restorePass.length<20} onClick={restoreCurrentDevice} style={{marginTop:8}}>{busy?'Restoring keys…':'Restore keys on this device'}</button>
       </>:<p>No recovery copy is available for this account. A key-holding owner must provision this device.</p>}
       {canReset&&<div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(217,119,6,.45)'}}>
-        <p style={{margin:'0 0 8px'}}><strong>Lost the recovery passphrase?</strong> If this is a new single-member organization and you do not need its encrypted private records, you can replace the inaccessible encryption state without deleting the organization.</p>
-        {!resetOpen?<button type="button" disabled={busy} onClick={openReset}>{busy?'Checking reset safety…':'Reset encryption…'}</button>:null}
+        <p style={{margin:'0 0 8px'}}><strong>Lost the recovery passphrase?</strong> For a new single-member organization whose encrypted private records can be discarded, reset creates fresh keys without deleting the organization, modules, membership, domains, or published public copies.</p>
+        {!resetOpen?<button className="btn" type="button" disabled={busy} onClick={openReset}>{busy?'Checking reset safety…':'Reset encryption…'}</button>:null}
       </div>}
     </div>}
 
     {resetOpen&&canReset&&<div style={{padding:14,border:'1px solid #b91c1c',borderRadius:8,marginBottom:14}}>
       <h3 style={{marginTop:0}}>Reset encryption</h3>
-      <p><strong>This is destructive.</strong> It creates fresh organization keys and permanently discards the encrypted private records that the lost keys protected. It does not delete the organization.</p>
+      <p><strong>This is destructive.</strong> It creates fresh organization keys and permanently discards the encrypted private records protected by the inaccessible keys. It does not delete the organization.</p>
       <p>Preserved: organization ID, membership, enabled modules, custom domains, and already-published public copies.</p>
       <p>
         Encrypted records to discard: <strong>{Number(resetInventory?.recordCount||0)}</strong>
         {Array.isArray(resetInventory?.records)&&resetInventory.records.length?` (${resetInventory.records.map(row=>`${row.kind}: ${row.count}`).join(', ')})`:''}.
         {' '}Encrypted file blobs: <strong>{Number(resetInventory?.blobCount||0)}</strong>. Members: <strong>{Number(resetInventory?.memberCount||0)}</strong>.
       </p>
-      {resetInventory?.memberCount!==1?<p role="alert">Reset is blocked because this organization has more than one member.</p>:null}
+      {resetInventory?.memberCount!==1?<p role="alert">Reset is blocked because this organization does not have exactly one member.</p>:null}
       {resetInventory?.blobCount?<p role="alert">Reset is blocked because encrypted file blobs exist. Use a key-holding device or owner recovery instead.</p>:null}
       <div style={{display:'grid',gap:8,maxWidth:560}}>
-        <label>Organization name<input value={resetName} onChange={e=>setResetName(e.target.value)} disabled={busy}/></label>
-        <label>New recovery passphrase<input type="password" autoComplete="new-password" minLength={20} value={resetPass} onChange={e=>setResetPass(e.target.value)} disabled={busy}/></label>
-        <label>Confirm new recovery passphrase<input type="password" autoComplete="new-password" minLength={20} value={resetAgain} onChange={e=>setResetAgain(e.target.value)} disabled={busy}/></label>
-        <label>Type <strong>RESET ENCRYPTION</strong><input value={resetConfirmation} onChange={e=>setResetConfirmation(e.target.value)} disabled={busy}/></label>
+        <label>Organization name<input className="input" value={resetName} onChange={e=>setResetName(e.target.value)} disabled={busy}/></label>
+        <label>New recovery passphrase<input className="input" type="password" autoComplete="new-password" minLength={20} value={resetPass} onChange={e=>setResetPass(e.target.value)} disabled={busy}/></label>
+        <label>Confirm new recovery passphrase<input className="input" type="password" autoComplete="new-password" minLength={20} value={resetAgain} onChange={e=>setResetAgain(e.target.value)} disabled={busy}/></label>
+        <label>Type <strong>RESET ENCRYPTION</strong><input className="input" value={resetConfirmation} onChange={e=>setResetConfirmation(e.target.value)} disabled={busy}/></label>
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:10}}>
-        <button type="button" disabled={busy||resetInventory?.memberCount!==1||!!resetInventory?.blobCount||resetPass.length<20||resetPass!==resetAgain||resetConfirmation!=='RESET ENCRYPTION'||!resetName.trim()} onClick={performReset}>{busy?'Resetting encryption…':'Reset encryption and create new keys'}</button>
-        <button type="button" disabled={busy} onClick={()=>{setResetOpen(false);setResetPass('');setResetAgain('');setResetConfirmation('');}}>Cancel</button>
+        <button className="btn-red" type="button" disabled={busy||resetInventory?.memberCount!==1||!!resetInventory?.blobCount||resetPass.length<20||resetPass!==resetAgain||resetConfirmation!=='RESET ENCRYPTION'||!resetName.trim()} onClick={performReset}>{busy?'Resetting encryption…':'Reset encryption and create new keys'}</button>
+        <button className="btn" type="button" disabled={busy} onClick={()=>{setResetOpen(false);setResetPass('');setResetAgain('');setResetConfirmation('');}}>Cancel</button>
       </div>
     </div>}
 
-    <form onSubmit={rotate} style={{display:'grid',gap:8}}>
-      <p>Rotation protects future writes and keeps older content readable for authorized members. People cannot lose knowledge of content they already decrypted. Save the new recovery passphrase; this replaces the scoped recovery backups.</p>
-      <label>Recovery passphrase<input type="password" autoComplete="new-password" minLength={20} required value={pass} onChange={e=>setPass(e.target.value)} disabled={busy}/></label>
-      <label>Confirm passphrase<input type="password" autoComplete="new-password" minLength={20} required value={again} onChange={e=>setAgain(e.target.value)} disabled={busy}/></label>
-      {state.privacy.role==='owner'&&<button disabled={busy}>{busy?'Updating keys…':state.epoch?'Rotate encryption keys':'Enable role-based keys'}</button>}
-      {!!state.epoch&&!missingCurrentDevice&&<button type="button" disabled={busy} onClick={saveRecovery}>Save my recovery backup</button>}
-    </form>
+    {!missingCurrentDevice&&<form onSubmit={rotate} style={{display:'grid',gap:8}}>
+      <h3 style={{marginBottom:0}}>Key maintenance</h3>
+      <p style={{marginTop:0}}>Rotation creates new keys for future writes and retains encrypted key history so authorized members can still read older records. Saving a recovery backup keeps the current keys but protects a recovery copy with the passphrase you choose.</p>
+      <label>New recovery passphrase<input className="input" type="password" autoComplete="new-password" minLength={20} required value={pass} onChange={e=>setPass(e.target.value)} disabled={busy}/></label>
+      <label>Confirm passphrase<input className="input" type="password" autoComplete="new-password" minLength={20} required value={again} onChange={e=>setAgain(e.target.value)} disabled={busy}/></label>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        {state.privacy.role==='owner'&&<button className="btn-red" disabled={busy}>{busy?'Updating keys…':state.epoch?'Rotate encryption keys':'Enable role-based keys'}</button>}
+        {!!state.epoch&&<button className="btn" type="button" disabled={busy||pass.length<20||pass!==again} onClick={saveRecovery}>Save my recovery backup</button>}
+      </div>
+    </form>}
     {error&&<p role="alert">{error}</p>}
   </section>;
 }
