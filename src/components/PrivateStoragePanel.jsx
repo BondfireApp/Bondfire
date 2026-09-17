@@ -3,8 +3,7 @@ import React from 'react';
 import { api } from '../utils/api.js';
 import { encryptPrivate, decryptPrivate, loadPrivateKey } from '../lib/privateCrypto.js';
 import { decodeLegacyRecord, uploadPayload } from '../lib/privateClient.js';
-import { PRIVATE_CONTENT } from '../../shared/privateContent.js';
-import { ensureDeviceKeypair, randomOrgKey, wrapForMember, unwrapOrgKey, cacheOrgKey, getCachedOrgKey, decryptWithOrgKey, wrapOrgKeyForRecovery, saveRecoveryToServer } from '../lib/zk.js';
+import { ensureDeviceKeypair, randomOrgKey, wrapForMember, unwrapOrgKey, cacheOrgKey, getCachedOrgKey, wrapOrgKeyForRecovery, saveRecoveryToServer } from '../lib/zk.js';
 
 export default function PrivateStoragePanel({orgId}) {
   const [status,setStatus]=React.useState(null),[busy,setBusy]=React.useState(false),[message,setMessage]=React.useState(''),[passphrase,setPassphrase]=React.useState(''),[confirm,setConfirm]=React.useState('');
@@ -75,26 +74,30 @@ export default function PrivateStoragePanel({orgId}) {
       }
       setMessage('Checking remaining data and removing migrated file originals…');
       await api(base+'/finish',{method:'POST',body:'{}'});
-      await refresh();setMessage('Member-only encrypted mode is active. Content is decrypted on authorized member devices.');
+      await refresh();setMessage('Encrypted storage is active. Private content is decrypted only on authorized member devices.');
       window.dispatchEvent(new Event('bf-private-mode-changed'));
     } catch(e) {setMessage(e.message||'Conversion stopped. Resume here after resolving the error.');await refresh().catch(()=>{});}
     finally {setBusy(false);}
   }
-  return <section style={{marginTop:16,padding:16,border:'1px solid #555',borderRadius:12}}>
-    <h3>Member-only encrypted organization</h3>
-    <p>Encrypt content on member devices before upload. The server stores ciphertext, without the content key. Public pages, public submissions, external chat, and server-side publishing are unavailable in this mode.</p>
-    <p>Server-visible metadata still includes accounts, memberships, roles, enabled modules, record identifiers, timestamps, traffic, and ciphertext sizes. This is content privacy, not anonymity. Previously published content and provider backups cannot be recalled by conversion.</p>
-    <p><strong>Status: {status?.state==='enabled'?'Encrypted mode active':status?.state==='migrating'?'Conversion incomplete — content writes paused':status?'Not converted':'Checking…'}</strong></p>
-    {status?.role==='owner'&&status?.state!=='enabled'?<>
-      <p>Conversion preserves supported records, verifies encryption locally, and removes their readable active-storage copies. Keep the existing key and recovery passphrase. Do not close this tab while conversion is running; interrupted work can be resumed.</p>
-      {!!status?.inventory?.blockers?.length&&<div role="alert"><p>These records require migration support before conversion can begin:</p><ul>{status.inventory.blockers.map((b,i)=><li key={i}>{b.table}: {b.count} — {b.reason}</li>)}</ul></div>}
+  const enabled=status?.state==='enabled';
+  return <section className="card" style={{marginTop:16,padding:16}} aria-labelledby="private-storage-title">
+    <h2 id="private-storage-title" style={{marginTop:0}}>Encrypted storage</h2>
+    <p>Private organization records are encrypted on authorized member devices before upload. The server stores ciphertext and the metadata needed to route and synchronize it, but not the plaintext content keys.</p>
+    <p>Public organization pages and Colophon publications are separate, explicit public projections or copies selected for publication. Publishing does not give the server permission to decrypt the private source record.</p>
+    <p>Server-visible metadata can still include accounts, memberships, roles, enabled modules, opaque record identifiers, timestamps, traffic, and ciphertext sizes. This protects content; it does not provide anonymity.</p>
+    <p><strong>Status: {enabled?'encrypted storage active':status?.state==='migrating'?'legacy conversion incomplete; private writes are paused':status?'legacy organization not converted':'checking…'}</strong>{status?.role?` · Your role: ${status.role}`:''}</p>
+
+    {status?.role==='owner'&&!enabled?<div style={{padding:12,border:'1px solid #d97706',borderRadius:8}}>
+      <h3 style={{marginTop:0}}>Legacy organization conversion</h3>
+      <p>This control exists only for organizations created before encrypted storage became the default. It migrates supported readable records into ciphertext and removes their readable active-storage copies. New encrypted organizations do not need this process.</p>
+      {!!status?.inventory?.blockers?.length&&<div role="alert"><p>These records require migration support before conversion can begin:</p><ul>{status.inventory.blockers.map((b,i)=><li key={i}>{b.table}: {b.count} · {b.reason}</li>)}</ul></div>}
       {status?.state==='off'&&<div style={{display:'grid',gap:8,maxWidth:520}}>
-        <label>Separate encryption recovery passphrase<input type="password" autoComplete="new-password" value={passphrase} onChange={e=>setPassphrase(e.target.value)} disabled={busy}/></label>
-        <label>Confirm recovery passphrase<input type="password" autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} disabled={busy}/></label>
+        <label>Legacy conversion recovery passphrase<input className="input" type="password" autoComplete="new-password" value={passphrase} onChange={e=>setPassphrase(e.target.value)} disabled={busy}/></label>
+        <label>Confirm recovery passphrase<input className="input" type="password" autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} disabled={busy}/></label>
       </div>}
-      <button disabled={busy||!!status?.inventory?.blockers?.length} onClick={convert}>{busy?'Encrypting…':status?.state==='migrating'?'Resume encrypted conversion':'Encrypt and switch to member-only mode'}</button>
-    </>:null}
-    <button disabled={busy} onClick={()=>refresh().catch(e=>setMessage(e.message))}>Refresh privacy status</button>
+      <button className="btn-red" disabled={busy||!!status?.inventory?.blockers?.length} onClick={convert}>{busy?'Encrypting…':status?.state==='migrating'?'Resume legacy conversion':'Convert legacy organization to encrypted storage'}</button>
+    </div>:null}
+    <button className="btn" style={{marginTop:12}} disabled={busy} onClick={()=>refresh().catch(e=>setMessage(e.message))}>Refresh encryption status</button>
     {message&&<p role="status">{message}</p>}
   </section>;
 }
