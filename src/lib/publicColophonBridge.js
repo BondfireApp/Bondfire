@@ -1,4 +1,5 @@
 const API_BASE = (import.meta.env?.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+const PUBLIC_RUNTIME_PREFIX = "/api/public/colophon-runtime";
 
 function responseJson(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -18,6 +19,11 @@ function requestMethod(input, init) {
 function requestUrl(input, origin) {
   const raw = input instanceof Request ? input.url : String(input || "");
   return new URL(raw, origin);
+}
+
+function runtimeEndpoint(pathname) {
+  if (!pathname.startsWith(`${PUBLIC_RUNTIME_PREFIX}/`)) return "";
+  return pathname.slice(PUBLIC_RUNTIME_PREFIX.length);
 }
 
 export function createPublicColophonProjectionLoader({ orgId, baseFetch = fetch } = {}) {
@@ -60,8 +66,10 @@ export function createPublicColophonFetchBridge({ orgId, baseFetch = fetch, orig
     if (url.origin !== origin) return baseFetch(input, init);
 
     const method = requestMethod(input, init);
+    const endpoint = runtimeEndpoint(url.pathname);
+    if (!endpoint) return baseFetch(input, init);
 
-    if (url.pathname === "/api/native-content" && method === "GET") {
+    if (endpoint === "/native-content" && method === "GET") {
       const projection = await loadProjection();
       return responseJson({
         ok: true,
@@ -71,7 +79,7 @@ export function createPublicColophonFetchBridge({ orgId, baseFetch = fetch, orig
       });
     }
 
-    if (url.pathname === "/api/public-site-config" && method === "GET") {
+    if (endpoint === "/public-site-config" && method === "GET") {
       const projection = await loadProjection();
       return responseJson({
         ok: true,
@@ -87,7 +95,7 @@ export function createPublicColophonFetchBridge({ orgId, baseFetch = fetch, orig
       });
     }
 
-    if (url.pathname === "/api/public-site-config" && method === "OPTIONS") {
+    if (endpoint === "/public-site-config" && method === "OPTIONS") {
       return responseJson({
         ok: true,
         canEdit: false,
@@ -97,15 +105,9 @@ export function createPublicColophonFetchBridge({ orgId, baseFetch = fetch, orig
       });
     }
 
-    // The public publication shell is intentionally read-only. Never proxy a
-    // Colophon write request through Bondfire's authenticated/private APIs.
-    if (
-      (url.pathname === "/api/native-content" || url.pathname === "/api/public-site-config")
-      && !["GET", "HEAD", "OPTIONS"].includes(method)
-    ) {
-      return responseJson({ ok: false, error: "PUBLICATION_READ_ONLY" }, 405);
-    }
-
-    return baseFetch(input, init);
+    // The custom-domain Colophon runtime is intentionally read-only. Unknown
+    // canonical Colophon endpoints stay inside this namespace and fail closed
+    // instead of falling through to Bondfire's private/general API surface.
+    return responseJson({ ok: false, error: "PUBLICATION_RUNTIME_ENDPOINT_UNAVAILABLE" }, 404);
   };
 }
