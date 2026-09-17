@@ -293,7 +293,11 @@ export async function dispatchPrivate(path,opts,transport) {
     const id=route.id||clear.id||crypto.randomUUID();
     let previous=null;
     if(method!=='POST') {
-      const current=await transport(`/api/orgs/${encodeURIComponent(orgId)}/${kind}/${encodeURIComponent(id)}`);
+      const currentBase=`/api/orgs/${encodeURIComponent(orgId)}/${kind}/${encodeURIComponent(id)}`;
+      const currentPath=route.url.searchParams.get('__bf_colophon_storage')==='1'
+        ? `${currentBase}?__bf_colophon_storage=1`
+        : currentBase;
+      const current=await transport(currentPath);
       previous=await reveal(key,orgId,kind,current[contract.one],transport);
     }
     let uploadedPayloadId=null;

@@ -34,6 +34,7 @@ const checks = [
   ["Colophon bridge bypasses internal ciphertext transport", "src/modules/colophon/ColophonNativeModule.jsx", /internalPrivateStorage[\s\S]*__bf_colophon_storage[\s\S]*return originalFetch/],
   ["Colophon bridge preserves private-storage marker to the server", "src/modules/colophon/ColophonNativeModule.jsx", /internalPrivateStorage[\s\S]*Keep the marker on the server-bound request[\s\S]*return originalFetch/],
   ["Colophon gateway delegates marked storage to the private gate", "functions/api/orgs/[orgId]/colophon/[[path]].js", /__bf_colophon_storage[\s\S]*privateRequestGate[\s\S]*PRIVATE_STORAGE_ROUTE_UNAVAILABLE/],
+  ["encrypted Colophon update lookups preserve the ciphertext-storage marker", "src/lib/privateClient.js", /route\.url\.searchParams\.get\('__bf_colophon_storage'\)[\s\S]*__bf_colophon_storage=1[\s\S]*transport\(currentPath\)/],
   ["Colophon dark-mode admin notices remain readable", "src/modules/colophon/colophon-native.css", /wp-admin-notices \.wp-notice[\s\S]*background: #15191d !important[\s\S]*wp-notice--error[\s\S]*#ffd7d7/],
   ["encrypted Colophon serializes writes per post", "src/modules/colophon/privateColophonRuntime.js", /contentWriteLocks[\s\S]*withContentWriteLock[\s\S]*const writeKey = `\$\{orgId\}:\$\{id\}`/],
   ["encrypted Colophon rebases same-tab autosave conflicts only", "src/modules/colophon/privateColophonRuntime.js", /recentContentWrites[\s\S]*note === "autosave"[\s\S]*locallyAdvanced[\s\S]*Reload the latest version before saving over it/],
