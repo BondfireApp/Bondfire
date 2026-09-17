@@ -21,10 +21,15 @@ jobs:
         with:
           node-version: 24.10.0
           cache: npm
-      - name: Install dependencies
-        run: npm ci
+      - name: Check reset source syntax
+        run: |
+          node --check functions/api/_lib/privateReset.js
+          node --check functions/api/orgs/'[orgId]'/privacy/reset.js
+          node --check src/lib/privateEncryptionReset.js
       - name: Run encryption reset regression
         run: node scripts/private-encryption-reset-regression.mjs
+      - name: Install dependencies
+        run: npm ci
       - name: Run product reliability checks
         run: npm run test:product-reliability
       - name: Build production bundle
