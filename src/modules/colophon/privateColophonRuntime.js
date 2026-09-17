@@ -179,7 +179,10 @@ async function handleNativeContent(orgId, url, input, init, session) {
       }
       const now = nowIso();
       const requestedStatus = String(incoming.status || existing?.status || "draft");
-      const status = rank < 2 && String(existing?.status || "").toLowerCase() === "published" ? "draft" : requestedStatus;
+      const demotePublishedEdit = !statusOnlyMutation
+        && rank < 2
+        && String(existing?.status || "").toLowerCase() === "published";
+      const status = demotePublishedEdit ? "draft" : requestedStatus;
       const incomingForSave = statusOnlyMutation && existing
         ? {
             status,

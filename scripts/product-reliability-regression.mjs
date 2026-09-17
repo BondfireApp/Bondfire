@@ -38,6 +38,7 @@ const checks = [
   ["encrypted Colophon serializes writes per post", "src/modules/colophon/privateColophonRuntime.js", /contentWriteLocks[\s\S]*withContentWriteLock[\s\S]*const writeKey = `\$\{orgId\}:\$\{id\}`/],
   ["encrypted Colophon rebases same-tab autosave conflicts only", "src/modules/colophon/privateColophonRuntime.js", /recentContentWrites[\s\S]*note === "autosave"[\s\S]*locallyAdvanced[\s\S]*Reload the latest version before saving over it/],
   ["encrypted Colophon trash actions preserve the latest post body", "src/modules/colophon/privateColophonRuntime.js", /statusOnlyMutation[\s\S]*bulk trash[\s\S]*incomingForSave[\s\S]*workflowState/],
+  ["encrypted Colophon keeps Trash status when a member trashes a published post", "src/modules/colophon/privateColophonRuntime.js", /const demotePublishedEdit = !statusOnlyMutation[\s\S]*rank < 2[\s\S]*published[\s\S]*const status = demotePublishedEdit \? "draft" : requestedStatus/],
   ["Colophon post-list controls keep dark-mode contrast", "src/modules/colophon/colophon-native.css", /wp-view-tab[\s\S]*background: #15191d !important[\s\S]*wp-posts-table/],
   ["Bondfire pins Colophon with real trash and permanent deletion", "package.json", /colophon\/archive\/da184cbcc83c1d4cdd16939d2728f6b0889ffa01\.tar\.gz/],
   ["Colophon Posts hides trash from All", "node_modules/colophon/src/components/ContentListPage.jsx", /tab === 'all' && bucket === 'trash'/],
