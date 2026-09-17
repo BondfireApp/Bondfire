@@ -41,7 +41,7 @@ const checks = [
   ["encrypted Colophon trash actions preserve the latest post body", "src/modules/colophon/privateColophonRuntime.js", /statusOnlyMutation[\s\S]*bulk trash[\s\S]*incomingForSave[\s\S]*workflowState/],
   ["encrypted Colophon keeps Trash status when a member trashes a published post", "src/modules/colophon/privateColophonRuntime.js", /const demotePublishedEdit = !statusOnlyMutation[\s\S]*rank < 2[\s\S]*published[\s\S]*const status = demotePublishedEdit \? "draft" : requestedStatus/],
   ["Colophon post-list controls keep dark-mode contrast", "src/modules/colophon/colophon-native.css", /wp-view-tab[\s\S]*background: #15191d !important[\s\S]*wp-posts-table/],
-  ["Bondfire pins Colophon with real trash and permanent deletion", "package.json", /colophon\/archive\/da184cbcc83c1d4cdd16939d2728f6b0889ffa01\.tar\.gz/],
+  ["Bondfire pins Colophon with real trash and permanent deletion", "package.json", /colophon\/archive\/639561cd7a56d6c6d410767b43c0f0f4a28442eb\.tar\.gz/],
   ["Colophon Posts hides trash from All", "node_modules/colophon/src/components/ContentListPage.jsx", /tab === 'all' && bucket === 'trash'/],
   ["Colophon Posts exposes permanent deletion", "node_modules/colophon/src/components/ContentListPage.jsx", /deleteNativeEntry[\s\S]*permanentlyDelete[\s\S]*Delete Permanently/],
   ["Colophon Empty Trash performs real deletes", "node_modules/colophon/src/components/ContentListPage.jsx", /async function emptyTrash[\s\S]*deleteNativeEntry/],

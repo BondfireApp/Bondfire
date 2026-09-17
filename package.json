@@ -26,7 +26,7 @@
     "desktop:dist:linux:arm64": "electron-builder --linux --arm64 --publish never"
   },
   "dependencies": {
-    "colophon": "https://github.com/colophon-hub/colophon/archive/da184cbcc83c1d4cdd16939d2728f6b0889ffa01.tar.gz",
+    "colophon": "https://github.com/colophon-hub/colophon/archive/639561cd7a56d6c6d410767b43c0f0f4a28442eb.tar.gz",
     "lucide-react": "^0.577.0",
     "matrix-js-sdk": "^37.13.0",
     "react": "^18.3.1",
