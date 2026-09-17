@@ -2,11 +2,12 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 
 const server = fs.readFileSync(new URL('../functions/api/_lib/privateReset.js', import.meta.url), 'utf8');
-const endpoint = fs.readFileSync(new URL('../functions/api/orgs/[orgId]/privacy/reset.js', import.meta.url), 'utf8');
+const protocol = fs.readFileSync(new URL('../functions/api/_lib/privateProtocol.js', import.meta.url), 'utf8');
 const client = fs.readFileSync(new URL('../src/lib/privateEncryptionReset.js', import.meta.url), 'utf8');
 const panel = fs.readFileSync(new URL('../src/components/ScopedKeysPanel.jsx', import.meta.url), 'utf8');
 
-assert.match(endpoint, /privateEncryptionReset/, 'reset endpoint must delegate to the guarded reset handler');
+assert.match(protocol, /path==='reset'\)return privateEncryptionReset/, 'privacy catch-all must route reset requests to the guarded reset handler');
+assert.match(protocol, /import \{ privateEncryptionReset \} from '\.\/privateReset\.js'/, 'private protocol must import the reset handler');
 assert.match(server, /minRole: 'owner'/, 'reset must be owner-only');
 assert.match(server, /RESET_REQUIRES_SINGLE_MEMBER_ORG/, 'reset must refuse multi-member organizations');
 assert.match(server, /RESET_PRIVATE_FILES_PRESENT/, 'reset must refuse organizations with encrypted file blobs');
