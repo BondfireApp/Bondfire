@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ChevronDown, ChevronRight, File, FileSpreadsheet, FileText, Folder, LayoutTemplate, MoreHorizontal } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { api } from "../../utils/api.js";
 
@@ -190,7 +191,7 @@ function PopMenu({ trigger, items, align = "right" }) {
     <div style={{ position: "relative" }}>
       <button
         ref={triggerRef}
-        className="btn"
+        className="btn bf-drive-moreButton"
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -223,6 +224,8 @@ function TreeRow({
 
   return (
     <div
+      className={`bf-drive-treeRow${active ? " is-active" : ""}${onToggle ? " has-toggle" : ""}`}
+      style={{ "--bf-drive-depth": depth }}
       data-drive-tree-row="true"
       draggable={draggable}
       onDragStart={draggable ? (event) => {
@@ -237,7 +240,7 @@ function TreeRow({
       onDrop={canDrop ? (event) => {
         event.preventDefault();
         event.stopPropagation();
-        let raw = event.dataTransfer.getData("application/x-bondfire-drive-item") || event.dataTransfer.getData("text/plain");
+        const raw = event.dataTransfer.getData("application/x-bondfire-drive-item") || event.dataTransfer.getData("text/plain");
         try {
           const item = JSON.parse(raw || "{}");
           if (item?.id && item?.kind) onDropItem(item);
@@ -248,64 +251,35 @@ function TreeRow({
         event.stopPropagation();
         setContextPoint({ x: event.clientX, y: event.clientY });
       } : undefined}
-      style={{
-        display: "grid",
-        gridTemplateColumns: onToggle ? "28px minmax(0,1fr) auto" : "minmax(0,1fr) auto",
-        gap: 4,
-        alignItems: "center",
-        marginTop: 3,
-        paddingLeft: onToggle ? depth * 12 : 0,
-      }}
     >
       {onToggle ? (
         <button
           type="button"
+          className="bf-drive-treeToggle"
           aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
           onClick={(event) => {
             event.stopPropagation();
             onToggle();
           }}
-          style={{
-            width: 28,
-            height: 28,
-            padding: 0,
-            display: "grid",
-            placeItems: "center",
-            background: "transparent",
-            color: "#fff",
-            border: "none",
-            cursor: "pointer",
-            opacity: 0.8,
-          }}
         >
-          {expanded ? "▾" : "▸"}
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
-      ) : null}
+      ) : <span className="bf-drive-treeSpacer" />}
       <button
         type="button"
+        className="bf-drive-treeMain"
         onClick={onClick}
         title={label}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          width: "100%",
-          minWidth: 0,
-          padding: "6px 8px",
-          paddingLeft: onToggle ? 8 : 8 + depth * 12,
-          background: active ? "rgba(255,255,255,0.08)" : "transparent",
-          color: "#fff",
-          border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: 10,
-          cursor: draggable ? "grab" : "pointer",
-          textAlign: "left",
-        }}
       >
-        <span style={{ opacity: 0.9, width: 12, textAlign: "center", flex: "0 0 12px" }}>{icon}</span>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: active ? 700 : 500 }}>{label}</span>
-        {hint ? <span className="helper" style={{ marginLeft: "auto", flex: "0 0 auto" }}>{hint}</span> : null}
+        <span className="bf-drive-treeIcon">{icon}</span>
+        <span className="bf-drive-treeLabel">{label}</span>
+        {hint ? <span className="bf-drive-treeHint">{hint}</span> : null}
       </button>
-      {menuItems?.length ? <PopMenu trigger="⋯" items={menuItems} /> : null}
+      {menuItems?.length ? (
+        <div className="bf-drive-treeActions">
+          <PopMenu trigger={<MoreHorizontal size={15} aria-hidden="true" />} items={menuItems} />
+        </div>
+      ) : null}
       {menuItems?.length ? <ContextMenu items={menuItems} point={contextPoint} onClose={() => setContextPoint(null)} /> : null}
     </div>
   );
@@ -568,7 +542,7 @@ export default function DriveSidebar({
             key={folder.id}
             depth={depth}
             active={currentFolder === folder.id}
-            icon="📁"
+            icon={<Folder size={15} />}
             label={folder.name}
             expanded={!isCollapsed}
             onToggle={() => setCollapsedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] }))}
@@ -596,7 +570,7 @@ export default function DriveSidebar({
             key={note.id}
             depth={depth}
             active={selectedKind === "note" && selectedId === note.id}
-            icon="•"
+            icon={<FileText size={15} />}
             label={note.title || "untitled"}
             dragPayload={{ kind: "note", id: note.id }}
             onClick={() => onSelectNote?.(note.id)}
@@ -616,7 +590,7 @@ export default function DriveSidebar({
             key={file.id}
             depth={depth}
             active={selectedKind === "file" && selectedId === file.id}
-            icon={String(file.mime || "").includes("bondfire.sheet") || /\.bfsheet$/i.test(String(file.name || "")) ? "▦" : String(file.mime || "").includes("bondfire.form") || /\.bfform$/i.test(String(file.name || "")) ? "☑" : "↗"}
+            icon={String(file.mime || "").includes("bondfire.sheet") || /\.bfsheet$/i.test(String(file.name || "")) ? <FileSpreadsheet size={15} /> : <File size={15} />}
             label={file.name}
             dragPayload={{ kind: "file", id: file.id }}
             onClick={() => onSelectFile?.(file)}
@@ -640,22 +614,22 @@ export default function DriveSidebar({
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "44px minmax(0,1fr)", height: "100%", position: "relative", zIndex: 0 }}>
-        <div style={{ borderRight: "1px solid #1b1b1b", padding: 8, display: "grid", alignContent: "start", gap: 6, position: "relative", zIndex: 1 }}>
-          <button className="btn" type="button" title="Explorer" onClick={() => setActivePane("explorer")} style={{ padding: "8px 0", fontWeight: activePane === "explorer" ? 800 : 500 }}>⌂</button>
-          <button className="btn" type="button" title="Templates" onClick={() => setActivePane("templates")} style={{ padding: "8px 0", fontWeight: activePane === "templates" ? 800 : 500 }}>T</button>
+      <div className="bf-drive-sidebarShell">
+        <div className="bf-drive-sidebarRail">
+          <button className={activePane === "explorer" ? "bf-drive-railButton is-active" : "bf-drive-railButton"} type="button" title="Explorer" aria-label="Explorer" onClick={() => setActivePane("explorer")}><Folder size={16} /></button>
+          <button className={activePane === "templates" ? "bf-drive-railButton is-active" : "bf-drive-railButton"} type="button" title="Templates" aria-label="Templates" onClick={() => setActivePane("templates")}><LayoutTemplate size={16} /></button>
         </div>
 
         <div
-          style={{ minWidth: 0, overflow: "auto", padding: 10, position: "relative", zIndex: 2 }}
+          className="bf-drive-sidebarBody"
           onContextMenu={(event) => {
             if (event.target.closest?.("[data-drive-tree-row]")) return;
             event.preventDefault();
             setBlankContextPoint({ x: event.clientX, y: event.clientY });
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <button className="btn" type="button" onClick={() => onOpenCreatePicker?.()} style={{ padding: "6px 12px", minWidth: 36 }}>＋</button>
+          <div className="bf-drive-sidebarSearch">
+            <button className="bf-drive-newButton" type="button" onClick={() => onOpenCreatePicker?.()} aria-label="New">＋</button>
             {activePane === "templates" ? (
               <PopMenu
                 trigger="⋯"
@@ -668,13 +642,13 @@ export default function DriveSidebar({
                 ]}
               />
             ) : null}
-            <input className="input" placeholder={activePane === "explorer" ? "search..." : "search templates..."} value={search} onChange={(e) => setSearch(e.target.value)} style={{ minWidth: 0, flex: 1, padding: "9px 10px" }} />
+            <input className="input bf-drive-searchInput" placeholder={activePane === "explorer" ? "Search Drive" : "Search templates"} value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           {activePane === "explorer" ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 6 }}>
-                <div className="helper" style={{ letterSpacing: "0.08em", textTransform: "uppercase" }}>Explorer</div>
+              <div className="bf-drive-sectionHead">
+                <div className="bf-drive-sectionLabel">Explorer</div>
                 <button
                   className="btn"
                   type="button"
@@ -682,12 +656,12 @@ export default function DriveSidebar({
                   onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
                   onDrop={handleRootDrop}
                   title="Open root or drop an item here to move it to root"
-                  style={{ padding: "5px 8px", fontSize: 12 }}
+                  className="bf-drive-rootButton"
                 >
                   Root
                 </button>
               </div>
-              <div style={{ display: "grid", gap: 2 }}>
+              <div className="bf-drive-tree">
                 {rootItems.length ? rootItems : <div className="helper" style={{ padding: "8px 4px" }}>Nothing here.</div>}
               </div>
             </>
@@ -727,7 +701,7 @@ export default function DriveSidebar({
                   .map((tpl) => (
                     <TreeRow
                       key={tpl.id}
-                      icon="✦"
+                      icon={<LayoutTemplate size={15} />}
                       label={tpl.name}
                       active={templateEditor?.id === tpl.id}
                       onClick={() => openTemplateEditor(tpl)}
