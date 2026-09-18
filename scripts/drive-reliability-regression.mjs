@@ -31,7 +31,11 @@ assert.match(docx, /word\/document\.xml/, "DOCX preview must extract the documen
 const sheet = fs.readFileSync(new URL("../src/components/drive/SpreadsheetFileView.jsx", import.meta.url), "utf8");
 assert.match(sheet, /Delete row/, "Drive sheets must support row deletion");
 assert.match(sheet, /Delete column/, "Drive sheets must support column deletion");
-assert.match(sheet, /Insert row above/, "Drive sheets must support row insertion");
+assert.match(sheet, /Insert above/, "Drive sheets must support row insertion");
 assert.match(sheet, /rewriteFormulaReferences/, "Drive sheet structural edits must rewrite formula references");
+assert.match(sheet, /bf-sheet-toolbar/, "Drive sheets must use the compact spreadsheet toolbar");
+assert.match(sheet, /bf-sheet-formulaBar/, "Drive sheets must expose a dedicated formula bar");
+assert.match(sidebar, /bf-drive-treeRow/, "Drive explorer must use the compact tree row layout");
+assert.match(drive, /showPreview = showEditableDocument && !isStructuredDriveDoc/, "Structured Drive documents must not render a duplicate split preview");
 
-console.log("PASS: Drive tree, folder import, recursive deletion, and DOCX preview regressions");
+console.log("PASS: Drive tree, sheet workspace, folder import, recursive deletion, and preview regressions");
