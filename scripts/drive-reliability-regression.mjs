@@ -18,6 +18,9 @@ assert.match(sidebar, /data-pop-direction/, "Drive action menus must expose thei
 assert.match(sidebar, /Import template/, "Templates pane must expose direct template-file import");
 assert.match(sidebar, /accept="\.bftemplate,application\/json"/, "Template import must accept Bondfire template files");
 assert.match(sidebar, /JSON\.parse\(raw\)[\s\S]*source\?\.body/, "Template import must unpack the wrapper instead of storing JSON as the template body");
+assert.match(sidebar, /data-drive-context-menu/, "Drive must render a cursor-positioned context menu");
+assert.match(sidebar, /onContextMenu=\{menuItems\?\.length/, "Drive tree items must open their action menu on right click");
+assert.match(sidebar, /New sheet[\s\S]*Upload folder/, "Blank Drive space must expose creation and upload actions on right click");
 assert.match(sidebar, /file\.textContent/, "Drive search must include editable text-file contents");
 assert.match(sidebar, /onToggle=/, "folder open and collapse actions must be separate");
 assert.match(privateStore, /WITH RECURSIVE subtree\(id\)/, "private Drive folder deletion must delete descendants instead of promoting them");
