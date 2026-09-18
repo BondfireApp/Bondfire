@@ -12,10 +12,12 @@ assert.match(drive, /Uploaded all \$\{uploaded\} files/, "folder imports must re
 assert.match(drive, /onMoveFolder=\{moveFolder\}/, "Drive must wire folder drag moves into the tree");
 assert.match(sidebar, /bf_drive_collapsed_v1_/, "tree collapse state must survive rerenders");
 assert.match(sidebar, /application\/x-bondfire-drive-item/, "Drive tree must expose drag-and-drop move payloads");
+assert.match(sidebar, /file\.textContent/, "Drive search must include editable text-file contents");
 assert.match(sidebar, /onToggle=/, "folder open and collapse actions must be separate");
 assert.match(privateStore, /WITH RECURSIVE subtree\(id\)/, "private Drive folder deletion must delete descendants instead of promoting them");
 assert.doesNotMatch(privateStore, /UPDATE org_private_records SET parent_id=.*drive\/folders.*drive\/notes.*drive\/files/s, "private folder deletion must not promote children");
 assert.match(preview, /DocxFilePreview/, "DOCX must render in the Drive preview");
+assert.match(drive, /isBondfireTemplateFile[\s\S]*drive\/templates/, "Drive uploads must import .bftemplate files into the Templates pane");
 assert.match(docx, /word\/document\.xml/, "DOCX preview must extract the document body client-side");
 
 console.log("PASS: Drive tree, folder import, recursive deletion, and DOCX preview regressions");
