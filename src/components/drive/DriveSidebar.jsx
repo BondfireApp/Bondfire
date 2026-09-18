@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useParams } from "react-router-dom";
 import { api } from "../../utils/api.js";
 
@@ -22,28 +23,99 @@ function MenuButton({ label, onClick, danger = false }) {
 
 function PopMenu({ trigger, items, align = "right" }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [position, setPosition] = useState({ top: 8, left: 8, openUp: false });
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+
+  function placeMenu() {
+    const triggerNode = triggerRef.current;
+    if (!triggerNode || typeof window === "undefined") return;
+    const rect = triggerNode.getBoundingClientRect();
+    const width = Math.max(190, Number(menuRef.current?.offsetWidth || 190));
+    const measuredHeight = Number(menuRef.current?.offsetHeight || 0);
+    const estimatedHeight = Math.min(window.innerHeight - 16, measuredHeight || (items.length * 40 + 8));
+    const gap = 6;
+    const edge = 8;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openUp = spaceBelow < estimatedHeight + gap && spaceAbove > spaceBelow;
+    const unclampedTop = openUp ? rect.top - estimatedHeight - gap : rect.bottom + gap;
+    const top = Math.max(edge, Math.min(unclampedTop, window.innerHeight - estimatedHeight - edge));
+    const unclampedLeft = align === "left" ? rect.left : rect.right - width;
+    const left = Math.max(edge, Math.min(unclampedLeft, window.innerWidth - width - edge));
+    setPosition({ top, left, openUp });
+  }
 
   useEffect(() => {
-    const onDown = (e) => {
-      if (!ref.current?.contains(e.target)) setOpen(false);
+    if (!open) return undefined;
+    placeMenu();
+    const frame = window.requestAnimationFrame(placeMenu);
+    const closeOnViewportMove = () => setOpen(false);
+    const onDown = (event) => {
+      if (triggerRef.current?.contains(event.target) || menuRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") setOpen(false);
     };
     window.addEventListener("mousedown", onDown);
-    return () => window.removeEventListener("mousedown", onDown);
-  }, []);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", closeOnViewportMove);
+    window.addEventListener("scroll", closeOnViewportMove, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", closeOnViewportMove);
+      window.removeEventListener("scroll", closeOnViewportMove, true);
+    };
+  }, [open, align, items.length]);
 
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button className="btn" type="button" onClick={() => setOpen((v) => !v)} style={{ padding: "5px 8px", minWidth: 30, borderRadius: 10 }}>
-        {trigger}
-      </button>
-      {open ? (
-        <div style={{ position: "absolute", top: "calc(100% + 6px)", ...(align === "left" ? { left: 0 } : { right: 0 }), minWidth: 190, background: "rgba(16,16,20,0.98)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: 4, boxShadow: "0 14px 32px rgba(0,0,0,0.42)", zIndex: 120, display: "grid", gap: 4 }}>
+  const menu = open && typeof document !== "undefined"
+    ? createPortal(
+        <div
+          ref={menuRef}
+          data-pop-direction={position.openUp ? "up" : "down"}
+          style={{
+            position: "fixed",
+            top: position.top,
+            left: position.left,
+            minWidth: 190,
+            maxWidth: "min(320px, calc(100vw - 16px))",
+            maxHeight: "calc(100vh - 16px)",
+            overflowY: "auto",
+            background: "rgba(16,16,20,0.98)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 10,
+            padding: 4,
+            boxShadow: "0 14px 32px rgba(0,0,0,0.42)",
+            zIndex: 1000,
+            display: "grid",
+            gap: 4,
+          }}
+        >
           {items.map((item, idx) => (
             <MenuButton key={`${item.label}-${idx}`} label={item.label} danger={item.danger} onClick={() => { item.onClick?.(); setOpen(false); }} />
           ))}
-        </div>
-      ) : null}
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        ref={triggerRef}
+        className="btn"
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        style={{ padding: "5px 8px", minWidth: 30, borderRadius: 10 }}
+      >
+        {trigger}
+      </button>
+      {menu}
     </div>
   );
 }
