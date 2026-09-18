@@ -15,6 +15,9 @@ assert.match(sidebar, /application\/x-bondfire-drive-item/, "Drive tree must exp
 assert.match(sidebar, /createPortal/, "Drive action menus must escape the scroll container");
 assert.match(sidebar, /spaceBelow < estimatedHeight/, "Drive action menus must flip upward near the bottom edge");
 assert.match(sidebar, /data-pop-direction/, "Drive action menus must expose their chosen pop direction");
+assert.match(sidebar, /Import template/, "Templates pane must expose direct template-file import");
+assert.match(sidebar, /accept="\.bftemplate,application\/json"/, "Template import must accept Bondfire template files");
+assert.match(sidebar, /JSON\.parse\(raw\)[\s\S]*source\?\.body/, "Template import must unpack the wrapper instead of storing JSON as the template body");
 assert.match(sidebar, /file\.textContent/, "Drive search must include editable text-file contents");
 assert.match(sidebar, /onToggle=/, "folder open and collapse actions must be separate");
 assert.match(privateStore, /WITH RECURSIVE subtree\(id\)/, "private Drive folder deletion must delete descendants instead of promoting them");
