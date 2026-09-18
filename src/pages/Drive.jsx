@@ -497,8 +497,8 @@ export default function Drive() {
       setStatus("saved");
     }
   }
-  async function moveNote(id, targetParentId) {
-    const target = arguments.length >= 2 ? targetParentId : prompt("Move to folderId (blank for root)", currentFolder || "");
+  async function moveNote(id, targetParentId = undefined) {
+    const target = targetParentId === undefined ? prompt("Move to folderId (blank for root)", currentFolder || "") : targetParentId;
     if (target === null) return;
     try {
       const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/notes/${encodeURIComponent(id)}`, {
@@ -539,8 +539,8 @@ export default function Drive() {
       setStatus("saved");
     }
   }
-  async function moveFile(id, targetParentId) {
-    const target = arguments.length >= 2 ? targetParentId : prompt("Move to folderId (blank for root)", currentFolder || "");
+  async function moveFile(id, targetParentId = undefined) {
+    const target = targetParentId === undefined ? prompt("Move to folderId (blank for root)", currentFolder || "") : targetParentId;
     if (target === null) return;
     try {
       const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, {
