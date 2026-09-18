@@ -77,10 +77,32 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
       await db.prepare('DELETE FROM org_private_records WHERE org_id=? AND kind=? AND id=? AND revision=? AND deleting=1').bind(orgId,kind,id,revision).run();
       return json({ok:true,deleted:true,id});
     }
+    if (kind === 'drive/folders') {
+      const subtree = await db.prepare(
+        "WITH RECURSIVE subtree(id) AS (" +
+        "SELECT id FROM org_private_records WHERE org_id=? AND kind='drive/folders' AND id=? " +
+        "UNION ALL " +
+        "SELECT child.id FROM org_private_records child JOIN subtree parent ON child.parent_id=parent.id " +
+        "WHERE child.org_id=? AND child.kind='drive/folders'" +
+        ") SELECT id FROM subtree"
+      ).bind(orgId,id,orgId).all();
+      const folderIds=(subtree.results||[]).map(row=>String(row.id||'')).filter(Boolean);
+      if (!folderIds.length) return bad(404,'NOT_FOUND');
+      const placeholders=folderIds.map(()=>'?').join(',');
+      const fileRows=await db.prepare(
+        `SELECT id FROM org_private_records WHERE org_id=? AND kind='drive/files' AND parent_id IN (${placeholders})`
+      ).bind(orgId,...folderIds).all();
+      for (const fileRow of fileRows.results||[]) await deletePrivateFileBlobs(env,orgId,fileRow.id);
+      const statements=[
+        db.prepare(`DELETE FROM org_private_records WHERE org_id=? AND kind IN ('drive/notes','drive/files') AND parent_id IN (${placeholders})`).bind(orgId,...folderIds),
+        db.prepare(`DELETE FROM org_private_records WHERE org_id=? AND kind='drive/folders' AND id IN (${placeholders})`).bind(orgId,...folderIds),
+      ];
+      await db.batch(statements);
+      return json({ok:true,deleted:true,id,deletedFolderIds:folderIds});
+    }
     const statements = [];
     await ensurePublicationSchema(db);
     statements.push(db.prepare('DELETE FROM org_public_projections WHERE org_id=? AND kind=? AND id=? AND EXISTS(SELECT 1 FROM org_private_records WHERE org_id=? AND kind=? AND id=? AND revision=?)').bind(orgId,kind,id,orgId,kind,id,body.revision));
-    if (kind === 'drive/folders') statements.push(db.prepare("UPDATE org_private_records SET parent_id=?,revision=revision+1 WHERE org_id=? AND kind IN ('drive/folders','drive/notes','drive/files') AND parent_id=? AND EXISTS (SELECT 1 FROM org_private_records WHERE org_id=? AND kind=? AND id=? AND revision=?)").bind(existing.parent_id, orgId, id, orgId, kind, id, body.revision));
     statements.push(db.prepare('DELETE FROM org_private_records WHERE org_id=? AND kind=? AND id=? AND revision=?').bind(orgId, kind, id, body.revision));
     const result = await db.batch(statements);
     if (Number(result.at(-1)?.meta?.changes || 0) !== 1) return bad(409, 'PRIVATE_REVISION_CONFLICT');
