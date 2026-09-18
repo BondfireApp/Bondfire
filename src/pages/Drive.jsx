@@ -844,8 +844,13 @@ export default function Drive() {
       const parts = rel.split("/").filter(Boolean);
       const fileName = parts.pop() || file.name;
       try {
-        const parentId = parts.length ? await ensureFolderChain(parts, folderIndex) : currentFolder;
         const wrapped = new File([file], fileName, { type: file.type, lastModified: file.lastModified });
+        if (isBondfireTemplateFile(wrapped)) {
+          await uploadFileRecord(wrapped, null, rel);
+          uploaded += 1;
+          continue;
+        }
+        const parentId = parts.length ? await ensureFolderChain(parts, folderIndex) : currentFolder;
         await uploadFileRecord(wrapped, parentId, rel);
         uploaded += 1;
       } catch (error) {
