@@ -35,6 +35,12 @@ assert.match(sheet, /Insert above/, "Drive sheets must support row insertion");
 assert.match(sheet, /rewriteFormulaReferences/, "Drive sheet structural edits must rewrite formula references");
 assert.match(sheet, /bf-sheet-toolbar/, "Drive sheets must use the compact spreadsheet toolbar");
 assert.match(sheet, /bf-sheet-formulaBar/, "Drive sheets must expose a dedicated formula bar");
+assert.match(sheet, /SheetContextMenu/, "Drive sheets must expose a custom right-click menu");
+assert.match(sheet, /rowContextItems/, "Drive sheet row headers must expose row actions on right click");
+assert.match(sheet, /columnContextItems/, "Drive sheet column headers must expose column actions on right click");
+assert.match(sheet, /cellContextItems/, "Drive sheet cells must expose contextual right-click actions");
+assert.match(sheet, /Delete row/, "Drive sheet context menus must expose row deletion");
+assert.match(sheet, /Delete column/, "Drive sheet context menus must expose column deletion");
 assert.match(sidebar, /bf-drive-treeRow/, "Drive explorer must use the compact tree row layout");
 assert.match(drive, /showPreview = showEditableDocument && !isStructuredDriveDoc/, "Structured Drive documents must not render a duplicate split preview");
 
