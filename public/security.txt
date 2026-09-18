@@ -1,0 +1,9 @@
+Policy: https://bondfireapp.org/security/
+Canonical: https://bondfireapp.org/.well-known/security.txt
+Acknowledgments: https://github.com/BondfireApp/Bondfire/security
+Preferred-Languages: en
+Expires: 2027-02-01T00:00:00.000Z
+
+# No dedicated security email is currently published in the repository.
+# Do not post exploitable details, credentials, or private user information in public issues.
+# Check the repository security page for the current private reporting mechanism.

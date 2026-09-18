@@ -1,0 +1,258 @@
+.bf-support-page {
+  width: min(920px, calc(100% - 24px));
+  margin: 0 auto;
+  padding: 28px 0 96px;
+}
+
+.bf-support-hero,
+.bf-support-form {
+  border: 1px solid rgba(255,255,255,.11);
+  background: linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.025));
+  box-shadow: 0 18px 50px rgba(0,0,0,.18);
+}
+
+.bf-support-hero {
+  margin-bottom: 14px;
+  padding: clamp(20px, 4vw, 34px);
+  border-radius: 22px;
+}
+
+.bf-support-hero h1 {
+  margin: 4px 0 10px;
+  font-size: clamp(30px, 6vw, 48px);
+  line-height: 1;
+}
+
+.bf-support-hero p {
+  max-width: 720px;
+  margin: 0;
+  color: #c8c8c8;
+  line-height: 1.55;
+}
+
+.bf-support-kicker {
+  color: #d56b6b !important;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .14em;
+}
+
+.bf-support-identity {
+  margin-top: 14px !important;
+  color: #eee !important;
+}
+
+.bf-support-form {
+  display: grid;
+  gap: 18px;
+  padding: clamp(18px, 4vw, 30px);
+  border-radius: 22px;
+}
+
+.bf-support-field {
+  display: grid;
+  gap: 7px;
+}
+
+.bf-support-field label {
+  font-weight: 800;
+}
+
+.bf-support-field input,
+.bf-support-field select,
+.bf-support-field textarea {
+  width: 100%;
+  min-height: 46px;
+  border-color: rgba(255,255,255,.16);
+  background: #0b0b0b;
+  font: inherit;
+}
+
+.bf-support-field textarea {
+  min-height: 190px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.bf-support-field input:focus-visible,
+.bf-support-field select:focus-visible,
+.bf-support-field textarea:focus-visible,
+.bf-support-checkbox:focus-within,
+.bf-support-diagnostics summary:focus-visible,
+.bf-support-actions button:focus-visible,
+.bf-support-status a:focus-visible {
+  outline: 3px solid rgba(255,255,255,.92);
+  outline-offset: 2px;
+}
+
+.bf-support-field-help,
+.bf-support-privacy-note {
+  margin: 0;
+  color: #aaa;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.bf-support-public-warning,
+.bf-support-private-note,
+.bf-support-status {
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  line-height: 1.45;
+}
+
+.bf-support-public-warning {
+  border: 1px solid rgba(229, 160, 47, .42);
+  background: rgba(229, 160, 47, .08);
+}
+
+.bf-support-private-note {
+  border: 1px solid rgba(120, 165, 225, .34);
+  background: rgba(120, 165, 225, .07);
+}
+
+.bf-support-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 14px;
+  background: rgba(255,255,255,.025);
+  cursor: pointer;
+}
+
+.bf-support-checkbox input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+}
+
+.bf-support-checkbox span {
+  display: grid;
+  gap: 3px;
+}
+
+.bf-support-checkbox small {
+  color: #aaa;
+  line-height: 1.4;
+}
+
+.bf-support-diagnostics {
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 14px;
+  background: #0d0d0d;
+  overflow: hidden;
+}
+
+.bf-support-diagnostics summary {
+  padding: 13px 15px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.bf-support-diagnostics dl {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 1px 0;
+  background: rgba(255,255,255,.08);
+}
+
+.bf-support-diagnostics dl > div {
+  display: grid;
+  grid-template-columns: minmax(150px, .6fr) minmax(0, 1.4fr);
+  gap: 12px;
+  padding: 10px 14px;
+  background: #101010;
+}
+
+.bf-support-diagnostics dt {
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.bf-support-diagnostics dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.bf-support-privacy-note {
+  padding: 12px 14px 14px;
+}
+
+.bf-support-status.is-error {
+  border: 1px solid rgba(222, 82, 82, .5);
+  background: rgba(157, 24, 24, .18);
+}
+
+.bf-support-status.is-success {
+  border: 1px solid rgba(87, 183, 124, .42);
+  background: rgba(45, 125, 76, .14);
+}
+
+.bf-support-status a {
+  width: fit-content;
+  text-decoration: underline;
+  font-weight: 800;
+}
+
+.bf-support-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bf-support-submit,
+.bf-support-secondary {
+  min-height: 46px;
+  padding-inline: 18px;
+  font-weight: 800;
+}
+
+.bf-support-submit:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
+.bf-support-secondary {
+  border-color: rgba(255,255,255,.14);
+  background: rgba(255,255,255,.055);
+}
+
+@media (max-width: 620px) {
+  .bf-support-page {
+    width: min(100% - 16px, 920px);
+    padding-top: 12px;
+  }
+
+  .bf-support-hero,
+  .bf-support-form {
+    border-radius: 17px;
+  }
+
+  .bf-support-diagnostics dl > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .bf-support-actions,
+  .bf-support-actions button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-support-page *,
+  .bf-support-page *::before,
+  .bf-support-page *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}

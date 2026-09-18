@@ -1,0 +1,435 @@
+/*
+ * Colophon is a separate product, but its native workspace still needs the
+ * same complete visual system as the standalone application. Keep this bundle
+ * mounted only while the native workspace is active.
+ */
+
+@import "../../../node_modules/colophon/src/styles.css";
+@import "../../../node_modules/colophon/src/public-mobile.css";
+@import "../../../node_modules/colophon/src/public-admin-toolbar-fix.css";
+@import "../../../node_modules/colophon/src/public-masthead-fit.css";
+@import "../../../node_modules/colophon/src/public-preview-media-layout.css";
+@import "../../../node_modules/colophon/src/public-archive-polish.css";
+@import "../../../node_modules/colophon/src/admin-polish.css";
+@import "../../../node_modules/colophon/src/colophon-setup.css";
+@import "../../../node_modules/colophon/src/admin-analytics.css";
+@import "../../../node_modules/colophon/src/admin-editor-form-fix.css";
+@import "../../../node_modules/colophon/src/admin-editor-link-tools.css";
+@import "../../../node_modules/colophon/src/admin-classic-editor-toolbar.css";
+@import "../../../node_modules/colophon/src/admin-classic-editor-polish.css";
+@import "../../../node_modules/colophon/src/admin-editor-usability.css";
+@import "../../../node_modules/colophon/src/admin-editor-focus-mode-fix.css";
+@import "../../../node_modules/colophon/src/printlab-disabled-tools.css";
+@import "../../../node_modules/colophon/src/audio-lab.css";
+@import "../../../node_modules/colophon/src/audio-lab-recording.css";
+@import "../../../node_modules/colophon/src/audio-lab-phase4.css";
+@import "../../../node_modules/colophon/src/audio-lab-phase5.css";
+@import "../../../node_modules/colophon/src/audio-lab-phase6.css";
+@import "../../../node_modules/colophon/src/audio-lab-phase7.css";
+@import "../../../node_modules/colophon/src/audio-lab-phase8.css";
+@import "../../../node_modules/colophon/src/audio-lab-fullscreen.css";
+@import "../../../node_modules/colophon/src/audio-lab-workspace.css";
+@import "../../../node_modules/colophon/src/audio-lab-workspace-final.css";
+@import "../../../node_modules/colophon/src/audio-lab-waveform-focus.css";
+@import "../../../node_modules/colophon/src/audio-lab-professional-polish.css";
+@import "../../../node_modules/colophon/src/audio-lab-task-pages.css";
+@import "../../../node_modules/colophon/src/audio-lab-transcription.css";
+@import "../../../node_modules/colophon/src/audio-lab-direct-manipulation.css";
+@import "../../../node_modules/colophon/src/audio-lab-shortcuts.css";
+@import "../../../node_modules/colophon/src/admin-media-library.css";
+@import "../../../node_modules/colophon/src/admin-media-inspector.css";
+@import "../../../node_modules/colophon/src/admin-users.css";
+@import "../../../node_modules/colophon/src/public-reading-type-fix.css";
+@import "../../../node_modules/colophon/src/public-type-force.css";
+@import "../../../node_modules/colophon/src/public-featured-image-only.css";
+@import "../../../node_modules/colophon/src/public-translation-selector.css";
+@import "../../../node_modules/colophon/src/admin-navigation.css";
+@import "../../../node_modules/colophon/src/admin-public-config.css";
+@import "../../../node_modules/colophon/src/admin-public-navigation.css";
+@import "../../../node_modules/colophon/src/sitewide-mobile-polish.css";
+@import "../../../node_modules/colophon/src/public-card-title-fit.css";
+@import "../../../node_modules/colophon/src/public-card-overlay-v2.css";
+@import "../../../node_modules/colophon/src/home-feed-v3.css";
+@import "../../../node_modules/colophon/src/campaign-page.css";
+@import "../../../node_modules/colophon/src/campaign-page-polish.css";
+@import "../../../node_modules/colophon/src/campaign-coverage-archive.css";
+@import "../../../node_modules/colophon/src/campaign-correspondence.css";
+@import "../../../node_modules/colophon/src/campaign-benefit-kit.css";
+@import "../../../node_modules/colophon/src/instagram-connect.css";
+@import "../../../node_modules/colophon/src/contact-secure-form.css";
+@import "../../../node_modules/colophon/src/admin-editor-sticky-toolbar.css";
+@import "../../../node_modules/colophon/src/public-accessibility.css";
+@import "../../../node_modules/colophon/src/browser-local.css";
+@import "../../../node_modules/colophon/src/investigations.css";
+@import "../../../node_modules/colophon/src/audio-lab-audacity-layout.css";
+@import "../../../node_modules/colophon/src/audio-lab-studio-v4.css";
+@import "../../../node_modules/colophon/src/audio-lab-audacity-v5.css";
+@import "../../../node_modules/colophon/src/audio-lab-audacity-tools.css";
+@import "../../../node_modules/colophon/src/audio-lab-dialog-track-focus.css";
+@import "../../../node_modules/colophon/src/audio-lab-standalone.css";
+@import "../../../node_modules/colophon/src/public-publication-theme.css";
+@import "../../../node_modules/colophon/src/product-maturity.css";
+@import "../../../node_modules/colophon/src/course.css";
+@import "../../../node_modules/colophon/src/admin-dark-mode-fixes.css";
+
+/*
+ * Bondfire only owns the mount boundary. Colophon owns every visual decision
+ * inside it. Do not repaint child text/controls here: those broad overrides
+ * caused the white-on-white and split light/dark surfaces in the native view.
+ */
+.bondfire-colophon-native-shell {
+  min-height: 100%;
+  min-width: 0;
+  background: var(--bg, #090b0d);
+  color: var(--text, #f0f3f5);
+}
+
+.bondfire-colophon-native-shell,
+.bondfire-colophon-native-shell * {
+  box-sizing: border-box;
+}
+
+.bondfire-colophon-native-shell .admin-frame,
+.bondfire-colophon-native-shell .admin-frame__main {
+  min-width: 0;
+}
+
+/* Native-only correction for Colophon's older light-only public-config sheet. */
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card {
+  background: #15191d !important;
+  color: #f0f3f5 !important;
+  border-color: #38434c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card :where(
+  h2,
+  h3,
+  h4,
+  label,
+  label > span,
+  .admin-public-config-card__eyebrow,
+  .description,
+  .admin-public-config-card__meta,
+  .admin-public-config-card__clean
+) {
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card .description,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__eyebrow,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__meta,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__clean,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card small {
+  color: #b9c3ca !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__identity {
+  border-color: #38434c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__identity input,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__identity textarea,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__identity select {
+  background: #0f1316 !important;
+  color: #f0f3f5 !important;
+  border-color: #53616c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__status {
+  background: #38434c !important;
+  border-color: #38434c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__status > span,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__summary article,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .public-type-preview,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .public-custom-font-list__item,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__changes {
+  background: #11161a !important;
+  color: #f0f3f5 !important;
+  border-color: #46525c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__status strong,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__summary strong,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .public-type-preview,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .public-type-preview :where(h4, p, strong),
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .public-type-preview__display,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .public-type-preview__nav,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .public-custom-font-list__item :where(span, strong),
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__changes summary {
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__status small,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__summary :where(span, small),
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .public-custom-font-list__item small {
+  color: #b9c3ca !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__health {
+  background: #11161a !important;
+  color: #b9c3ca !important;
+  border-color: #46525c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .admin-frame .admin-public-config-card__health.is-ready {
+  background: #10251a !important;
+  color: #a9e6b9 !important;
+  border-color: #39764a !important;
+}
+
+/*
+ * Native editor dark-mode contrast repair.
+ * Colophon's older admin sheets put --admin-ink directly on several labels,
+ * so the dark parent color cannot inherit into them. Keep the correction
+ * limited to the editor's genuinely dark surfaces instead of repainting the
+ * whole Colophon tree and creating white-on-white controls elsewhere.
+ */
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-edit-screen :where(
+  .wp-screen-header h1,
+  .native-content-editor__title-field,
+  .native-content-editor__title-field > span,
+  .native-content-editor__permalink > span,
+  .native-content-editor__field,
+  .native-content-editor__field > span,
+  .native-content-editor__check,
+  .native-content-editor__check > span,
+  .native-content-editor__code-language > span,
+  .native-bridge-sidebar .wp-meta-box > h2,
+  .native-bridge-sidebar .wp-meta-box > h3,
+  .native-bridge-sidebar legend,
+  .native-bridge-sidebar label,
+  .native-bridge-sidebar label > span
+) {
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-edit-screen :where(
+  .description,
+  small,
+  .native-content-editor__placeholder,
+  .native-content-editor__permalink .description,
+  .native-bridge-sidebar .description,
+  .native-bridge-sidebar small
+) {
+  color: #b9c3ca !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-edit-screen .native-content-editor__permalink code {
+  color: #8fc7f0 !important;
+}
+
+/* Bondfire-native logo upload restored beside the existing URL field. */
+.bondfire-colophon-logo-upload {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bondfire-colophon-logo-upload__picker {
+  display: grid !important;
+  gap: 6px !important;
+  color: inherit !important;
+}
+
+.bondfire-colophon-logo-upload__picker > span {
+  color: inherit !important;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bondfire-colophon-logo-upload__picker input[type="file"] {
+  width: 100% !important;
+  min-height: 38px;
+  padding: 6px 8px !important;
+}
+
+.bondfire-colophon-logo-upload__preview {
+  width: min(220px, 100%);
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #46525c;
+  border-radius: 4px;
+  background: #0b0f12;
+  padding: 8px;
+}
+
+.bondfire-colophon-logo-upload__preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+}
+
+.bondfire-colophon-logo-upload small.is-error {
+  color: #ff9b9b !important;
+}
+
+/* Text mastheads should size to the title instead of the fixed image stage. */
+.bondfire-colophon-native-shell .publication-topbar--masthead .publication-topbar__brand-link--isolated:has(.publication-topbar__site-name) {
+  width: fit-content !important;
+  max-width: calc(100vw - 48px) !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: visible !important;
+  line-height: 1 !important;
+  transform: none !important;
+}
+
+.bondfire-colophon-native-shell .publication-topbar--masthead .publication-topbar__site-name {
+  width: auto !important;
+  max-width: min(100%, 1120px) !important;
+  display: block !important;
+  margin: 0 auto !important;
+  text-align: center !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  line-height: 0.94 !important;
+  font-size: clamp(2.2rem, 6vw, 4.5rem) !important;
+}
+
+@media (max-width: 720px) {
+  .bondfire-colophon-native-shell .publication-topbar--masthead .publication-topbar__brand-link--isolated:has(.publication-topbar__site-name) {
+    max-width: calc(100vw - 28px) !important;
+  }
+
+  .bondfire-colophon-native-shell .publication-topbar--masthead .publication-topbar__site-name {
+    font-size: clamp(1.9rem, 11vw, 3.4rem) !important;
+  }
+}
+
+/* Native admin notices must stay readable in dark mode. */
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice {
+  background: #15191d !important;
+  color: #f0f3f5 !important;
+  border-top: 1px solid #38434c !important;
+  border-right: 1px solid #38434c !important;
+  border-bottom: 1px solid #38434c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice p {
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice--error {
+  background: #2a1416 !important;
+  color: #ffd7d7 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice--error p {
+  color: #ffd7d7 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice__dismiss {
+  color: #d7dee3 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-notices .wp-notice__dismiss:hover {
+  color: #ffffff !important;
+}
+
+
+/* Posts admin is a dark surface in Bondfire. Colophon's default WordPress-inspired
+ * list screen assumes white paper, so scope a complete correction to this screen. */
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-admin-screen > .wp-meta-box {
+  background: #11161a !important;
+  color: #f0f3f5 !important;
+  border-color: #38434c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-view-tabs {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-view-tab {
+  min-height: 32px !important;
+  border: 1px solid #46525c !important;
+  border-radius: 4px !important;
+  background: #15191d !important;
+  color: #8fc7f0 !important;
+  padding: 5px 10px !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-view-tab:hover,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-view-tab:focus-visible {
+  background: #1d242a !important;
+  border-color: #6f8190 !important;
+  color: #ffffff !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-view-tab.is-active {
+  background: #26313a !important;
+  border-color: #8fc7f0 !important;
+  color: #ffffff !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-list-controls :where(select, input),
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-quick-edit :where(select, input) {
+  background: #0f1316 !important;
+  color: #f0f3f5 !important;
+  border: 1px solid #53616c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-list-controls select option,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-quick-edit select option {
+  background: #15191d !important;
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-list-controls .button {
+  background: #1a2228 !important;
+  color: #f0f3f5 !important;
+  border-color: #53616c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-posts-table {
+  background: #11161a !important;
+  color: #f0f3f5 !important;
+  border-color: #38434c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-posts-table :where(th, td) {
+  background: #11161a !important;
+  color: #f0f3f5 !important;
+  border-color: #38434c !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-posts-table thead th {
+  background: #182026 !important;
+  color: #dfe7ec !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-posts-table tbody tr:hover td {
+  background: #151c21 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-posts-table .content-table__title {
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-row-actions :where(a, button) {
+  color: #8fc7f0 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-row-actions .wp-row-action-delete {
+  color: #ff9b9b !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-quick-edit-row td,
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-quick-edit {
+  background: #15191d !important;
+  color: #f0f3f5 !important;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-list-controls {
+  align-items: stretch;
+}
+

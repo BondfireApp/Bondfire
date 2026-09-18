@@ -1,0 +1,24 @@
+/* overrides to ensure only the top header appears */
+.brand-row, .section-brand, .org-brand-row { display: none !important; }
+.header .brand-row, .header .section-brand, .header .org-brand-row { display: inherit !important; }
+
+/* =========================================
+   Mobile: cards-only mode for wide pages
+   (Meetings + Settings: Members/Pledges)
+   ========================================= */
+
+.bf-table-desktop{ display: block; }
+.bf-cards-mobile{ display: none; }
+
+@media (max-width: 840px) {
+  .bf-table-desktop{ display: none !important; }
+  .bf-cards-mobile{ display: grid !important; gap: 10px; }
+
+  /* prevent sideways page drift */
+  body{ overflow-x: hidden; }
+
+  /* if any table slips through, at least allow containment */
+  .table, .pledges-table, .table-like{
+    max-width: 100%;
+  }
+}

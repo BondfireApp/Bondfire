@@ -1,0 +1,77 @@
+name: Build Desktop Apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            command: npm run desktop:dist:win:x64
+            artifact: windows-x64
+
+          - name: Windows ARM64
+            os: windows-latest
+            command: npm run desktop:dist:win:arm64
+            artifact: windows-arm64
+
+          - name: macOS Intel
+            os: macos-latest
+            command: npm run desktop:dist:mac:x64
+            artifact: macos-x64
+
+          - name: macOS Apple Silicon
+            os: macos-latest
+            command: npm run desktop:dist:mac:arm64
+            artifact: macos-arm64
+
+          - name: Linux x64
+            os: ubuntu-latest
+            command: npm run desktop:dist:linux:x64
+            artifact: linux-x64
+
+          - name: Linux ARM64
+            os: ubuntu-latest
+            command: npm run desktop:dist:linux:arm64
+            artifact: linux-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.10.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Bondfire desktop application
+        run: ${{ matrix.command }}
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bondfire-${{ matrix.artifact }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error

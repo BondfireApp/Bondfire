@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+<title>People</title>
+<rect width="64" height="64" rx="7" fill="#24c7a7"/>
+<circle cx="24" cy="24" r="9" fill="#fff4df" stroke="#111" stroke-width="3"/>
+<circle cx="42" cy="25" r="8" fill="#ff5a7a" stroke="#111" stroke-width="3"/>
+<path d="M10 52c1-11 7-17 14-17s13 6 14 17" fill="#fff4df" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+<path d="M31 52c1-9 5-14 11-14s10 5 12 14" fill="#ff5a7a" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+<path d="M18 20c2-4 5-6 9-5M37 21c2-3 5-5 8-4" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+</svg>

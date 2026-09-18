@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Bondfire Studio</title>
+  <desc id="desc">A graphic design artboard with a pen-nib vector mark.</desc>
+  <rect x="46" y="46" width="420" height="420" rx="76" fill="#0b0d10"/>
+  <rect x="118" y="104" width="276" height="304" rx="28" fill="none" stroke="#f4f4f5" stroke-width="24"/>
+  <path d="M256 150 322 242 256 336 190 242Z" fill="#ef4444"/>
+  <circle cx="256" cy="242" r="22" fill="#0b0d10" stroke="#f4f4f5" stroke-width="12"/>
+  <path d="M256 150v70M190 242h44M278 242h44M256 264v72" stroke="#f4f4f5" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="256" cy="150" r="12" fill="#f4f4f5"/>
+  <circle cx="190" cy="242" r="12" fill="#f4f4f5"/>
+  <circle cx="322" cy="242" r="12" fill="#f4f4f5"/>
+  <circle cx="256" cy="336" r="12" fill="#f4f4f5"/>
+</svg>

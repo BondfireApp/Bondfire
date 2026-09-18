@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+<title>Newsletter subscribers</title>
+<rect width="64" height="64" rx="7" fill="#ffb703"/>
+<rect x="10" y="17" width="44" height="32" rx="4" fill="#fff4df" stroke="#111" stroke-width="3"/>
+<path d="M12 20l20 16 20-16" fill="none" stroke="#111" stroke-width="3" stroke-linejoin="round"/>
+<circle cx="49" cy="17" r="10" fill="#6c35ff" stroke="#111" stroke-width="3"/>
+<path d="M49 12v10M44 17h10" stroke="#fff4df" stroke-width="3" stroke-linecap="round"/>
+</svg>

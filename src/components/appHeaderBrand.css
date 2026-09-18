@@ -1,0 +1,61 @@
+/* Header brand tweaks:
+   - restore logo
+   - let org name pill show long names
+*/
+
+.bf-brand-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bf-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.bf-brand img {
+  height: 22px;
+  width: 22px;
+  display: block;
+}
+
+.bf-brand span {
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.bf-brand-org {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.2;
+  /* Let long org names show fully without turning the header into
+     a horizontal scroll hellscape. Wrap inside the pill instead. */
+  white-space: normal;
+  max-width: min(520px, 46vw);
+  overflow: visible;
+  text-overflow: unset;
+  word-break: break-word;
+}
+
+.bf-appHeader-left {
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .bf-brand-org {
+    max-width: 92vw;
+  }
+}

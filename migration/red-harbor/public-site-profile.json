@@ -1,0 +1,172 @@
+{
+  "format": "bondfire-public-site-profile",
+  "version": 1,
+  "migration_target_org_id": "73bdf68b-d67a-4d70-8ae8-7c3bf9c934b0",
+  "public_site": {
+    "enabled": true,
+    "newsletter_enabled": true,
+    "pledges_enabled": false,
+    "show_action_strip": true,
+    "show_needs": false,
+    "show_meetings": true,
+    "show_what_we_do": false,
+    "show_get_involved": true,
+    "show_newsletter_card": true,
+    "show_website_button": false,
+    "show_available_supplies": false,
+    "slug": "red-harbor",
+    "template": "organizing",
+    "title": "Red Harbor IWW",
+    "location": "Aberdeen, Hoquiam, and the surrounding Grays Harbor region",
+    "about": "Red Harbor is a branch of the Industrial Workers of the World organizing workers across Grays Harbor.",
+    "branch_label": "Red Harbor Branch",
+    "hero_headline": "Building worker power on the harbor and beyond.",
+    "hero_text": "Red Harbor is a branch of the Industrial Workers of the World. We organize across workplaces, support workers in struggle, publish branch updates, and build solidarity rooted in direct action and rank and file power.",
+    "hero_image_url": "/red-harbor/red-harbor-hero.jpg",
+    "font_family": "system",
+    "accent_color": "#a11f1f",
+    "theme_mode": "light",
+    "about_title": "About Red Harbor",
+    "about_intro": "Red Harbor is the local IWW branch for Aberdeen, Hoquiam, and the surrounding region. We build organization, education, and solidarity among workers and support workers who want to organize where they work.",
+    "purpose_title": "What this site is for",
+    "site_purpose_items": [
+      "Connect workers with the Red Harbor branch and the IWW.",
+      "Share branch news, events, organizing resources, and labor history.",
+      "Give members a clear path into the private organization workspace.",
+      "Build durable worker organization rooted in direct action and solidarity."
+    ],
+    "about_card_title": "A union for all workers",
+    "about_card_body": "The IWW organizes workers across industries and trades around the principle that workers should build power together rather than rely on bosses, politicians, or professional intermediaries.",
+    "location_card_title": "Grays Harbor, Washington",
+    "location_card_body": "Serving workers in Aberdeen, Hoquiam, and communities throughout the harbor.",
+    "join_title": "Organize with Red Harbor",
+    "join_intro": "Whether you want to join the IWW, organize your workplace, support another worker in struggle, or take part in branch activity, there is a place to begin.",
+    "join_cards": [
+      {
+        "title": "Join the branch",
+        "body": "Become an IWW member and take part in Red Harbor meetings, education, campaigns, and mutual support."
+      },
+      {
+        "title": "Organize your workplace",
+        "body": "Talk with us about workplace problems, organizing with coworkers, and building collective power where you work."
+      },
+      {
+        "title": "Join the broader struggle",
+        "body": "Support workers in struggle, take part in labor solidarity, and help build working-class organization across the harbor."
+      }
+    ],
+    "membership_title": "Join the IWW through Red Harbor",
+    "membership_intro": "The Industrial Workers of the World is a member-run union open to workers across industries. Red Harbor is our local branch on Grays Harbor.",
+    "membership_details_title": "Who can join?",
+    "membership_details_body": "Most workers can join the IWW, including workers who are unemployed or underemployed, students, retirees, self-employed and informal workers. Workers who belong to another union can generally join as well, except officers of other unions and people whose primary role is hiring or firing workers.",
+    "membership_includes_title": "Membership includes",
+    "membership_includes_items": [
+      "Workers across industries and trades",
+      "Unemployed and underemployed workers",
+      "Students and retirees",
+      "Self-employed and informal workers",
+      "Workers already represented by another union, except union officers"
+    ],
+    "membership_dues_title": "Monthly dues",
+    "membership_dues_items": [
+      "$11/mo · Less than $2,000 per month",
+      "$22/mo · $2,000 to $3,500 per month",
+      "$33/mo · More than $3,500 per month",
+      "Initiation fee: one month of dues"
+    ],
+    "membership_cta_title": "Ready to get your red card?",
+    "membership_cta_body": "Join the IWW through the union's membership system, then connect with Red Harbor as your local branch.",
+    "membership_poster_url": "/red-harbor/red-harbor-hero.jpg",
+    "membership_url": "https://redcard.iww.org/",
+    "archive_title": "Labor history on the harbor",
+    "archive_intro": "Grays Harbor has a long history of worker organization, strikes, repression, solidarity, and IWW activity. These photographs preserve a small piece of that history.",
+    "archive_items": [
+      {
+        "title": "Finn Hall",
+        "image_url": "/red-harbor/home-archive/iww-1.jpg",
+        "caption": "Finn Hall and the immigrant worker communities that helped shape radical labor politics on Grays Harbor."
+      },
+      {
+        "title": "1912 Grays Harbor Lumber Strike",
+        "image_url": "/red-harbor/home-archive/iww-2.jpg",
+        "caption": "Workers during the 1912 Grays Harbor lumber strike, one of the region's defining industrial conflicts."
+      },
+      {
+        "title": "Everett Massacre Memorial",
+        "image_url": "/red-harbor/home-archive/iww-3.jpg",
+        "caption": "A memorial connected to the Everett Massacre and the violent repression faced by IWW organizers in Washington."
+      },
+      {
+        "title": "IWW headquarters, probably Seattle",
+        "image_url": "/red-harbor/home-archive/iww-4.jpg",
+        "caption": "An early IWW headquarters image from Washington labor history."
+      },
+      {
+        "title": "IWW gathering in Aberdeen",
+        "image_url": "/red-harbor/home-archive/iww-5.jpg",
+        "caption": "An IWW gathering in Aberdeen, reflecting the union's deep roots on the harbor."
+      },
+      {
+        "title": "Hoquiam Strike March",
+        "image_url": "/red-harbor/home-archive/iww-6.jpg",
+        "caption": "Workers marching during a strike in Hoquiam."
+      }
+    ],
+    "events_title": "Meetings and events",
+    "events_intro": "Branch meetings, public events, trainings, solidarity actions, and other organizing activity appear here when published.",
+    "events_items": [],
+    "contact_title": "Contact Red Harbor",
+    "contact_intro": "Reach out if you want to join, organize your workplace, ask for solidarity, or learn more about the branch.",
+    "contact_card_title": "Red Harbor IWW",
+    "contact_card_body": "Email redharboriww@gmail.com",
+    "member_access_title": "Member area",
+    "member_access_body": "Red Harbor members can sign in to the private Bondfire organization workspace for meetings, files, organizing work, chat, and branch administration.",
+    "primary_actions": [
+      {
+        "label": "Join Us",
+        "url": "#membership"
+      },
+      {
+        "label": "Read the Bulletin",
+        "url": "https://bulletin.redharbor.org/"
+      },
+      {
+        "label": "Contact",
+        "url": "#contact"
+      }
+    ],
+    "get_involved_links": [
+      {
+        "label": "Join the IWW",
+        "url": "https://redcard.iww.org/"
+      },
+      {
+        "label": "Email Red Harbor",
+        "url": "mailto:redharboriww@gmail.com"
+      },
+      {
+        "label": "Membership",
+        "url": "#membership"
+      }
+    ],
+    "section_order": [
+      "hero",
+      "about",
+      "join",
+      "membership",
+      "archive",
+      "events",
+      "contact"
+    ],
+    "section_visibility": {
+      "hero": true,
+      "about": true,
+      "join": true,
+      "membership": true,
+      "archive": true,
+      "events": true,
+      "contact": true
+    },
+    "logo_url": "/red-harbor/red-harbor-logo.png"
+  }
+}

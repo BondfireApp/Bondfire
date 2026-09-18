@@ -1,0 +1,44 @@
+BONDFIRE HOSTED INFRASTRUCTURE CANARY
+
+Issued: 2026-09-17
+Expires: 2026-11-01
+
+As of the issue date above:
+
+1. Bondfire's hosted infrastructure remains under project control.
+
+2. Bondfire has not knowingly or intentionally modified the hosted service
+   to bypass or weaken the published client-side encryption and
+   ciphertext-authoritative private-data model for third-party access.
+
+3. Bondfire has not knowingly deployed software or infrastructure whose
+   purpose is to provide a third party with access to decrypted private
+   organization content.
+
+4. Bondfire is not aware of a breach of its hosted infrastructure that
+   provided an unauthorized party with decrypted private organization
+   content.
+
+5. This statement makes no claim about private encryption keys held only
+   by Bondfire users and not possessed by the hosted service.
+
+This statement applies only to infrastructure controlled by the operators
+of the hosted Bondfire service.
+
+Self-hosted Bondfire deployments are independently operated and are not
+covered by this statement.
+
+An expired, missing, or discontinued canary indicates only the absence of
+a current statement. It is not proof of any particular legal demand,
+security compromise, or third-party action.
+
+Contemporary public reference:
+Associated Press, 2026-09-17:
+"Climate change made deadly Nepal glacier and rock collapse more likely,
+according to analysis."
+
+Signing key:
+Bondfire Canary <info@bondfireapp.org>
+
+OpenPGP fingerprint:
+3F4D E9C0 044C E33D 3646  A66D 5B5E E4C4 5431 8E68

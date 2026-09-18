@@ -1,0 +1,590 @@
+/*
+ * Bondfire V3 global visual layer.
+ *
+ * The builder remains the source of truth. This file deliberately overrides the
+ * older generic UI primitives without changing page behavior or module logic.
+ */
+
+:root {
+  --bg: var(--bf-v3-ink, #0b0d0c);
+  --panel: var(--bf-v3-panel, #121514);
+  --text: var(--bf-v3-bone, #eee8d9);
+  --muted: var(--bf-v3-muted, #a0a39a);
+  --border: var(--bf-v3-line, rgba(238, 232, 217, 0.14));
+  --red: var(--bf-v3-ember, #ff5b45);
+  --red-2: #ff725f;
+  --bf-v3-cream: var(--bf-v3-bone, #eee8d9);
+  --bf-v3-radius: 0px;
+  --bf-v3-focus: rgba(199, 255, 77, 0.52);
+  --bf-v3-hover: rgba(238, 232, 217, 0.06);
+  --bf-v3-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+}
+
+html {
+  background: var(--bf-v3-ink);
+}
+
+body {
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 82% -10%, rgba(255, 91, 69, 0.065), transparent 32rem),
+    var(--bf-v3-ink);
+  color: var(--bf-v3-bone);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "kern" 1;
+}
+
+::selection {
+  background: var(--bf-v3-lime);
+  color: var(--bf-v3-ink);
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--bf-v3-focus);
+  outline-offset: 2px;
+}
+
+/* Typography -------------------------------------------------------------- */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--bf-v3-bone);
+  font-family: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+h1 {
+  font-size: clamp(30px, 4vw, 52px);
+  line-height: 0.98;
+}
+
+h2 {
+  line-height: 1.05;
+}
+
+p,
+li,
+.helper {
+  line-height: 1.55;
+}
+
+.helper {
+  color: var(--bf-v3-muted) !important;
+}
+
+.error {
+  color: #ff9d91 !important;
+}
+
+code,
+pre,
+kbd,
+.bf-build-label,
+.tag,
+.badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Main application canvas ------------------------------------------------- */
+
+.main {
+  width: min(1520px, 100%);
+  padding: clamp(18px, 3vw, 34px) clamp(12px, 3vw, 34px) 96px;
+}
+
+.main > h1:first-child,
+.main > div > h1:first-child,
+.main > section > h1:first-child {
+  margin-bottom: 14px;
+}
+
+/* Panels, cards, rows ------------------------------------------------------ */
+
+.card,
+.kpi,
+.bf-stat-card,
+.bf-modal-shell {
+  border: 1px solid var(--bf-v3-line);
+  border-radius: 0;
+  background: var(--bf-v3-panel);
+  color: var(--bf-v3-bone);
+  box-shadow: none;
+}
+
+.card {
+  padding: clamp(14px, 2vw, 20px);
+}
+
+.card:hover {
+  border-color: rgba(238, 232, 217, 0.22);
+}
+
+.kpi,
+.bf-stat-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi::before,
+.bf-stat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--bf-v3-lime);
+  opacity: 0.6;
+}
+
+.row {
+  border-color: var(--bf-v3-line) !important;
+}
+
+.table {
+  border: 1px solid var(--bf-v3-line);
+  background: var(--bf-v3-panel);
+}
+
+.table th {
+  color: var(--bf-v3-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.table th,
+.table td {
+  border-color: var(--bf-v3-line);
+  padding: 12px 10px;
+}
+
+.table tbody tr:hover {
+  background: var(--bf-v3-hover);
+}
+
+/* Controls ---------------------------------------------------------------- */
+
+button,
+.btn,
+a.btn,
+.btn-red,
+a.btn-red,
+.linkbtn,
+.bf-logout,
+.bf-appnav-link {
+  min-height: 40px;
+  border-radius: 0;
+  font-weight: 850;
+  letter-spacing: -0.015em;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    opacity 140ms ease;
+}
+
+button,
+.btn-red,
+a.btn-red {
+  border: 1px solid var(--bf-v3-ember);
+  background: var(--bf-v3-ember);
+  color: #170b09;
+}
+
+.btn,
+a.btn,
+.linkbtn,
+.bf-logout,
+.bf-appnav-link {
+  border: 1px solid var(--bf-v3-line);
+  background: transparent;
+  color: var(--bf-v3-bone);
+}
+
+button:hover:not(:disabled),
+.btn:hover,
+a.btn:hover,
+.btn-red:hover,
+a.btn-red:hover,
+.linkbtn:hover,
+.bf-logout:hover,
+.bf-appnav-link:hover {
+  filter: none;
+  transform: translateY(-1px);
+}
+
+button:hover:not(:disabled),
+.btn-red:hover,
+a.btn-red:hover {
+  background: #ff725f;
+  border-color: #ff725f;
+}
+
+.btn:hover,
+a.btn:hover,
+.linkbtn:hover,
+.bf-logout:hover,
+.bf-appnav-link:hover {
+  border-color: rgba(199, 255, 77, 0.55);
+  color: var(--bf-v3-lime);
+  background: rgba(199, 255, 77, 0.035);
+}
+
+button:active:not(:disabled),
+.btn:active,
+a.btn:active,
+.btn-red:active,
+a.btn-red:active {
+  transform: translateY(0);
+}
+
+button:disabled,
+.btn:disabled,
+.btn-red:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  filter: none;
+}
+
+input,
+select,
+textarea,
+.input {
+  width: 100%;
+  border: 1px solid var(--bf-v3-line);
+  border-radius: 0;
+  background: #0e1110;
+  color: var(--bf-v3-bone);
+  padding: 11px 12px;
+  accent-color: var(--bf-v3-lime);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #747970;
+}
+
+input:hover,
+select:hover,
+textarea:hover,
+.input:hover {
+  border-color: rgba(238, 232, 217, 0.26);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.input:focus {
+  border-color: var(--bf-v3-lime);
+  outline: 2px solid rgba(199, 255, 77, 0.16);
+  outline-offset: 1px;
+}
+
+select {
+  color-scheme: dark;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+}
+
+/* Status language --------------------------------------------------------- */
+
+.tag,
+.badge {
+  border: 1px solid var(--bf-v3-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bf-v3-muted);
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.badge {
+  border-color: rgba(255, 91, 69, 0.45);
+  color: var(--bf-v3-ember);
+}
+
+/* Global header ----------------------------------------------------------- */
+
+.bf-appHeader,
+.header {
+  min-height: 64px;
+  padding: 10px clamp(12px, 2vw, 24px);
+  border-bottom: 1px solid var(--bf-v3-line);
+  background: rgba(11, 13, 12, 0.93);
+  backdrop-filter: blur(18px);
+  box-shadow: none;
+}
+
+.bf-brand,
+.brand {
+  font-family: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.bf-brand img,
+.brand img {
+  border-radius: 0;
+  object-fit: contain;
+}
+
+.bf-brand > img {
+  width: 32px;
+  height: 32px;
+}
+
+.bf-orgPill,
+.orgpill {
+  border: 1px solid var(--bf-v3-line);
+  border-radius: 0;
+  background: var(--bf-v3-panel);
+  color: var(--bf-v3-bone);
+}
+
+.bf-appnav {
+  gap: 6px;
+}
+
+.bf-appnav-link {
+  padding: 9px 11px;
+  font-size: 12px;
+}
+
+.bf-appnav-link.is-active {
+  border-color: rgba(199, 255, 77, 0.55);
+  background: rgba(199, 255, 77, 0.07);
+  color: var(--bf-v3-lime);
+  box-shadow: inset 0 -2px var(--bf-v3-lime);
+}
+
+/* Keep the dense desktop nav quiet: only the active module gets its mark.
+   The mobile drawer can show every canonical module mark because it has room. */
+.bf-appnav-module-logo {
+  display: none;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  object-fit: contain;
+}
+
+.bf-appnav.is-drawer .bf-appnav-module-logo,
+.bf-nav-desktop .bf-appnav-link.is-active .bf-appnav-module-logo {
+  display: block;
+}
+
+.bf-appnav.is-drawer .bf-appnav-link {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+}
+
+.bf-hamburger {
+  border: 1px solid var(--bf-v3-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.bf-drawer {
+  border-color: var(--bf-v3-line) !important;
+  background: rgba(11, 13, 12, 0.98) !important;
+}
+
+.bottomnav {
+  border-top: 1px solid var(--bf-v3-line);
+  background: rgba(11, 13, 12, 0.96);
+  backdrop-filter: blur(18px);
+}
+
+/* Modal / toast ----------------------------------------------------------- */
+
+.bf-modal-backdrop {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(5px);
+}
+
+.bf-modal-shell {
+  border-color: rgba(238, 232, 217, 0.2);
+  box-shadow: var(--bf-v3-shadow);
+}
+
+.toast {
+  border: 1px solid var(--bf-v3-line);
+  border-radius: 0;
+  background: var(--bf-v3-panel-2);
+  color: var(--bf-v3-bone);
+  box-shadow: var(--bf-v3-shadow);
+}
+
+/* Org dashboard and older page wrappers --------------------------------- */
+
+#root > div:not(.bf-build-page) > div[style*="padding: 16px"],
+#root > div:not(.bf-build-page) > main {
+  color: var(--bf-v3-bone);
+}
+
+/* Give old dashboards the builder's strong section rhythm without changing
+   their JSX structure. */
+.card > h2:first-child,
+.card > h3:first-child {
+  margin-bottom: 10px;
+}
+
+.card > .helper:first-of-type {
+  max-width: 68ch;
+}
+
+.actions {
+  gap: 8px;
+}
+
+.search {
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+/* Public REC deliberately shares the builder canvas. --------------------- */
+
+.bf-build-page .card {
+  border-color: var(--bf-v3-line);
+  background: var(--bf-v3-panel);
+}
+
+.bf-build-page .btn {
+  border-color: var(--bf-v3-line);
+  background: transparent;
+}
+
+.bf-build-page .btn-red {
+  border-color: var(--bf-v3-ember);
+  background: var(--bf-v3-ember);
+}
+
+/* Builder is canonical. Keep generic overrides from muddying it. ---------- */
+
+.bf-build-action,
+.bf-build-pack,
+.bf-build-module-toggle {
+  border-radius: 0;
+}
+
+.bf-build-pack {
+  border-radius: 999px;
+}
+
+.bf-build-core-logo {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  object-fit: contain;
+}
+
+.bf-build-core-logo + .bf-build-mark {
+  display: none;
+}
+
+.bf-build-module-logo-wrap {
+  position: relative;
+  display: inline-grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  flex: 0 0 52px;
+}
+
+.bf-build-module-logo {
+  width: 52px;
+  height: 52px;
+  display: block;
+  object-fit: contain;
+}
+
+.bf-build-module-logo + .bf-build-module-mark {
+  display: none;
+}
+
+/* Responsive -------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .main {
+    padding: 16px 10px 92px;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bf-appHeader,
+  .header {
+    min-height: 60px;
+  }
+}
+
+@media (max-width: 640px) {
+  h1 {
+    font-size: clamp(30px, 10vw, 44px);
+  }
+
+  .card,
+  .kpi,
+  .bf-stat-card {
+    padding: 14px;
+  }
+
+  .kpis {
+    grid-template-columns: 1fr;
+  }
+
+  button,
+  .btn,
+  a.btn,
+  .btn-red,
+  a.btn-red,
+  .linkbtn {
+    min-height: 44px;
+  }
+
+  .table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .bf-build-core-logo {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+
+  .bf-build-module-logo-wrap,
+  .bf-build-module-logo {
+    width: 46px;
+    height: 46px;
+  }
+
+  .bf-build-module-logo-wrap {
+    flex-basis: 46px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
