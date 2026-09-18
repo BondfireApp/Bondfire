@@ -51,6 +51,11 @@ function isMarkdownFile(file) {
   const ext = getFileExtension(file?.name);
   return file?.mime === "text/markdown" || ext === "md" || ext === "markdown";
 }
+function isDocxFile(file) {
+  const ext = getFileExtension(file?.name);
+  const mime = String(file?.mime || "").toLowerCase();
+  return ext === "docx" || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+}
 function isEditableTextFile(file) {
   const ext = getFileExtension(file?.name);
   const mime = String(file?.mime || "");
@@ -66,6 +71,7 @@ function canPreviewFileInApp(file) {
   if (mime.startsWith("video/")) return true;
   if (mime === "application/vnd.bondfire.sheet+json") return true;
   if (mime === "application/vnd.bondfire.form+json") return true;
+  if (isDocxFile(file)) return true;
   if (isEditableTextFile(file)) return true;
   return false;
 }
@@ -150,6 +156,7 @@ export default function Drive() {
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [loadState, setLoadState] = useState("loading");
   const [loadError, setLoadError] = useState("");
+  const [driveNotice, setDriveNotice] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 900 : false));
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -318,21 +325,76 @@ export default function Drive() {
   async function renameFolder(id) {
     const folder = folders.find((f) => f.id === id);
     const name = prompt("Rename folder", folder?.name || "");
-    if (!name) return;
-    const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      body: JSON.stringify({ name: String(name).trim() }),
-    });
-    if (!res?.folder) return;
-    setFolders((prev) => prev.map((f) => (f.id === id ? res.folder : f)));
+    const cleanName = String(name || "").trim();
+    if (!cleanName || cleanName === String(folder?.name || "")) return;
+    setDriveNotice("");
+    try {
+      const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: cleanName }),
+      });
+      if (!res?.folder) throw new Error("Folder rename was not acknowledged by the server.");
+      setFolders((prev) => prev.map((f) => (f.id === id ? res.folder : f)));
+      setDriveNotice(`Renamed folder to "${cleanName}".`);
+    } catch (error) {
+      setDriveNotice(`Rename failed: ${String(error?.message || error || "unknown error")}`);
+    }
+  }
+
+  async function moveFolder(id, targetParentId = null) {
+    const folder = folders.find((f) => f.id === id);
+    if (!folder) return;
+    if (targetParentId === id) return;
+    let cursor = targetParentId;
+    const seen = new Set();
+    while (cursor) {
+      if (cursor === id) {
+        setDriveNotice("A folder cannot be moved inside itself.");
+        return;
+      }
+      if (seen.has(cursor)) break;
+      seen.add(cursor);
+      cursor = folders.find((f) => f.id === cursor)?.parentId || null;
+    }
+    setDriveNotice("");
+    try {
+      const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ parentId: targetParentId || null }),
+      });
+      if (!res?.folder) throw new Error("Folder move was not acknowledged by the server.");
+      setFolders((prev) => prev.map((f) => (f.id === id ? res.folder : f)));
+      setDriveNotice(`Moved "${folder.name}".`);
+    } catch (error) {
+      setDriveNotice(`Move failed: ${String(error?.message || error || "unknown error")}`);
+    }
   }
   async function deleteFolder(id) {
-    await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, { method: "DELETE" });
-    const parent = folders.find((f) => f.id === id)?.parentId ?? null;
-    setFolders((prev) => prev.map((f) => (f.parentId === id ? { ...f, parentId: parent } : f)).filter((f) => f.id !== id));
-    setNotes((prev) => prev.map((n) => (n.parentId === id ? { ...n, parentId: parent } : n)));
-    setFiles((prev) => prev.map((f) => (f.parentId === id ? { ...f, parentId: parent } : f)));
-    if (currentFolder === id) setCurrentFolder(parent);
+    const folder = folders.find((f) => f.id === id);
+    if (!folder) return;
+    if (!window.confirm(`Delete "${folder.name}" and everything inside it? This cannot be undone.`)) return;
+    setDriveNotice("");
+    try {
+      await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const descendants = new Set([id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const candidate of folders) {
+          if (candidate.parentId && descendants.has(candidate.parentId) && !descendants.has(candidate.id)) {
+            descendants.add(candidate.id);
+            changed = true;
+          }
+        }
+      }
+      setFolders((prev) => prev.filter((f) => !descendants.has(f.id)));
+      setNotes((prev) => prev.filter((n) => !n.parentId || !descendants.has(n.parentId)));
+      setFiles((prev) => prev.filter((file) => !file.parentId || !descendants.has(file.parentId)));
+      if (currentFolder && descendants.has(currentFolder)) setCurrentFolder(folder.parentId || null);
+      setDriveNotice(`Deleted "${folder.name}" and its contents.`);
+    } catch (error) {
+      setDriveNotice(`Delete failed: ${String(error?.message || error || "unknown error")}`);
+    }
   }
 
   async function createNoteWithPayload(payload) {
@@ -435,14 +497,19 @@ export default function Drive() {
       setStatus("saved");
     }
   }
-  async function moveNote(id) {
-    const target = prompt("Move to folderId (blank for root)", currentFolder || "");
-    const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/notes/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      body: JSON.stringify({ parentId: target || null }),
-    });
-    if (!res?.note) return;
-    setNotes((prev) => prev.map((n) => (n.id === id ? res.note : n)));
+  async function moveNote(id, targetParentId) {
+    const target = arguments.length >= 2 ? targetParentId : prompt("Move to folderId (blank for root)", currentFolder || "");
+    if (target === null) return;
+    try {
+      const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/notes/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ parentId: target || null }),
+      });
+      if (!res?.note) throw new Error("Note move was not acknowledged by the server.");
+      setNotes((prev) => prev.map((n) => (n.id === id ? res.note : n)));
+    } catch (error) {
+      setDriveNotice(`Move failed: ${String(error?.message || error || "unknown error")}`);
+    }
   }
 
   async function renameFile(id) {
@@ -472,14 +539,19 @@ export default function Drive() {
       setStatus("saved");
     }
   }
-  async function moveFile(id) {
-    const target = prompt("Move to folderId (blank for root)", currentFolder || "");
-    const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      body: JSON.stringify({ parentId: target || null }),
-    });
-    if (!res?.file) return;
-    setFiles((prev) => prev.map((f) => (f.id === id ? withFileUrls(orgId, { ...f, ...res.file }) : f)));
+  async function moveFile(id, targetParentId) {
+    const target = arguments.length >= 2 ? targetParentId : prompt("Move to folderId (blank for root)", currentFolder || "");
+    if (target === null) return;
+    try {
+      const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ parentId: target || null }),
+      });
+      if (!res?.file) throw new Error("File move was not acknowledged by the server.");
+      setFiles((prev) => prev.map((f) => (f.id === id ? withFileUrls(orgId, { ...f, ...res.file }) : f)));
+    } catch (error) {
+      setDriveNotice(`Move failed: ${String(error?.message || error || "unknown error")}`);
+    }
   }
 
   async function hydrateFile(fileId) {
@@ -537,7 +609,7 @@ export default function Drive() {
   async function openFile(file) {
     let nextFile = withFileUrls(orgId, file);
     if (!nextFile) return;
-    if ((nextFile.encrypted || isEditableTextFile(nextFile)) && !nextFile.textContent && !nextFile.dataUrl) {
+    if ((nextFile.encrypted || isEditableTextFile(nextFile) || isDocxFile(nextFile)) && !nextFile.textContent && !nextFile.dataUrl) {
       nextFile = await hydrateFile(nextFile.id);
       if (!nextFile) return;
       nextFile = withFileUrls(orgId, nextFile);
@@ -696,42 +768,61 @@ export default function Drive() {
     }
     event.target.value = "";
   }
-  async function ensureFolderChain(segments) {
+  function folderIndexKey(parentId, name) {
+    return `${parentId || "__root__"}\u0000${String(name || "")}`;
+  }
+
+  async function ensureFolderChain(segments, folderIndex) {
     let parentId = currentFolder;
-    let nextFolders = folders;
-    for (const segment of segments) {
-      let existing = nextFolders.find((folder) => (folder.parentId || null) === (parentId || null) && folder.name === segment);
+    for (const rawSegment of segments) {
+      const segment = String(rawSegment || "").trim();
+      if (!segment) continue;
+      const key = folderIndexKey(parentId, segment);
+      let existing = folderIndex.get(key) || null;
       if (!existing) {
         const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders`, {
           method: "POST",
           body: JSON.stringify({ name: segment, parentId }),
         });
         existing = res?.folder || null;
-        if (existing) {
-          nextFolders = [...nextFolders, existing];
-          setFolders(nextFolders);
-        }
+        if (!existing) throw new Error(`Could not create folder "${segment}".`);
+        folderIndex.set(key, existing);
+        setFolders((prev) => prev.some((folder) => folder.id === existing.id) ? prev : [...prev, existing]);
       }
-      parentId = existing?.id || parentId;
+      parentId = existing.id;
     }
     return parentId;
   }
+
   async function onUploadFolder(event) {
     const chosen = Array.from(event.target.files || []);
     if (!chosen.length) return;
+    setDriveNotice(`Uploading ${chosen.length} file${chosen.length === 1 ? "" : "s"}…`);
+    const folderIndex = new Map(
+      folders.map((folder) => [folderIndexKey(folder.parentId || null, folder.name), folder]),
+    );
+    let uploaded = 0;
+    const failures = [];
     for (const file of chosen) {
       const rel = String(file.webkitRelativePath || file.name);
       const parts = rel.split("/").filter(Boolean);
       const fileName = parts.pop() || file.name;
-      const parentId = parts.length ? await ensureFolderChain(parts) : currentFolder;
-      const wrapped = new File([file], fileName, { type: file.type });
       try {
+        const parentId = parts.length ? await ensureFolderChain(parts, folderIndex) : currentFolder;
+        const wrapped = new File([file], fileName, { type: file.type, lastModified: file.lastModified });
         await uploadFileRecord(wrapped, parentId, rel);
+        uploaded += 1;
       } catch (error) {
-        console.error("Drive folder upload failed", error);
+        console.error("Drive folder upload failed", rel, error);
+        failures.push(`${rel}: ${String(error?.message || error || "upload failed")}`);
       }
     }
     event.target.value = "";
+    if (failures.length) {
+      setDriveNotice(`Uploaded ${uploaded} of ${chosen.length} files. Failed: ${failures.join(" | ")}`);
+    } else {
+      setDriveNotice(`Uploaded all ${uploaded} files.`);
+    }
   }
 
   async function openLinkedNoteByTitle(rawTitle) {
@@ -933,6 +1024,7 @@ export default function Drive() {
                     onUploadFile={() => { if (fileInputRef.current) fileInputRef.current.value = ""; fileInputRef.current?.click(); }}
                     onUploadFolder={() => { const input = folderInputRef.current; if (input) { input.value = ""; input.setAttribute("webkitdirectory", "true"); input.setAttribute("directory", "true"); } input?.click(); }}
                     onRenameFolder={renameFolder}
+                    onMoveFolder={moveFolder}
                     onDeleteFolder={deleteFolder}
                     onRenameNote={renameNote}
                     onMoveNote={moveNote}
@@ -986,6 +1078,7 @@ export default function Drive() {
                   input?.click();
                 }}
                 onRenameFolder={renameFolder}
+                onMoveFolder={moveFolder}
                 onDeleteFolder={deleteFolder}
                 onRenameNote={renameNote}
                 onMoveNote={moveNote}
@@ -1009,6 +1102,22 @@ export default function Drive() {
 
         <div style={{ minWidth: 0, overflow: "auto", padding: isMobile ? 8 : 8 }}>
           <Breadcrumbs folders={folders} currentFolder={currentFolder} setCurrentFolder={setCurrentFolder} compact />
+          {driveNotice ? (
+            <div
+              role="status"
+              className="helper"
+              style={{
+                marginBottom: 10,
+                padding: "8px 10px",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 10,
+                background: "rgba(255,255,255,0.03)",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {driveNotice}
+            </div>
+          ) : null}
 
           {loadState === "loading" ? (
             <div className="card" style={{ padding: 14, maxWidth: 560 }}>
