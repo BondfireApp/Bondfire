@@ -56,6 +56,11 @@ function isDocxFile(file) {
   const mime = String(file?.mime || "").toLowerCase();
   return ext === "docx" || mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 }
+function isBondfireTemplateFile(file) {
+  const ext = getFileExtension(file?.name);
+  const mime = String(file?.mime || "").toLowerCase();
+  return ext === "bftemplate" || mime === "application/vnd.bondfire.template+json";
+}
 function isEditableTextFile(file) {
   const ext = getFileExtension(file?.name);
   const mime = String(file?.mime || "");
@@ -707,6 +712,27 @@ export default function Drive() {
   }
 
   async function uploadFileRecord(rawFile, parentId, relativePath = "") {
+    if (isBondfireTemplateFile(rawFile)) {
+      let parsed = null;
+      try {
+        parsed = JSON.parse(await rawFile.text());
+      } catch {
+        throw new Error(`${rawFile.name}: invalid Bondfire template file.`);
+      }
+      const template = parsed?.template && typeof parsed.template === "object" ? parsed.template : parsed;
+      const name = String(template?.name || template?.title || rawFile.name.replace(/\.bftemplate$/i, "") || "Template").trim();
+      const title = String(template?.title || "");
+      const body = String(template?.body || template?.content || "");
+      if (!body.trim()) throw new Error(`${rawFile.name}: template body is empty.`);
+      const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/templates`, {
+        method: "POST",
+        body: JSON.stringify({ name, title, body }),
+      });
+      if (!res?.template) throw new Error(`${rawFile.name}: template import was not acknowledged by the server.`);
+      setTemplates((prev) => [res.template, ...prev.filter((tpl) => tpl.id !== res.template.id)]);
+      return { ...res.template, importedTemplate: true };
+    }
+
     const record = await fileToStoredRecord(rawFile, parentId, relativePath);
     const isPreviewableBinary = canPreviewFileInApp(record) && !isEditableTextFile(record);
     const localPreviewUrl = isPreviewableBinary ? URL.createObjectURL(rawFile) : "";
