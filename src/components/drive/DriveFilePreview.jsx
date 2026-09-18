@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import SpreadsheetFileView from "./SpreadsheetFileView.jsx";
 import FormFileView from "./FormFileView.jsx";
+import DocxFilePreview from "./DocxFilePreview.jsx";
 
 function escapeHtml(str) {
   return String(str || "")
@@ -206,12 +207,15 @@ export default function DriveFilePreview({ file }) {
   const rawContent = file?.textContent || "";
   const isSheet = isBondfireSheetFile(file, rawContent);
   const isForm = isBondfireFormFile(file, rawContent);
+  const ext = getFileExtension(file?.name);
+  const isDocx = ext === "docx" || String(file?.mime || "").toLowerCase() === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
   if (loading) return <div className="card" style={{ padding: 16 }}>Loading preview…</div>;
   if (error) return <div className="card" style={{ padding: 16, color: "#ff9a9a", whiteSpace: "pre-wrap" }}>{error}</div>;
 
   if (isSheet) return <SpreadsheetFileView value={rawContent} mode="preview" />;
   if (isForm) return <FormFileView value={rawContent} mode="preview" readOnlyPreview />;
+  if (isDocx && file?.dataUrl) return <DocxFilePreview file={file} />;
   if (String(file.mime || "").startsWith("image/") && src) {
     return <div style={{ display: "flex", justifyContent: "center" }}><img src={src} alt={file.name} style={{ maxWidth: "100%", maxHeight: "78vh", borderRadius: 12, border: "1px solid #1f1f1f" }} /></div>;
   }
