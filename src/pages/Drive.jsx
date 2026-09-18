@@ -759,14 +759,24 @@ export default function Drive() {
   async function onUploadFiles(event) {
     const chosen = Array.from(event.target.files || []);
     if (!chosen.length) return;
+    setDriveNotice(`Uploading ${chosen.length} file${chosen.length === 1 ? "" : "s"}…`);
+    let uploaded = 0;
+    const failures = [];
     for (const rawFile of chosen) {
       try {
         await uploadFileRecord(rawFile, currentFolder);
+        uploaded += 1;
       } catch (error) {
-        console.error("Drive file upload failed", error);
+        console.error("Drive file upload failed", rawFile?.name, error);
+        failures.push(`${rawFile?.name || "file"}: ${String(error?.message || error || "upload failed")}`);
       }
     }
     event.target.value = "";
+    setDriveNotice(
+      failures.length
+        ? `Uploaded ${uploaded} of ${chosen.length} files. Failed: ${failures.join(" | ")}`
+        : `Uploaded all ${uploaded} files.`,
+    );
   }
   function folderIndexKey(parentId, name) {
     return `${parentId || "__root__"}\u0000${String(name || "")}`;
