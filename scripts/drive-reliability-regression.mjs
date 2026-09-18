@@ -19,5 +19,10 @@ assert.doesNotMatch(privateStore, /UPDATE org_private_records SET parent_id=.*dr
 assert.match(preview, /DocxFilePreview/, "DOCX must render in the Drive preview");
 assert.match(drive, /isBondfireTemplateFile[\s\S]*drive\/templates/, "Drive uploads must import .bftemplate files into the Templates pane");
 assert.match(docx, /word\/document\.xml/, "DOCX preview must extract the document body client-side");
+const sheet = fs.readFileSync(new URL("../src/components/drive/SpreadsheetFileView.jsx", import.meta.url), "utf8");
+assert.match(sheet, /Delete row/, "Drive sheets must support row deletion");
+assert.match(sheet, /Delete column/, "Drive sheets must support column deletion");
+assert.match(sheet, /Insert row above/, "Drive sheets must support row insertion");
+assert.match(sheet, /rewriteFormulaReferences/, "Drive sheet structural edits must rewrite formula references");
 
 console.log("PASS: Drive tree, folder import, recursive deletion, and DOCX preview regressions");
