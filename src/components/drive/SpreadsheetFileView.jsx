@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const DEFAULT_ROW_HEIGHT = 34;
 const DEFAULT_COL_WIDTH = 120;
@@ -405,6 +406,80 @@ function SheetActionMenu({ label, items = [], footer = null }) {
   );
 }
 
+function SheetContextMenu({ menu, onClose }) {
+  const ref = useRef(null);
+  const [position, setPosition] = useState(() => ({
+    left: Number(menu?.x || 8),
+    top: Number(menu?.y || 8),
+  }));
+
+  useEffect(() => {
+    if (!menu || typeof window === "undefined") return undefined;
+    const place = () => {
+      const node = ref.current;
+      const width = Number(node?.offsetWidth || 220);
+      const height = Number(node?.offsetHeight || 260);
+      const edge = 8;
+      setPosition({
+        left: Math.max(edge, Math.min(Number(menu.x || edge), window.innerWidth - width - edge)),
+        top: Math.max(edge, Math.min(Number(menu.y || edge), window.innerHeight - height - edge)),
+      });
+    };
+    place();
+    const frame = window.requestAnimationFrame(place);
+    const close = () => onClose?.();
+    const onDown = (event) => {
+      if (ref.current?.contains(event.target)) return;
+      onClose?.();
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [menu, onClose]);
+
+  if (!menu || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      ref={ref}
+      role="menu"
+      className="bf-sheet-contextMenu"
+      style={{ left: position.left, top: position.top }}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      {(menu.items || []).map((item, index) => item.separator ? (
+        <div key={`sep-${index}`} className="bf-sheet-contextSeparator" />
+      ) : (
+        <button
+          key={`${item.label}-${index}`}
+          type="button"
+          className={item.danger ? "bf-sheet-contextItem is-danger" : "bf-sheet-contextItem"}
+          disabled={item.disabled}
+          onClick={async () => {
+            await item.onClick?.();
+            onClose?.();
+          }}
+        >
+          <span>{item.label}</span>
+          {item.hint ? <small>{item.hint}</small> : null}
+        </button>
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
 export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) {
   const doc = useMemo(() => normalizeSheet(safeParse(value)), [value]);
   const readOnly = mode === "preview";
@@ -414,6 +489,7 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
   const [sheetNameDraft, setSheetNameDraft] = useState("");
   const [renamingSheetId, setRenamingSheetId] = useState("");
   const [functionsOpen, setFunctionsOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
   const inputRefs = useRef({});
   const formulaInputRef = useRef(null);
   const functionsRef = useRef(null);
@@ -527,6 +603,87 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
         Object.entries(sheet.cells || {}).filter(([key]) => parseCellRef(key)?.col !== colIndex),
       ),
     }));
+  };
+
+  const openContextMenu = (event, items) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      items: items.filter(Boolean),
+    });
+  };
+
+  const copyCell = async (cellRef) => {
+    const value = String(activeSheet?.cells?.[cellRef]?.input || "");
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {}
+  };
+
+  const pasteCell = async (cellRef) => {
+    if (readOnly) return;
+    try {
+      const value = await navigator.clipboard.readText();
+      setCellInput(cellRef, value);
+      setFormulaDraft(value);
+    } catch {}
+  };
+
+  const duplicateSheet = (sheetId) => {
+    const source = doc.sheets.find((sheet) => sheet.id === sheetId);
+    if (!source) return;
+    const id = `sheet_${Date.now()}`;
+    const copy = JSON.parse(JSON.stringify(source));
+    copy.id = id;
+    copy.name = `${source.name} copy`;
+    commit({ ...doc, activeSheetId: id, sheets: [...doc.sheets, copy] });
+    setSelectedCell("A1");
+    setEditingCell("A1");
+  };
+
+  const deleteSheet = (sheetId) => {
+    if (doc.sheets.length <= 1) return;
+    const sheet = doc.sheets.find((item) => item.id === sheetId);
+    if (!window.confirm(`Delete sheet "${sheet?.name || "Sheet"}"?`)) return;
+    const nextSheets = doc.sheets.filter((item) => item.id !== sheetId);
+    const nextActive = doc.activeSheetId === sheetId ? nextSheets[0].id : doc.activeSheetId;
+    commit({ ...doc, activeSheetId: nextActive, sheets: nextSheets });
+    setSelectedCell("A1");
+    setEditingCell("A1");
+  };
+
+  const rowContextItems = (rowIndex) => [
+    { label: "Insert row above", onClick: () => insertRowAt(rowIndex) },
+    { label: "Insert row below", onClick: () => insertRowAt(rowIndex + 1) },
+    { label: "Auto-fit row", onClick: () => autoFitRow(rowIndex) },
+    { separator: true },
+    { label: "Clear row", onClick: () => clearRowAt(rowIndex) },
+    { label: "Delete row", danger: true, disabled: activeSheet.rowCount <= 1, onClick: () => deleteRowAt(rowIndex) },
+  ];
+
+  const columnContextItems = (colIndex) => [
+    { label: "Insert column left", onClick: () => insertColumnAt(colIndex) },
+    { label: "Insert column right", onClick: () => insertColumnAt(colIndex + 1) },
+    { label: "Auto-fit column", onClick: () => autoFitColumn(colIndex) },
+    { separator: true },
+    { label: "Clear column", onClick: () => clearColumnAt(colIndex) },
+    { label: "Delete column", danger: true, disabled: activeSheet.columnCount <= 1, onClick: () => deleteColumnAt(colIndex) },
+  ];
+
+  const cellContextItems = (rowIndex, colIndex) => {
+    const ref = cellKey(rowIndex, colIndex);
+    return [
+      { label: "Edit cell", onClick: () => selectCell(ref, true) },
+      { label: "Copy cell", onClick: () => copyCell(ref) },
+      { label: "Paste into cell", disabled: readOnly, onClick: () => pasteCell(ref) },
+      { label: "Clear cell", disabled: readOnly, onClick: () => setCellInput(ref, "") },
+      { separator: true },
+      ...rowContextItems(rowIndex),
+      { separator: true },
+      ...columnContextItems(colIndex),
+    ];
   };
 
   const addSheet = () => {
@@ -706,7 +863,18 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
 
       {isMobile ? <div className="bf-sheet-mobileHint">Swipe to pan · tap a cell to edit · formulas live in the bar above.</div> : null}
 
-      <div className="bf-sheet-gridViewport">
+      <div
+        className="bf-sheet-gridViewport"
+        onContextMenu={(event) => {
+          if (event.target.closest?.(".bf-sheet-cell, .bf-sheet-rowHeader, .bf-sheet-columnHeader")) return;
+          openContextMenu(event, [
+            { label: "Add 25 rows", onClick: () => addRow(25) },
+            { label: "Add 5 columns", onClick: () => addColumn(5) },
+            { separator: true },
+            { label: "Add sheet", onClick: addSheet },
+          ]);
+        }}
+      >
         <div
           className="bf-sheet-grid"
           style={{
@@ -721,6 +889,12 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
               type="button"
               onClick={() => selectCell(cellKey(selectedRef.row, colIndex), false)}
               onDoubleClick={() => autoFitColumn(colIndex)}
+              onContextMenu={(event) => {
+                const ref = cellKey(selectedRef.row, colIndex);
+                setSelectedCell(ref);
+                setEditingCell(ref);
+                openContextMenu(event, columnContextItems(colIndex));
+              }}
               className={selectedRef.col === colIndex ? "bf-sheet-columnHeader is-selected" : "bf-sheet-columnHeader"}
             >
               {label}
@@ -736,6 +910,12 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
                 type="button"
                 onClick={() => selectCell(cellKey(rowIndex, selectedRef.col), false)}
                 onDoubleClick={() => autoFitRow(rowIndex)}
+                onContextMenu={(event) => {
+                  const ref = cellKey(rowIndex, selectedRef.col);
+                  setSelectedCell(ref);
+                  setEditingCell(ref);
+                  openContextMenu(event, rowContextItems(rowIndex));
+                }}
                 className={selectedRef.row === rowIndex ? "bf-sheet-rowHeader is-selected" : "bf-sheet-rowHeader"}
                 style={{ height: rowHeight, minHeight: isMobile ? 34 : rowHeight }}
               >
@@ -751,6 +931,12 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
                 <div
                   key={key}
                   className={selected ? "bf-sheet-cell is-selected" : "bf-sheet-cell"}
+                  onContextMenu={(event) => {
+                    setSelectedCell(key);
+                    setEditingCell(key);
+                    setFormulaDraft(input);
+                    openContextMenu(event, cellContextItems(rowIndex, colIndex));
+                  }}
                   style={{ height: rowHeight, minHeight: isMobile ? 34 : rowHeight }}
                 >
                   {readOnly ? (
@@ -834,6 +1020,12 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
                     setSheetNameDraft(sheet.name);
                     setRenamingSheetId(sheet.id);
                   }}
+                  onContextMenu={(event) => openContextMenu(event, [
+                    { label: "Rename sheet", disabled: readOnly, onClick: () => { setSheetNameDraft(sheet.name); setRenamingSheetId(sheet.id); } },
+                    { label: "Duplicate sheet", disabled: readOnly, onClick: () => duplicateSheet(sheet.id) },
+                    { separator: true },
+                    { label: "Delete sheet", danger: true, disabled: readOnly || doc.sheets.length <= 1, onClick: () => deleteSheet(sheet.id) },
+                  ])}
                   title={readOnly ? sheet.name : `${sheet.name} · double click to rename`}
 
                 >
@@ -847,6 +1039,7 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
           <button className="bf-sheet-addTab" type="button" onClick={addSheet}>＋ Sheet</button>
         ) : null}
       </div>
+      <SheetContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
     </div>
   );
 }
