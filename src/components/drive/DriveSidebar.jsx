@@ -21,6 +21,90 @@ function MenuButton({ label, onClick, danger = false }) {
   );
 }
 
+function ContextMenu({ items, point, onClose }) {
+  const menuRef = useRef(null);
+  const [position, setPosition] = useState(() => ({
+    top: Number(point?.y || 8),
+    left: Number(point?.x || 8),
+  }));
+
+  useEffect(() => {
+    if (!point || typeof window === "undefined") return undefined;
+    const place = () => {
+      const node = menuRef.current;
+      const width = Number(node?.offsetWidth || 210);
+      const height = Number(node?.offsetHeight || Math.min(items.length * 40 + 8, window.innerHeight - 16));
+      const edge = 8;
+      setPosition({
+        left: Math.max(edge, Math.min(Number(point.x || edge), window.innerWidth - width - edge)),
+        top: Math.max(edge, Math.min(Number(point.y || edge), window.innerHeight - height - edge)),
+      });
+    };
+    place();
+    const frame = window.requestAnimationFrame(place);
+    const close = () => onClose?.();
+    const onDown = (event) => {
+      if (menuRef.current?.contains(event.target)) return;
+      onClose?.();
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [point, items.length, onClose]);
+
+  if (!point || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      role="menu"
+      data-drive-context-menu="true"
+      style={{
+        position: "fixed",
+        top: position.top,
+        left: position.left,
+        minWidth: 210,
+        maxWidth: "min(320px, calc(100vw - 16px))",
+        maxHeight: "calc(100vh - 16px)",
+        overflowY: "auto",
+        background: "rgba(16,16,20,0.99)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        borderRadius: 10,
+        padding: 4,
+        boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
+        zIndex: 1100,
+        display: "grid",
+        gap: 4,
+      }}
+      onContextMenu={(event) => event.preventDefault()}
+    >
+      {items.map((item, idx) => (
+        <MenuButton
+          key={`${item.label}-${idx}`}
+          label={item.label}
+          danger={item.danger}
+          onClick={() => {
+            item.onClick?.();
+            onClose?.();
+          }}
+        />
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
 function PopMenu({ trigger, items, align = "right" }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 8, left: 8, openUp: false });
@@ -135,9 +219,11 @@ function TreeRow({
 }) {
   const draggable = !!dragPayload;
   const canDrop = typeof onDropItem === "function";
+  const [contextPoint, setContextPoint] = useState(null);
 
   return (
     <div
+      data-drive-tree-row="true"
       draggable={draggable}
       onDragStart={draggable ? (event) => {
         event.dataTransfer.effectAllowed = "move";
@@ -156,6 +242,11 @@ function TreeRow({
           const item = JSON.parse(raw || "{}");
           if (item?.id && item?.kind) onDropItem(item);
         } catch {}
+      } : undefined}
+      onContextMenu={menuItems?.length ? (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setContextPoint({ x: event.clientX, y: event.clientY });
       } : undefined}
       style={{
         display: "grid",
@@ -215,6 +306,7 @@ function TreeRow({
         {hint ? <span className="helper" style={{ marginLeft: "auto", flex: "0 0 auto" }}>{hint}</span> : null}
       </button>
       {menuItems?.length ? <PopMenu trigger="⋯" items={menuItems} /> : null}
+      {menuItems?.length ? <ContextMenu items={menuItems} point={contextPoint} onClose={() => setContextPoint(null)} /> : null}
     </div>
   );
 }
@@ -271,6 +363,7 @@ export default function DriveSidebar({
   const [templateBusy, setTemplateBusy] = useState(false);
   const [templateError, setTemplateError] = useState("");
   const [templateEditor, setTemplateEditor] = useState(null);
+  const [blankContextPoint, setBlankContextPoint] = useState(null);
 
   useEffect(() => {
     setTemplateItems(templates);
@@ -553,7 +646,14 @@ export default function DriveSidebar({
           <button className="btn" type="button" title="Templates" onClick={() => setActivePane("templates")} style={{ padding: "8px 0", fontWeight: activePane === "templates" ? 800 : 500 }}>T</button>
         </div>
 
-        <div style={{ minWidth: 0, overflow: "auto", padding: 10, position: "relative", zIndex: 2 }}>
+        <div
+          style={{ minWidth: 0, overflow: "auto", padding: 10, position: "relative", zIndex: 2 }}
+          onContextMenu={(event) => {
+            if (event.target.closest?.("[data-drive-tree-row]")) return;
+            event.preventDefault();
+            setBlankContextPoint({ x: event.clientX, y: event.clientY });
+          }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <button className="btn" type="button" onClick={() => onOpenCreatePicker?.()} style={{ padding: "6px 12px", minWidth: 36 }}>＋</button>
             {activePane === "templates" ? (
@@ -643,6 +743,30 @@ export default function DriveSidebar({
               </div>
             </>
           )}
+          <ContextMenu
+            point={blankContextPoint}
+            onClose={() => setBlankContextPoint(null)}
+            items={activePane === "templates"
+              ? [
+                  { label: "New template", onClick: createTemplate },
+                  {
+                    label: "Import template",
+                    onClick: () => {
+                      if (templateImportRef.current) templateImportRef.current.value = "";
+                      templateImportRef.current?.click();
+                    },
+                  },
+                  { label: "New note", onClick: onNewNote },
+                ]
+              : [
+                  { label: "New note", onClick: onNewNote },
+                  { label: "New folder", onClick: onNewFolder },
+                  { label: "New sheet", onClick: onNewSpreadsheet },
+                  { label: "New form", onClick: onNewForm },
+                  { label: "Upload files", onClick: onUploadFile },
+                  { label: "Upload folder", onClick: onUploadFolder },
+                ]}
+          />
         </div>
       </div>
 
