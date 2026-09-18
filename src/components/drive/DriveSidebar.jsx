@@ -267,6 +267,7 @@ export default function DriveSidebar({
     }
   });
   const [templateItems, setTemplateItems] = useState(templates);
+  const templateImportRef = useRef(null);
   const [templateBusy, setTemplateBusy] = useState(false);
   const [templateError, setTemplateError] = useState("");
   const [templateEditor, setTemplateEditor] = useState(null);
@@ -312,6 +313,34 @@ export default function DriveSidebar({
       title: String(template.title || ""),
       body: String(template.body || ""),
     });
+  }
+
+  async function importTemplateFile(event) {
+    const file = event.target.files?.[0] || null;
+    event.target.value = "";
+    if (!file || !orgId || templateBusy) return;
+    setTemplateBusy(true);
+    setTemplateError("");
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      const source = parsed?.template && typeof parsed.template === "object" ? parsed.template : parsed;
+      const name = String(source?.name || source?.title || file.name.replace(/\.bftemplate$/i, "") || "Imported template").trim();
+      const title = String(source?.title || "");
+      const body = String(source?.body || source?.content || "");
+      if (!body.trim()) throw new Error("Template file has no body.");
+      const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/templates`, {
+        method: "POST",
+        body: JSON.stringify({ name, title, body }),
+      });
+      if (!res?.template) throw new Error("Template import was not acknowledged by the server.");
+      setTemplateItems((prev) => [res.template, ...prev.filter((tpl) => tpl.id !== res.template.id)]);
+      openTemplateEditor(res.template);
+    } catch (error) {
+      setTemplateError(`Import failed: ${String(error?.message || error || "invalid template file")}`);
+    } finally {
+      setTemplateBusy(false);
+    }
   }
 
   async function createTemplate() {
@@ -564,11 +593,32 @@ export default function DriveSidebar({
             </>
           ) : (
             <>
+              <input
+                ref={templateImportRef}
+                type="file"
+                accept=".bftemplate,application/json"
+                style={{ display: "none" }}
+                onChange={importTemplateFile}
+              />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
                 <div className="helper" style={{ letterSpacing: "0.08em", textTransform: "uppercase" }}>Templates</div>
-                <button className="btn" type="button" onClick={createTemplate} disabled={templateBusy} style={{ padding: "5px 8px", fontSize: 12 }}>
-                  {templateBusy ? "Working…" : "+ New Template"}
-                </button>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => {
+                      if (templateImportRef.current) templateImportRef.current.value = "";
+                      templateImportRef.current?.click();
+                    }}
+                    disabled={templateBusy}
+                    style={{ padding: "5px 8px", fontSize: 12 }}
+                  >
+                    Import template
+                  </button>
+                  <button className="btn" type="button" onClick={createTemplate} disabled={templateBusy} style={{ padding: "5px 8px", fontSize: 12 }}>
+                    {templateBusy ? "Working…" : "+ New Template"}
+                  </button>
+                </div>
               </div>
               {templateError ? <div role="alert" style={{ color: "#ff8f8f", fontSize: 12, marginBottom: 8 }}>{templateError}</div> : null}
               <div style={{ display: "grid", gap: 4 }}>
