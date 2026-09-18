@@ -314,7 +314,7 @@ export default function DriveSidebar({
   const rootItems = useMemo(() => {
     const q = String(search || "").trim().toLowerCase();
     const noteMatches = (note) => !q || String(note.title || "").toLowerCase().includes(q) || String(note.body || "").toLowerCase().includes(q);
-    const fileMatches = (file) => !q || String(file.name || "").toLowerCase().includes(q);
+    const fileMatches = (file) => !q || String(file.name || "").toLowerCase().includes(q) || String(file.textContent || "").toLowerCase().includes(q);
     const folderMatches = (folder) => !q || String(folder.name || "").toLowerCase().includes(q);
 
     const folderMap = new Map();
