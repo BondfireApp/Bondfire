@@ -159,6 +159,93 @@ function parseCellRef(ref) {
   return { row: Number(match[2]) - 1, col: col - 1 };
 }
 
+function rewriteFormulaReferences(input, axis, index, mode) {
+  const raw = String(input || "");
+  if (!raw.startsWith("=")) return raw;
+  return raw.replace(/\b([A-Z]+)(\d+)\b/g, (match, letters, rowNumber) => {
+    const ref = parseCellRef(`${letters}${rowNumber}`);
+    if (!ref) return match;
+    let { row, col } = ref;
+
+    if (axis === "row") {
+      if (mode === "delete" && row === index) return "#REF!";
+      if (mode === "delete" && row > index) row -= 1;
+      if (mode === "insert" && row >= index) row += 1;
+    } else {
+      if (mode === "delete" && col === index) return "#REF!";
+      if (mode === "delete" && col > index) col -= 1;
+      if (mode === "insert" && col >= index) col += 1;
+    }
+    return cellKey(row, col);
+  });
+}
+
+function remapRowHeights(rowHeights, index, mode) {
+  const next = {};
+  Object.entries(rowHeights || {}).forEach(([key, value]) => {
+    const row = Number(key) - 1;
+    if (!Number.isFinite(row) || row < 0) return;
+    if (mode === "delete" && row === index) return;
+    const target = mode === "delete"
+      ? (row > index ? row - 1 : row)
+      : (row >= index ? row + 1 : row);
+    next[String(target + 1)] = value;
+  });
+  return next;
+}
+
+function remapColumnWidths(columnWidths, index, mode) {
+  const next = {};
+  Object.entries(columnWidths || {}).forEach(([key, value]) => {
+    const parsed = parseCellRef(`${String(key || "").toUpperCase()}1`);
+    if (!parsed) return;
+    const col = parsed.col;
+    if (mode === "delete" && col === index) return;
+    const target = mode === "delete"
+      ? (col > index ? col - 1 : col)
+      : (col >= index ? col + 1 : col);
+    next[columnLabel(target)] = value;
+  });
+  return next;
+}
+
+function transformSheetAxis(sheet, axis, index, mode) {
+  const nextCells = {};
+  Object.entries(sheet?.cells || {}).forEach(([key, cell]) => {
+    const parsed = parseCellRef(key);
+    if (!parsed) return;
+    let { row, col } = parsed;
+
+    if (axis === "row") {
+      if (mode === "delete" && row === index) return;
+      if (mode === "delete" && row > index) row -= 1;
+      if (mode === "insert" && row >= index) row += 1;
+    } else {
+      if (mode === "delete" && col === index) return;
+      if (mode === "delete" && col > index) col -= 1;
+      if (mode === "insert" && col >= index) col += 1;
+    }
+
+    nextCells[cellKey(row, col)] = {
+      ...cell,
+      input: rewriteFormulaReferences(cell?.input, axis, index, mode),
+    };
+  });
+
+  return {
+    ...sheet,
+    rowCount: axis === "row"
+      ? Math.max(1, sheet.rowCount + (mode === "insert" ? 1 : -1))
+      : sheet.rowCount,
+    columnCount: axis === "column"
+      ? Math.max(1, sheet.columnCount + (mode === "insert" ? 1 : -1))
+      : sheet.columnCount,
+    cells: nextCells,
+    rowHeights: axis === "row" ? remapRowHeights(sheet.rowHeights, index, mode) : sheet.rowHeights,
+    columnWidths: axis === "column" ? remapColumnWidths(sheet.columnWidths, index, mode) : sheet.columnWidths,
+  };
+}
+
 function expandRange(startRef, endRef) {
   const start = parseCellRef(startRef);
   const end = parseCellRef(endRef);
@@ -277,7 +364,7 @@ function MenuButton({ item, onSelect }) {
         display: "grid",
         gap: 2,
         width: "100%",
-        padding: isMobile ? "6px 8px" : "7px 9px",
+        padding: "7px 9px",
         background: "transparent",
         color: "#fff",
         border: "none",
@@ -363,6 +450,58 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
   const setSheetProp = (patch) => patchActiveSheet((sheet) => ({ ...sheet, ...patch }));
   const addRow = (count = 25) => setSheetProp({ rowCount: activeSheet.rowCount + count });
   const addColumn = (count = 5) => setSheetProp({ columnCount: activeSheet.columnCount + count });
+
+  const insertRowAt = (rowIndex) => {
+    patchActiveSheet((sheet) => transformSheetAxis(sheet, "row", rowIndex, "insert"));
+    const next = cellKey(rowIndex, selectedRef.col);
+    setSelectedCell(next);
+    setEditingCell(next);
+  };
+
+  const deleteRowAt = (rowIndex) => {
+    if (activeSheet.rowCount <= 1) return;
+    if (!window.confirm(`Delete row ${rowIndex + 1}? Cells below it will move up.`)) return;
+    patchActiveSheet((sheet) => transformSheetAxis(sheet, "row", rowIndex, "delete"));
+    const nextRow = Math.min(rowIndex, activeSheet.rowCount - 2);
+    const next = cellKey(Math.max(0, nextRow), selectedRef.col);
+    setSelectedCell(next);
+    setEditingCell(next);
+  };
+
+  const clearRowAt = (rowIndex) => {
+    patchActiveSheet((sheet) => ({
+      ...sheet,
+      cells: Object.fromEntries(
+        Object.entries(sheet.cells || {}).filter(([key]) => parseCellRef(key)?.row !== rowIndex),
+      ),
+    }));
+  };
+
+  const insertColumnAt = (colIndex) => {
+    patchActiveSheet((sheet) => transformSheetAxis(sheet, "column", colIndex, "insert"));
+    const next = cellKey(selectedRef.row, colIndex);
+    setSelectedCell(next);
+    setEditingCell(next);
+  };
+
+  const deleteColumnAt = (colIndex) => {
+    if (activeSheet.columnCount <= 1) return;
+    if (!window.confirm(`Delete column ${columnLabel(colIndex)}? Cells to the right will move left.`)) return;
+    patchActiveSheet((sheet) => transformSheetAxis(sheet, "column", colIndex, "delete"));
+    const nextCol = Math.min(colIndex, activeSheet.columnCount - 2);
+    const next = cellKey(selectedRef.row, Math.max(0, nextCol));
+    setSelectedCell(next);
+    setEditingCell(next);
+  };
+
+  const clearColumnAt = (colIndex) => {
+    patchActiveSheet((sheet) => ({
+      ...sheet,
+      cells: Object.fromEntries(
+        Object.entries(sheet.cells || {}).filter(([key]) => parseCellRef(key)?.col !== colIndex),
+      ),
+    }));
+  };
 
   const addSheet = () => {
     const id = `sheet_${Date.now()}`;
@@ -454,8 +593,16 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           {!readOnly ? (
             <>
-              <button className="btn" type="button" onClick={() => addRow(25)} style={{ padding: compactButtonPad }}>Add 25 rows</button>
-              <button className="btn" type="button" onClick={() => addColumn(5)} style={{ padding: compactButtonPad }}>Add 5 columns</button>
+              <button className="btn" type="button" onClick={() => insertRowAt(selectedRef.row)} style={{ padding: compactButtonPad }}>Insert row above</button>
+              <button className="btn" type="button" onClick={() => insertRowAt(selectedRef.row + 1)} style={{ padding: compactButtonPad }}>Insert row below</button>
+              <button className="btn" type="button" onClick={() => clearRowAt(selectedRef.row)} style={{ padding: compactButtonPad }}>Clear row</button>
+              <button className="btn" type="button" onClick={() => deleteRowAt(selectedRef.row)} disabled={activeSheet.rowCount <= 1} style={{ padding: compactButtonPad }}>Delete row</button>
+              <button className="btn" type="button" onClick={() => insertColumnAt(selectedRef.col)} style={{ padding: compactButtonPad }}>Insert column left</button>
+              <button className="btn" type="button" onClick={() => insertColumnAt(selectedRef.col + 1)} style={{ padding: compactButtonPad }}>Insert column right</button>
+              <button className="btn" type="button" onClick={() => clearColumnAt(selectedRef.col)} style={{ padding: compactButtonPad }}>Clear column</button>
+              <button className="btn" type="button" onClick={() => deleteColumnAt(selectedRef.col)} disabled={activeSheet.columnCount <= 1} style={{ padding: compactButtonPad }}>Delete column</button>
+              <button className="btn" type="button" onClick={() => addRow(25)} style={{ padding: compactButtonPad }}>+25 rows</button>
+              <button className="btn" type="button" onClick={() => addColumn(5)} style={{ padding: compactButtonPad }}>+5 columns</button>
             </>
           ) : null}
         </div>
