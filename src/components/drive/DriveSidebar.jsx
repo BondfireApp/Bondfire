@@ -650,13 +650,12 @@ export default function DriveSidebar({
               <div className="bf-drive-sectionHead">
                 <div className="bf-drive-sectionLabel">Explorer</div>
                 <button
-                  className="btn"
+                  className="bf-drive-rootButton"
                   type="button"
                   onClick={() => onSelectFolder?.(null)}
                   onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
                   onDrop={handleRootDrop}
                   title="Open root or drop an item here to move it to root"
-                  className="bf-drive-rootButton"
                 >
                   Root
                 </button>
