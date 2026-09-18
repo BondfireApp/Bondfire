@@ -379,6 +379,32 @@ function MenuButton({ item, onSelect }) {
   );
 }
 
+function SheetActionMenu({ label, items = [], footer = null }) {
+  return (
+    <details className="bf-sheet-actionMenu">
+      <summary className="bf-sheet-toolButton">{label}<span aria-hidden="true">⌄</span></summary>
+      <div className="bf-sheet-actionPopover">
+        {items.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className={item.danger ? "bf-sheet-menuItem is-danger" : "bf-sheet-menuItem"}
+            disabled={item.disabled}
+            onClick={(event) => {
+              item.onClick?.();
+              event.currentTarget.closest("details")?.removeAttribute("open");
+            }}
+          >
+            <span>{item.label}</span>
+            {item.hint ? <small>{item.hint}</small> : null}
+          </button>
+        ))}
+        {footer ? <div className="bf-sheet-menuFooter">{footer}</div> : null}
+      </div>
+    </details>
+  );
+}
+
 export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) {
   const doc = useMemo(() => normalizeSheet(safeParse(value)), [value]);
   const readOnly = mode === "preview";
@@ -588,49 +614,81 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
   const compactButtonPad = isMobile ? "6px 9px" : DENSITY.buttonPad;
 
   return (
-    <div style={{ display: "grid", gap: DENSITY.gap, maxWidth: "100%" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: DENSITY.gap, flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+    <div className="bf-sheet">
+      <div className="bf-sheet-toolbar">
+        <div className="bf-sheet-toolbarActions">
           {!readOnly ? (
             <>
-              <button className="btn" type="button" onClick={() => insertRowAt(selectedRef.row)} style={{ padding: compactButtonPad }}>Insert row above</button>
-              <button className="btn" type="button" onClick={() => insertRowAt(selectedRef.row + 1)} style={{ padding: compactButtonPad }}>Insert row below</button>
-              <button className="btn" type="button" onClick={() => clearRowAt(selectedRef.row)} style={{ padding: compactButtonPad }}>Clear row</button>
-              <button className="btn" type="button" onClick={() => deleteRowAt(selectedRef.row)} disabled={activeSheet.rowCount <= 1} style={{ padding: compactButtonPad }}>Delete row</button>
-              <button className="btn" type="button" onClick={() => insertColumnAt(selectedRef.col)} style={{ padding: compactButtonPad }}>Insert column left</button>
-              <button className="btn" type="button" onClick={() => insertColumnAt(selectedRef.col + 1)} style={{ padding: compactButtonPad }}>Insert column right</button>
-              <button className="btn" type="button" onClick={() => clearColumnAt(selectedRef.col)} style={{ padding: compactButtonPad }}>Clear column</button>
-              <button className="btn" type="button" onClick={() => deleteColumnAt(selectedRef.col)} disabled={activeSheet.columnCount <= 1} style={{ padding: compactButtonPad }}>Delete column</button>
-              <button className="btn" type="button" onClick={() => addRow(25)} style={{ padding: compactButtonPad }}>+25 rows</button>
-              <button className="btn" type="button" onClick={() => addColumn(5)} style={{ padding: compactButtonPad }}>+5 columns</button>
+              <SheetActionMenu
+                label={`Row ${selectedRef.row + 1}`}
+                items={[
+                  { label: "Insert above", onClick: () => insertRowAt(selectedRef.row) },
+                  { label: "Insert below", onClick: () => insertRowAt(selectedRef.row + 1) },
+                  { label: "Auto-fit height", onClick: () => autoFitRow(selectedRef.row) },
+                  { label: "Clear row", onClick: () => clearRowAt(selectedRef.row) },
+                  { label: "Delete row", danger: true, disabled: activeSheet.rowCount <= 1, onClick: () => deleteRowAt(selectedRef.row) },
+                ]}
+                footer={
+                  <label className="bf-sheet-sizeField">
+                    <span>Height</span>
+                    <input className="input" type="number" min="24" max="180" value={selectedRowHeight} onChange={(e) => setRowHeight(selectedRef.row, e.target.value)} />
+                    <small>px</small>
+                  </label>
+                }
+              />
+              <SheetActionMenu
+                label={`Column ${columnLabel(selectedRef.col)}`}
+                items={[
+                  { label: "Insert left", onClick: () => insertColumnAt(selectedRef.col) },
+                  { label: "Insert right", onClick: () => insertColumnAt(selectedRef.col + 1) },
+                  { label: "Auto-fit width", onClick: () => autoFitColumn(selectedRef.col) },
+                  { label: "Clear column", onClick: () => clearColumnAt(selectedRef.col) },
+                  { label: "Delete column", danger: true, disabled: activeSheet.columnCount <= 1, onClick: () => deleteColumnAt(selectedRef.col) },
+                ]}
+                footer={
+                  <label className="bf-sheet-sizeField">
+                    <span>Width</span>
+                    <input className="input" type="number" min="60" max="420" value={selectedColWidth} onChange={(e) => setColumnWidth(selectedRef.col, e.target.value)} />
+                    <small>px</small>
+                  </label>
+                }
+              />
+              <div ref={functionsRef} className="bf-sheet-functions">
+                <button className="bf-sheet-toolButton" type="button" onClick={() => setFunctionsOpen((v) => !v)}>
+                  <span className="bf-sheet-fxMark">fx</span> Functions
+                </button>
+                {functionsOpen ? (
+                  <div className="bf-sheet-functionPopover">
+                    {FUNCTION_GROUPS.map((group) => (
+                      <div key={group.label} className="bf-sheet-functionGroup">
+                        <div className="bf-sheet-functionLabel">{group.label}</div>
+                        {group.items.map((item) => <MenuButton key={item.name} item={item} onSelect={insertFunction} />)}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <SheetActionMenu
+                label="Add"
+                items={[
+                  { label: "25 rows", hint: "Append to bottom", onClick: () => addRow(25) },
+                  { label: "5 columns", hint: "Append to right", onClick: () => addColumn(5) },
+                ]}
+              />
             </>
-          ) : null}
+          ) : (
+            <span className="bf-sheet-readOnlyLabel">Preview</span>
+          )}
         </div>
-        <div className="helper">{activeSheet.rowCount} rows · {activeSheet.columnCount} columns</div>
+        <div className="bf-sheet-dimensions">{activeSheet.rowCount} × {activeSheet.columnCount}</div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: readOnly ? (isMobile ? "1fr" : "84px minmax(0,1fr)") : (isMobile ? "1fr" : "84px auto minmax(0,1fr)"), gap: 6, alignItems: "center" }}>
-        <div style={{ fontWeight: 700, minWidth: 0 }}>{selectedCell}</div>
-        {!readOnly ? (
-          <div ref={functionsRef} style={{ position: "relative" }}>
-            <button className="btn" type="button" onClick={() => setFunctionsOpen((v) => !v)} style={{ padding: compactButtonPad, whiteSpace: "nowrap", width: isMobile ? "100%" : "auto" }}>Functions</button>
-            {functionsOpen ? (
-              <div style={{ position: "absolute", left: 0, top: "calc(100% + 6px)", width: 320, maxHeight: 340, overflow: "auto", background: "rgba(16,16,20,0.98)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: 8, boxShadow: "0 14px 32px rgba(0,0,0,0.42)", zIndex: 120, display: "grid", gap: 8 }}>
-                {FUNCTION_GROUPS.map((group) => (
-                  <div key={group.label} style={{ display: "grid", gap: 4 }}>
-                    <div className="helper" style={{ fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase" }}>{group.label}</div>
-                    <div style={{ display: "grid", gap: 2 }}>
-                      {group.items.map((item) => <MenuButton key={item.name} item={item} onSelect={insertFunction} />)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+      <div className="bf-sheet-formulaBar">
+        <div className="bf-sheet-cellRef">{selectedCell}</div>
+        <div className="bf-sheet-formulaFx" aria-hidden="true">fx</div>
         <input
           ref={formulaInputRef}
-          className="input"
+          className="input bf-sheet-formulaInput"
           value={formulaDraft}
           disabled={readOnly}
           onChange={(e) => setFormulaDraft(e.target.value)}
@@ -642,51 +700,28 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
               commitFormulaBar();
             }
           }}
-          placeholder="Value or formula, like =SUM(A1:B4)"
-          style={{ padding: isMobile ? "7px 10px" : DENSITY.inputPad, height: mobileFieldHeight, width: "100%" }}
+          placeholder="Enter a value or formula"
         />
       </div>
 
-      {!readOnly ? (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          {isMobile ? <div className="helper" style={{ width: "100%" }}>Tip: swipe to pan the grid, tap a cell to edit, and use the formula bar for formulas.</div> : null}
-          <div className="helper">Column {columnLabel(selectedRef.col)} width</div>
-          <input className="input" type="number" min="60" max="420" value={selectedColWidth} onChange={(e) => setColumnWidth(selectedRef.col, e.target.value)} style={{ width: isMobile ? 72 : 82, padding: isMobile ? "6px 8px" : "7px 9px", height: mobileFieldHeight }} />
-          <button className="btn" type="button" onClick={() => autoFitColumn(selectedRef.col)} style={{ padding: compactButtonPad }}>Auto-fit column</button>
-          <div className="helper">Row {selectedRef.row + 1} height</div>
-          <input className="input" type="number" min="24" max="180" value={selectedRowHeight} onChange={(e) => setRowHeight(selectedRef.row, e.target.value)} style={{ width: isMobile ? 72 : 82, padding: isMobile ? "6px 8px" : "7px 9px", height: mobileFieldHeight }} />
-          <button className="btn" type="button" onClick={() => autoFitRow(selectedRef.row)} style={{ padding: compactButtonPad }}>Auto-fit row</button>
-        </div>
-      ) : null}
+      {isMobile ? <div className="bf-sheet-mobileHint">Swipe to pan · tap a cell to edit · formulas live in the bar above.</div> : null}
 
-      <div style={{ overflow: "auto", border: DENSITY.border, borderRadius: DENSITY.radius, background: DENSITY.panelBg, WebkitOverflowScrolling: "touch", touchAction: "pan-x pan-y", maxWidth: "100%" }}>
+      <div className="bf-sheet-gridViewport">
         <div
+          className="bf-sheet-grid"
           style={{
-            display: "grid",
-            gridTemplateColumns: `52px ${columnLabels.map((label) => `${Number(activeSheet.columnWidths?.[label] || DEFAULT_COL_WIDTH)}px`).join(" ")}`,
+            gridTemplateColumns: `46px ${columnLabels.map((label) => `${Number(activeSheet.columnWidths?.[label] || DEFAULT_COL_WIDTH)}px`).join(" ")}`,
             minWidth: isMobile ? `${Math.max(680, activeSheet.columnCount * 92)}px` : "max-content",
           }}
         >
-          <div style={{ position: "sticky", left: 0, top: 0, zIndex: 4, borderBottom: "1px solid #222", borderRight: "1px solid #222", background: "#0f1012", minHeight: isMobile ? 34 : 36 }} />
+          <div className="bf-sheet-corner" />
           {columnLabels.map((label, colIndex) => (
             <button
               key={label}
               type="button"
               onClick={() => selectCell(cellKey(selectedRef.row, colIndex), false)}
               onDoubleClick={() => autoFitColumn(colIndex)}
-              style={{
-                position: "sticky",
-                top: 0,
-                zIndex: 3,
-                border: "none",
-                borderBottom: "1px solid #222",
-                borderRight: "1px solid #222",
-                background: selectedRef.col === colIndex ? "rgba(24,129,242,0.18)" : "#0f1012",
-                color: "#fff",
-                minHeight: isMobile ? 34 : 36,
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
+              className={selectedRef.col === colIndex ? "bf-sheet-columnHeader is-selected" : "bf-sheet-columnHeader"}
             >
               {label}
             </button>
@@ -701,20 +736,8 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
                 type="button"
                 onClick={() => selectCell(cellKey(rowIndex, selectedRef.col), false)}
                 onDoubleClick={() => autoFitRow(rowIndex)}
-                style={{
-                  position: "sticky",
-                  left: 0,
-                  zIndex: 2,
-                  border: "none",
-                  borderBottom: "1px solid #1d1d1d",
-                  borderRight: "1px solid #222",
-                  background: selectedRef.row === rowIndex ? "rgba(24,129,242,0.18)" : "#0f1012",
-                  color: "#fff",
-                  height: rowHeight,
-                  minHeight: isMobile ? 34 : rowHeight,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
+                className={selectedRef.row === rowIndex ? "bf-sheet-rowHeader is-selected" : "bf-sheet-rowHeader"}
+                style={{ height: rowHeight, minHeight: isMobile ? 34 : rowHeight }}
               >
                 {rowIndex + 1}
               </button>
@@ -727,20 +750,15 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
               return (
                 <div
                   key={key}
-                  style={{
-                    borderBottom: "1px solid #1d1d1d",
-                    borderRight: "1px solid #1d1d1d",
-                    height: rowHeight,
-                  minHeight: isMobile ? 34 : rowHeight,
-                    background: selected ? "rgba(24,129,242,0.08)" : "transparent",
-                  }}
+                  className={selected ? "bf-sheet-cell is-selected" : "bf-sheet-cell"}
+                  style={{ height: rowHeight, minHeight: isMobile ? 34 : rowHeight }}
                 >
                   {readOnly ? (
-                    <div style={{ padding: isMobile ? "6px 8px" : "7px 9px", whiteSpace: "pre-wrap", overflow: "hidden", textOverflow: "ellipsis", height: "100%" }}>{display}</div>
+                    <div className="bf-sheet-cellValue">{display}</div>
                   ) : (
                     <input
                       ref={(node) => { inputRefs.current[key] = node; }}
-                      className="input"
+                      className="input bf-sheet-cellInput"
                       value={selected && editingCell === key ? input : (selected ? input : display)}
                       onFocus={() => { setSelectedCell(key); setEditingCell(key); setFormulaDraft(input); }}
                       onClick={() => { setSelectedCell(key); setEditingCell(key); }}
@@ -766,16 +784,7 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
                           moveSelection(0, 1);
                         }
                       }}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        border: selected ? "1px solid #1881f2" : "1px solid transparent",
-                        borderRadius: 0,
-                        background: "transparent",
-                        padding: isMobile ? "6px 8px" : "7px 9px",
-                        boxShadow: "none",
-                        outline: "none",
-                      }}
+                      style={{ padding: isMobile ? "6px 8px" : "7px 9px" }}
                     />
                   )}
                 </div>
@@ -786,7 +795,7 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, alignItems: "center" }}>
+      <div className="bf-sheet-tabs">
         {doc.sheets.map((sheet) => {
           const active = sheet.id === activeSheet.id;
           const isRenaming = renamingSheetId === sheet.id && !readOnly;
@@ -813,7 +822,7 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
                 />
               ) : (
                 <button
-                  className="btn"
+                  className={active ? "bf-sheet-tab is-active" : "bf-sheet-tab"}
                   type="button"
                   onClick={() => {
                     commit({ ...doc, activeSheetId: sheet.id });
@@ -826,12 +835,7 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
                     setRenamingSheetId(sheet.id);
                   }}
                   title={readOnly ? sheet.name : `${sheet.name} · double click to rename`}
-                  style={{
-                    padding: isMobile ? "6px 10px" : "7px 11px",
-                    borderRadius: 12,
-                    background: active ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.02)",
-                    borderColor: active ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.08)",
-                  }}
+
                 >
                   {sheet.name}
                 </button>
@@ -840,7 +844,7 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
           );
         })}
         {!readOnly ? (
-          <button className="btn" type="button" onClick={addSheet} style={{ padding: isMobile ? "6px 9px" : "7px 10px", borderRadius: 12 }}>＋ Sheet</button>
+          <button className="bf-sheet-addTab" type="button" onClick={addSheet}>＋ Sheet</button>
         ) : null}
       </div>
     </div>
