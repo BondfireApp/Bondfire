@@ -43,5 +43,13 @@ assert.match(sheet, /Delete row/, "Drive sheet context menus must expose row del
 assert.match(sheet, /Delete column/, "Drive sheet context menus must expose column deletion");
 assert.match(sidebar, /bf-drive-treeRow/, "Drive explorer must use the compact tree row layout");
 assert.match(drive, /showPreview = showEditableDocument && \(!canEditSelected \|\| \(!isStructuredDriveDoc && viewMode !== "edit"\)\)/, "Drive preview selection must preserve structured-document and view-only behavior");
+assert.match(drive, /const pendingSave = useRef\(null\)/, "Drive must queue autosaves instead of allowing overlapping writes");
+assert.match(drive, /const saveDrain = useRef\(null\)/, "Drive must track the active autosave drain");
+assert.match(drive, /while \(pendingSave\.current\)[\s\S]*await persistSaveSnapshot\(next\)/, "Drive autosaves must serialize revision-checked writes");
+assert.match(drive, /isBondfireFormFile\(nextFile, nextFile\.textContent \|\| ""\)[\s\S]*syncPublicFormProjection/, "Opening an existing form must repair its public projection");
+assert.match(drive, /onBeforePublicUse=\{flushSaveBeforePublicUse\}/, "Public form actions must flush pending Drive saves");
+const formView = fs.readFileSync(new URL("../src/components/drive/FormFileView.jsx", import.meta.url), "utf8");
+assert.match(formView, /await ensurePublicFormSaved\(\)/, "Public form links must wait for Drive persistence before opening or copying");
+assert.match(formView, /Preparing encrypted public link/, "Public form UI must expose key initialization instead of a premature URL");
 
 console.log("PASS: Drive tree, sheet workspace, folder import, recursive deletion, and preview regressions");
