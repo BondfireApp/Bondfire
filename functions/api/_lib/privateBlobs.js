@@ -1,20 +1,23 @@
 import { getDriveBucket } from './drive.js';
 import { getDb } from './auth.js';
 import { contentContext, isCiphertext } from '../../../shared/privateContent.js';
+import { getEffectiveDriveSharePolicy } from './driveShares.js';
 
 export async function ensurePrivateBlobs(db) {
   await db.prepare('CREATE TABLE IF NOT EXISTS org_private_blobs (org_id TEXT NOT NULL,id TEXT NOT NULL,file_id TEXT NOT NULL,inline_ciphertext TEXT,created_at INTEGER NOT NULL,PRIMARY KEY(org_id,id))').run();
 }
 export const privateBlobObjectKey=(orgId,id)=>`${orgId}/drive/private/${id}`;
 const objectKey=privateBlobObjectKey;
-export async function putPrivateBlob(env,orgId,id,ciphertext,fileId) {
+export async function putPrivateBlob(env,orgId,id,ciphertext,fileId,parentId=undefined) {
   if(!/^[a-f0-9-]{36}$/.test(id)||!isCiphertext(ciphertext,contentContext(orgId,'drive/blob',id))) throw new Error('VALID_CIPHERTEXT_REQUIRED');
   if(!/^[A-Za-z0-9_.:-]{1,160}$/.test(fileId))throw new Error('INVALID_FILE_ID');
   const db=getDb(env); await ensurePrivateBlobs(db);
   const hasEpochs=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='org_private_key_state'").first();
   const state=hasEpochs?await db.prepare('SELECT * FROM org_private_key_state WHERE org_id=?').bind(orgId).first():null;
   const envelope=JSON.parse(ciphertext);
-  if(state?.epoch&&(state.roster_revision!==state.rotated_revision||envelope.v!==3||envelope.epoch!==state.epoch||envelope.scope!=='viewer'))throw new Error('PRIVATE_KEY_ROTATION_REQUIRED');
+  const sharePolicy=await getEffectiveDriveSharePolicy(db,orgId,'drive/files',fileId,{preferPending:true,parentId});
+  if(state?.epoch&&!sharePolicy&&(state.roster_revision!==state.rotated_revision||envelope.v!==3||envelope.epoch!==state.epoch||envelope.scope!=='viewer'))throw new Error('PRIVATE_KEY_ROTATION_REQUIRED');
+  if(sharePolicy&&![2,3].includes(Number(envelope.v)))throw new Error('VALID_CIPHERTEXT_REQUIRED');
   const file=await db.prepare("SELECT deleting FROM org_private_records WHERE org_id=? AND kind='drive/files' AND id=?").bind(orgId,fileId).first();
   if(file?.deleting)throw new Error('PRIVATE_FILE_DELETION_IN_PROGRESS');
   const exists=await db.prepare('SELECT id FROM org_private_blobs WHERE org_id=? AND id=?').bind(orgId,id).first();
