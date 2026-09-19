@@ -1035,10 +1035,15 @@ React.useEffect(() => {
     setNlBusy(true);
     setNlMsg("");
     try {
-      await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter/subscribers`, {
-        method: "DELETE",
-        body: { id },
-      });
+      await authFetch(
+        newsletterPrivateMode
+          ? `/api/orgs/${encodeURIComponent(orgId)}/privacy/submissions`
+          : `/api/orgs/${encodeURIComponent(orgId)}/newsletter/subscribers`,
+        {
+          method: "DELETE",
+          body: { id },
+        }
+      );
       await loadSubscribers();
       setNlMsg("Subscriber removed from Bondfire.");
     } catch (error) {
