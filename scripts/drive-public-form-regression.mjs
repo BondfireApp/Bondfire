@@ -125,7 +125,7 @@ assert.match(formView, /The public form could not be prepared/, "Public form pop
 assert.match(formView, /markdownToHtml\(form\.description\)/, "Form preview descriptions must render Markdown rather than literal markers");
 assert.match(publicHandler, /renderMarkdownText\(form\.description\)/, "Public form descriptions must use the same Markdown semantics");
 assert.match(publicHandler, /heading = trimmed\.match/, "Public forms must parse Markdown headings");
-assert.match(publicHandler, /<h\\$\\{level\\}>/, "Public forms must emit heading elements instead of raw Markdown markers");
+assert.ok(publicHandler.includes('html += `<h${level}>${applyInline(heading[2])}</h${level}>`'), "Public forms must emit heading elements instead of raw Markdown markers");
 assert.match(publicHandler, /bf-public-form-markdown h1/, "Public form Markdown headings must be styled");
 assert.match(privateGate, /if\(form\) return null/);
 assert.match(privateGate, /route==='drive\/shares'\|\|route==='drive\/forms-public'/);
