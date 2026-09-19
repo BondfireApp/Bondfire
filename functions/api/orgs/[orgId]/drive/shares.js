@@ -1,12 +1,12 @@
-import { requireOrgRole, getDb } from '../../_lib/auth.js';
-import { bad, json } from '../../_lib/http.js';
-import { requireCookieCsrf } from '../../_lib/csrf.js';
+import { requireOrgRole, getDb } from '../../../_lib/auth.js';
+import { bad, json } from '../../../_lib/http.js';
+import { requireCookieCsrf } from '../../../_lib/csrf.js';
 import {
   ensureDriveShareSchema,
   normalizeDriveShareKind,
   getShareDetail,
   listSharedWithUser,
-} from '../../_lib/driveShares.js';
+} from '../../../_lib/driveShares.js';
 
 const PERMISSIONS = new Set(['view', 'edit']);
 
@@ -172,6 +172,7 @@ export async function onRequest({ env, request, params }) {
   if (!grants.some((row) => row.userId === owner)) grants.push({ userId: owner, permission: 'edit' });
   const ownerWraps = wraps.filter((row) => row.userId === owner);
   if (!ownerWraps.length) return bad(400, 'DRIVE_SHARE_OWNER_KEY_REQUIRED');
+  if (grants.some((grant) => !wraps.some((wrap) => wrap.userId === grant.userId))) return bad(400, 'DRIVE_SHARE_RECIPIENT_KEY_REQUIRED');
 
   const current = existing || { active_version: 0, pending_version: 0 };
   const nextVersion = Math.max(Number(current.active_version || 0), Number(current.pending_version || 0)) + 1;
