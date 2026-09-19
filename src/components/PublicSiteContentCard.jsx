@@ -128,7 +128,7 @@ function ImageField({ label, value, onChange }) {
   );
 }
 
-export function PublicSiteContentCard() {
+export const PublicSiteContentCard = React.forwardRef(function PublicSiteContentCard(_, ref) {
   const { orgId } = useParams();
   const [form, setForm] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
@@ -206,10 +206,10 @@ export function PublicSiteContentCard() {
 
   React.useEffect(() => { load(); }, [load]);
 
-  async function save() {
-    if (!orgId || !form) return;
+  async function save({ silent = false, throwOnError = false } = {}) {
+    if (!orgId || !form) return false;
     setBusy(true);
-    setMessage("");
+    if (!silent) setMessage("");
     try {
       const logoIsData = String(form.logo_url || "").startsWith("data:image/");
       const payload = {
@@ -268,14 +268,21 @@ export function PublicSiteContentCard() {
         section_visibility: form.section_visibility,
       };
       await api(`/api/orgs/${encodeURIComponent(orgId)}/public/save`, { method: "POST", body: JSON.stringify(payload) });
-      setMessage("Public-site content saved.");
+      if (!silent) setMessage("Public-site content saved.");
       await load();
+      return true;
     } catch (error) {
-      setMessage(error?.message || "Unable to save public-site content.");
+      if (!silent) setMessage(error?.message || "Unable to save public-site content.");
+      if (throwOnError) throw error;
+      return false;
     } finally {
       setBusy(false);
     }
   }
+
+  React.useImperativeHandle(ref, () => ({
+    save: () => save({ silent: true, throwOnError: true }),
+  }), [form, orgId]);
 
   if (!form) return <section className="card" style={{ padding: 16 }}><p className="helper">{busy ? "Loading public-site content…" : message || "Public-site content unavailable."}</p></section>;
 
@@ -286,7 +293,7 @@ export function PublicSiteContentCard() {
           <h3 style={{ marginTop: 0 }}>Site layout and organization content</h3>
           <p className="helper" style={{ marginBottom: 0 }}>Build the public Organization Page here. The organizing layout supports unions, chapters, associations, established groups, and other organizations that need more than a mutual-aid listing.</p>
         </div>
-        <button className="btn-red" type="button" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save site content"}</button>
+        <button className="btn-red" type="button" onClick={() => save()} disabled={busy}>{busy ? "Saving…" : "Save site content"}</button>
       </div>
 
       {message ? <p className="helper">{message}</p> : null}
@@ -390,4 +397,4 @@ export function PublicSiteContentCard() {
       </div>
     </section>
   );
-}
+});
