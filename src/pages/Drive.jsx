@@ -1089,15 +1089,27 @@ export default function Drive() {
     while (changed) {
       changed = false;
       for (const folder of folders) {
-        if (folder.parentId && folderIds.has(folder.parentId) && !folderIds.has(folder.id)) {
-          folderIds.add(folder.id);
-          changed = true;
-        }
+        if (!folder.parentId || !folderIds.has(folder.parentId) || folderIds.has(folder.id)) continue;
+        const directOverride = folder.id !== target.id
+          && folder.shareRestricted
+          && folder.shareRootKind === "drive/folders"
+          && folder.shareRootId === folder.id;
+        if (directOverride) continue;
+        folderIds.add(folder.id);
+        changed = true;
       }
     }
     const targets = [...folderIds].map((id) => ({ kind: "drive/folders", id }));
-    for (const note of notes) if (note.parentId && folderIds.has(note.parentId)) targets.push({ kind: "drive/notes", id: note.id });
-    for (const file of files) if (file.parentId && folderIds.has(file.parentId)) targets.push({ kind: "drive/files", id: file.id });
+    for (const note of notes) {
+      if (!note.parentId || !folderIds.has(note.parentId)) continue;
+      const directOverride = note.shareRestricted && note.shareRootKind === "drive/notes" && note.shareRootId === note.id;
+      if (!directOverride) targets.push({ kind: "drive/notes", id: note.id });
+    }
+    for (const file of files) {
+      if (!file.parentId || !folderIds.has(file.parentId)) continue;
+      const directOverride = file.shareRestricted && file.shareRootKind === "drive/files" && file.shareRootId === file.id;
+      if (!directOverride) targets.push({ kind: "drive/files", id: file.id });
+    }
     return targets;
   }
 
