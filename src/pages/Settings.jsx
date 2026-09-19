@@ -155,7 +155,7 @@ export default function Settings({ privateMode = false }) {
     } catch (e) {
       setInviteMsg(e.message || "Failed to load invites");
     }
-  }, [orgId]);
+  }, [orgId, orgName]);
 
   const createInvite = async () => {
     if (!orgId) return;
@@ -873,8 +873,8 @@ React.useEffect(() => {
       setNlEnabled(!!cfg.enabled);
       setNlListAddress(String(cfg.list_address || cfg.listAddress || ""));
       setNlBlurb(nextBlurb);
-      setNlSubject(`${orgName || "Organization"} update`);
-      setNlDraft(defaultNewsletterBody(nextBlurb, orgName || "Organization"));
+      setNlSubject((current) => current || `${orgName || "Organization"} update`);
+      setNlDraft((current) => current || defaultNewsletterBody(nextBlurb, orgName || "Organization"));
     } catch (e) {
       setNlMsg(e.message || "Failed to load newsletter settings");
     } finally {
@@ -936,6 +936,37 @@ React.useEffect(() => {
       loadSubscribers();
     }
   }, [tab, loadNewsletter, loadSubscribers]);
+
+  React.useEffect(() => {
+    if (tab !== "newsletter" || !orgId) return;
+    try {
+      const raw = sessionStorage.getItem("bf_newsletter_handoff_v1");
+      if (!raw) return;
+      const handoff = JSON.parse(raw);
+      if (String(handoff?.orgId || "") !== String(orgId)) return;
+      if (Date.now() - Number(handoff?.createdAt || 0) > 30 * 60 * 1000) {
+        sessionStorage.removeItem("bf_newsletter_handoff_v1");
+        return;
+      }
+
+      const postTitle = String(handoff?.title || "New article").trim();
+      const postUrl = String(handoff?.url || "").trim();
+      setNlSubject(postTitle);
+      setNlDraft([
+        String(nlBlurb || "").trim(),
+        postTitle,
+        "",
+        postUrl ? `Read the full article:\n${postUrl}` : "",
+        "",
+        "In solidarity,",
+        String(orgName || "").trim(),
+      ].filter(Boolean).join("\n\n"));
+      setNlMsg(`Newsletter draft prepared from “${postTitle}”. Review it before sending.`);
+      sessionStorage.removeItem("bf_newsletter_handoff_v1");
+    } catch {
+      sessionStorage.removeItem("bf_newsletter_handoff_v1");
+    }
+  }, [tab, orgId, orgName, nlBlurb]);
 
   const csvHref = orgId
     ? `/#/org/${encodeURIComponent(orgId)}/settings?tab=newsletter`
