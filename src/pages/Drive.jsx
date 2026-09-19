@@ -172,6 +172,8 @@ export default function Drive() {
   const [sharedItems, setSharedItems] = useState([]);
 
   const saveTimer = useRef(null);
+  const pendingSave = useRef(null);
+  const saveDrain = useRef(null);
   const skipNextSave = useRef(false);
   const resizeMode = useRef(null);
   const editorRef = useRef(null);
@@ -694,6 +696,13 @@ export default function Drive() {
       nextFile = withFileUrls(orgId, nextFile);
     }
     if (canPreviewFileInApp(nextFile)) {
+      if (isBondfireFormFile(nextFile, nextFile.textContent || "")) {
+        try {
+          await syncPublicFormProjection(nextFile.id, nextFile.textContent || "");
+        } catch (error) {
+          setDriveNotice(`Public form sync needs a save: ${String(error?.message || error || "unknown error")}`);
+        }
+      }
       skipNextSave.current = true;
       setSelectedId(nextFile.id);
       setSelectedKind("file");
@@ -716,50 +725,118 @@ export default function Drive() {
     a.click();
   }
 
-  async function saveNow() {
-    if (!selectedId) return;
-    if (!canEditSelected) {
-      setStatus("view only");
+  function currentSaveSnapshot() {
+    return {
+      id: selectedId,
+      kind: selectedKind,
+      title,
+      content,
+      canEdit: canEditSelected,
+      fileEditable: fileIsEditable,
+      fileMarkdown: fileIsMarkdown,
+      fileSubtype: selectedFileSubtype,
+      fileMime: selectedFile?.mime || "",
+    };
+  }
+
+  async function persistSaveSnapshot(snapshot) {
+    if (!snapshot?.id) return;
+    if (snapshot.kind === "note") {
+      const parsed = parseFrontmatter(snapshot.content);
+      const propertyTags = parsed.properties.find((p) => p.key.toLowerCase() === "tags")?.value || "";
+      const combinedTags = [...new Set([...parseTags(parsed.body), ...String(propertyTags).split(",").map((x) => x.trim().toLowerCase()).filter(Boolean)])];
+      const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/notes/${encodeURIComponent(snapshot.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title: snapshot.title, body: snapshot.content, tags: combinedTags }),
+      });
+      if (res?.note) setNotes((prev) => prev.map((n) => (n.id === snapshot.id ? res.note : n)));
       return;
     }
+    if (snapshot.kind === "file" && snapshot.fileEditable) {
+      const mime = snapshot.fileMime || (snapshot.fileMarkdown ? "text/markdown;charset=utf-8" : "text/plain;charset=utf-8");
+      const dataUrl = textToDataUrl(snapshot.content, mime);
+      const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(snapshot.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: snapshot.title,
+          mime,
+          size: new Blob([snapshot.content], { type: mime }).size,
+          dataUrl,
+          textContent: snapshot.content,
+        }),
+      });
+      if (res?.file) {
+        setFiles((prev) => prev.map((file) => (file.id === snapshot.id ? withFileUrls(orgId, { ...file, ...res.file }) : file)));
+      }
+      if (snapshot.fileSubtype === "form") await syncPublicFormProjection(snapshot.id, snapshot.content);
+    }
+  }
+
+  async function saveNow() {
+    const snapshot = currentSaveSnapshot();
+    if (!snapshot.id) return false;
+    if (!snapshot.canEdit) {
+      setStatus("view only");
+      return false;
+    }
+    pendingSave.current = snapshot;
+    setStatus("saving");
+
+    if (!saveDrain.current) {
+      const run = (async () => {
+        while (pendingSave.current) {
+          const next = pendingSave.current;
+          pendingSave.current = null;
+          await persistSaveSnapshot(next);
+        }
+      })();
+      saveDrain.current = run.finally(() => {
+        saveDrain.current = null;
+      });
+    }
+
     try {
-      if (selectedKind === "note") {
-        const parsed = parseFrontmatter(content);
-        const propertyTags = parsed.properties.find((p) => p.key.toLowerCase() === "tags")?.value || "";
-        const combinedTags = [...new Set([...parseTags(parsed.body), ...String(propertyTags).split(",").map((x) => x.trim().toLowerCase()).filter(Boolean)])];
-        const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/notes/${encodeURIComponent(selectedId)}`, {
-          method: "PATCH",
-          body: JSON.stringify({ title, body: content, tags: combinedTags }),
-        });
-        if (res?.note) {
-          setNotes((prev) => prev.map((n) => (n.id === selectedId ? res.note : n)));
-        }
+      await saveDrain.current;
+      if (!pendingSave.current) {
         setStatus("saved");
-        return;
+        setDriveNotice((notice) => notice.startsWith("Save failed:") ? "" : notice);
       }
-      if (selectedKind === "file" && fileIsEditable) {
-        const mime = selectedFile?.mime || (fileIsMarkdown ? "text/markdown;charset=utf-8" : "text/plain;charset=utf-8");
-        const dataUrl = textToDataUrl(content, mime);
-        const res = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(selectedId)}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            name: title,
-            mime,
-            size: new Blob([content], { type: mime }).size,
-            dataUrl,
-            textContent: content,
-          }),
-        });
-        if (res?.file) {
-          setFiles((prev) => prev.map((file) => (file.id === selectedId ? withFileUrls(orgId, { ...file, ...res.file }) : file)));
-        }
-        if (selectedFileSubtype === "form") await syncPublicFormProjection(selectedId, content);
-        setStatus("saved");
-      }
+      return true;
     } catch (error) {
+      pendingSave.current = null;
       setStatus("error");
       setDriveNotice(`Save failed: ${String(error?.message || error || "unknown error")}`);
+      return false;
     }
+  }
+
+  async function flushSaveBeforePublicUse() {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      return saveNow();
+    }
+    if (saveDrain.current) {
+      try {
+        await saveDrain.current;
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    if (status === "saved") {
+      if (selectedKind === "file" && selectedFileSubtype === "form" && selectedId) {
+        try {
+          await syncPublicFormProjection(selectedId, content);
+          return true;
+        } catch (error) {
+          setDriveNotice(`Public form sync failed: ${String(error?.message || error || "unknown error")}`);
+          return false;
+        }
+      }
+      return true;
+    }
+    return saveNow();
   }
 
   useEffect(() => {
@@ -771,7 +848,7 @@ export default function Drive() {
     }
     setStatus("saving");
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => { saveNow(); }, 350);
+    saveTimer.current = setTimeout(() => { saveTimer.current = null; void saveNow(); }, 350);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [selectedId, selectedKind, title, content, fileIsEditable]);
 
@@ -1434,7 +1511,7 @@ export default function Drive() {
                     {selectedFileSubtype === "sheet" ? (
                       <SpreadsheetFileView value={content} onChange={setContent} mode="edit" />
                     ) : selectedFileSubtype === "form" ? (
-                      <FormFileView value={content} onChange={setContent} mode="edit" fileId={selectedFile?.id || ""} orgId={orgId} />
+                      <FormFileView value={content} onChange={setContent} mode="edit" fileId={selectedFile?.id || ""} orgId={orgId} saveStatus={status} onBeforePublicUse={flushSaveBeforePublicUse} />
                     ) : (
                       <NoteEditor value={content} onChange={setContent} focusMode={focusMode} editorRef={editorRef} compact />
                     )}
