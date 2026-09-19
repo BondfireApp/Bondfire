@@ -4,6 +4,7 @@ import { bad, json } from './http.js';
 import { requireCookieCsrf } from './csrf.js';
 import { PRIVATE_CONTENT, PRIVATE_KINDS, contentContext, isCiphertext } from '../../../shared/privateContent.js';
 import {ensurePublicationSchema} from './privatePublication.js';
+import { ensureDriveShareSchema, driveAccessForUser, decorateDriveRecord, DRIVE_SHARE_KINDS } from './driveShares.js';
 
 export async function ensurePrivateSchema(db) {
   for (const sql of [
@@ -12,6 +13,7 @@ export async function ensurePrivateSchema(db) {
     `CREATE INDEX IF NOT EXISTS private_records_parent ON org_private_records(org_id,kind,parent_id)`,
     `CREATE TABLE IF NOT EXISTS org_private_migrations (org_id TEXT NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, source_hash TEXT NOT NULL, PRIMARY KEY(org_id,kind,id))`,
   ]) await db.prepare(sql).run();
+  await ensureDriveShareSchema(db);
 }
 export async function getPrivateMode(env, orgId) {
   const db = getDb(env);
@@ -22,7 +24,7 @@ export async function getPrivateMode(env, orgId) {
 export function storedRecord(row) {
   if (!row) return null;
   return { id: row.id, parentId: row.parent_id, roomId: row.parent_id, ciphertext: row.ciphertext,
-    revision: row.revision, deleting: !!row.deleting, created_at: row.created_at, updated_at: row.updated_at,
+    revision: row.revision, deleting: !!row.deleting, createdBy: row.created_by || null, created_at: row.created_at, updated_at: row.updated_at,
     createdAt: row.created_at, updatedAt: row.updated_at };
 }
 export async function privateRecords({ env, request, orgId, kind, id = '' }) {
@@ -46,13 +48,23 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
     if (id) {
       const row = await db.prepare('SELECT * FROM org_private_records WHERE org_id=? AND kind=? AND id=?').bind(orgId, kind, id).first();
       if (!row) return bad(404, 'NOT_FOUND');
-      return json({ ok: true, [contract.one]: storedRecord(row) });
+      const stored = storedRecord(row);
+      if (DRIVE_SHARE_KINDS.has(kind)) {
+        const decorated = await decorateDriveRecord(db, orgId, kind, stored, gate.user.sub);
+        if (!decorated) return bad(403, 'DRIVE_SHARE_ACCESS_DENIED');
+        return json({ ok: true, [contract.one]: decorated });
+      }
+      return json({ ok: true, [contract.one]: stored });
     }
     const parent = url.searchParams.get('roomId');
     const rows = parent !== null
       ? await db.prepare('SELECT * FROM org_private_records WHERE org_id=? AND kind=? AND parent_id=? ORDER BY created_at').bind(orgId, kind, parent).all()
       : await db.prepare('SELECT * FROM org_private_records WHERE org_id=? AND kind=? ORDER BY created_at').bind(orgId, kind).all();
-    const data = (rows.results || []).map(storedRecord);
+    let data = (rows.results || []).map(storedRecord);
+    if (DRIVE_SHARE_KINDS.has(kind)) {
+      const decorated = await Promise.all(data.map((row) => decorateDriveRecord(db, orgId, kind, row, gate.user.sub)));
+      data = decorated.filter(Boolean);
+    }
     return json({ ok: true, [contract.list]: data, ...(kind === 'witness' ? { records: data } : {}) });
   }
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return bad(405, 'METHOD_NOT_ALLOWED');
@@ -62,6 +74,17 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
   id = id || String(body.id || '');
   if (!/^[A-Za-z0-9_.:-]{1,160}$/.test(id)) return bad(400, 'INVALID_ID');
   const existing = await db.prepare('SELECT * FROM org_private_records WHERE org_id=? AND kind=? AND id=?').bind(orgId, kind, id).first();
+  const requestedParentId = body.parentId === undefined ? existing?.parent_id || null : body.parentId;
+  if (DRIVE_SHARE_KINDS.has(kind)) {
+    if (existing) {
+      const access = await driveAccessForUser(db, orgId, kind, id, gate.user.sub);
+      if (!access.allowed) return bad(403, 'DRIVE_SHARE_ACCESS_DENIED');
+      if (access.restricted && access.permission === 'view' && method !== 'GET') return bad(403, 'DRIVE_SHARE_READ_ONLY');
+    } else if (requestedParentId) {
+      const parentAccess = await driveAccessForUser(db, orgId, 'drive/folders', requestedParentId, gate.user.sub);
+      if (!parentAccess.allowed || (parentAccess.restricted && parentAccess.permission === 'view')) return bad(403, 'DRIVE_SHARE_READ_ONLY');
+    }
+  }
   if (contract.append && existing && method !== 'DELETE') return bad(409, 'PRIVATE_APPEND_ONLY');
   if (method === 'DELETE') {
     if (!existing) return bad(404, 'NOT_FOUND');
@@ -113,7 +136,7 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
   if (!isCiphertext(body.ciphertext, contentContext(orgId, kind, id))) return bad(400, 'VALID_CIPHERTEXT_REQUIRED');
   if (existing && Number(body.revision) !== existing.revision) return bad(409, 'PRIVATE_REVISION_CONFLICT');
   if (!existing && (method !== 'POST' || Number(body.revision) !== 0)) return bad(409, 'PRIVATE_REVISION_CONFLICT');
-  const parentId = body.parentId === undefined ? existing?.parent_id || null : body.parentId;
+  const parentId = requestedParentId;
   if (parentId !== null) {
     if (!contract.parentKind || typeof parentId !== 'string') return bad(400, 'INVALID_PARENT');
     const parent = await db.prepare('SELECT id FROM org_private_records WHERE org_id=? AND kind=? AND id=?').bind(orgId, contract.parentKind, parentId).first();
@@ -131,10 +154,12 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
   const t = Date.now();
   const result = existing
     ? await db.prepare('UPDATE org_private_records SET ciphertext=?,parent_id=?,revision=revision+1,updated_at=? WHERE org_id=? AND kind=? AND id=? AND revision=?').bind(body.ciphertext, parentId, t, orgId, kind, id, body.revision).run()
-    : await db.prepare('INSERT OR IGNORE INTO org_private_records (org_id,kind,id,parent_id,ciphertext,revision,created_at,updated_at) VALUES (?,?,?,?,?,1,?,?)').bind(orgId, kind, id, parentId, body.ciphertext, t, t).run();
+    : await db.prepare('INSERT OR IGNORE INTO org_private_records (org_id,kind,id,parent_id,ciphertext,revision,created_at,updated_at,created_by) VALUES (?,?,?,?,?,1,?,?,?)').bind(orgId, kind, id, parentId, body.ciphertext, t, t, gate.user.sub).run();
   if (Number(result?.meta?.changes || 0) !== 1) return bad(409, 'PRIVATE_REVISION_CONFLICT');
   const row = await db.prepare('SELECT * FROM org_private_records WHERE org_id=? AND kind=? AND id=?').bind(orgId, kind, id).first();
   const records = await db.prepare('SELECT * FROM org_private_records WHERE org_id=? AND kind=? ORDER BY created_at').bind(orgId, kind).all();
-  return json({ ok: true, id, [contract.one]: storedRecord(row), ...(kind === 'pledges' ? { pledges: records.results.map(storedRecord) } : {}) });
+  let entity = storedRecord(row);
+  if (DRIVE_SHARE_KINDS.has(kind)) entity = await decorateDriveRecord(db, orgId, kind, entity, gate.user.sub);
+  return json({ ok: true, id, [contract.one]: entity, ...(kind === 'pledges' ? { pledges: records.results.map(storedRecord) } : {}) });
 }
 export { PRIVATE_CONTENT, PRIVATE_KINDS };
