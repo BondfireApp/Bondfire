@@ -233,12 +233,26 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
       };
 
       let body = clearBody;
+      let sealed = false;
+
       if (state.data?.private_mode) {
         const recipient = await fetchJson(`/api/public/${encodeURIComponent(publicSlug)}/submission-key`);
         body = await sealSubmission(recipient, "newsletter", clearBody);
+        sealed = true;
       }
 
-      await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, body);
+      try {
+        await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, body);
+      } catch (submitError) {
+        const submitCode = String(submitError?.message || "");
+        if (!sealed && submitCode.includes("ENCRYPTED_SUBMISSION_REQUIRED")) {
+          const recipient = await fetchJson(`/api/public/${encodeURIComponent(publicSlug)}/submission-key`);
+          const encryptedBody = await sealSubmission(recipient, "newsletter", clearBody);
+          await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, encryptedBody);
+        } else {
+          throw submitError;
+        }
+      }
       setNewsletterName("");
       setNewsletterEmail("");
       setNewsletterWebsite("");
