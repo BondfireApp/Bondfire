@@ -948,24 +948,64 @@ React.useEffect(() => {
   const openRiseupDraft = () => {
     const to = (nlListAddress || "").trim();
     if (!to) {
-      setNlMsg("Set a Riseup list address first.");
-      setTimeout(() => setNlMsg(""), 1400);
+      setNlMsg("Set the mailing-list address first.");
       return;
     }
-    const subject = `${orgName || "Bondfire"} newsletter`;
-    const body =
-      (nlBlurb ? `${nlBlurb}\n\n` : "") +
-      `Hello,\n\n` +
-      `Here is the latest update.\n\n` +
-      `Needs:\n- \n\n` +
-      `Pledges:\n- \n\n` +
-      `Thanks,\n${orgName || ""}`;
-
-    const href = `mailto:${safeMailto(to)}?subject=${safeMailto(subject)}&body=${safeMailto(
-      body
-    )}`;
+    const subject = String(nlSubject || "").trim() || `${orgName || "Organization"} update`;
+    const body = String(nlDraft || "").trim() || defaultNewsletterBody(nlBlurb, orgName || "Organization");
+    const href = `mailto:${safeMailto(to)}?subject=${safeMailto(subject)}&body=${safeMailto(body)}`;
     window.location.href = href;
   };
+
+  const copyNewsletterDraft = async () => {
+    const subject = String(nlSubject || "").trim();
+    const body = String(nlDraft || "").trim();
+    const text = [subject ? `Subject: ${subject}` : "", body].filter(Boolean).join("\n\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setNlMsg("Draft copied.");
+    } catch {
+      setNlMsg("Could not copy the draft. Select the text manually instead.");
+    }
+  };
+
+  const copySubscriberEmails = async () => {
+    const emails = subscribers
+      .map((subscriber) => String(subscriber?.email || "").trim())
+      .filter((email) => email && email !== "__encrypted__");
+    if (!emails.length) {
+      setNlMsg("There are no subscriber addresses to copy.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(emails.join("\n"));
+      setNlMsg(`Copied ${emails.length} subscriber address${emails.length === 1 ? "" : "es"}.`);
+    } catch {
+      setNlMsg("Could not copy subscriber addresses.");
+    }
+  };
+
+  const removeSubscriber = async (subscriber) => {
+    const id = String(subscriber?.id || "").trim();
+    if (!id || !orgId) return;
+    if (!window.confirm(`Remove ${subscriber?.email || "this subscriber"} from Bondfire's website signup list?`)) return;
+    setNlBusy(true);
+    setNlMsg("");
+    try {
+      await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter/subscribers`, {
+        method: "DELETE",
+        body: { id },
+      });
+      await loadSubscribers();
+      setNlMsg("Subscriber removed from Bondfire.");
+    } catch (error) {
+      setNlMsg(error?.message || "Could not remove subscriber.");
+    } finally {
+      setNlBusy(false);
+    }
+  };
+
+  const riseupInfoUrl = riseupListInfoUrl(nlListAddress);
 
   /* ========== PLEDGES (backend) ========== */
   const [pledges, setPledges] = React.useState([]);
