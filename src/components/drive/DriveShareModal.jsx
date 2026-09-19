@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Copy, LockKeyhole, Share2, X } from "lucide-react";
 import { api } from "../../utils/api.js";
 import { deviceKeyId } from "../../../shared/privateContent.js";
-import { ensureDeviceKeypair } from "../../lib/zk.js";
+import { ensureDeviceKeypair, getCachedOrgKey } from "../../lib/zk.js";
+import { decryptRows } from "../../utils/decryptRow.js";
 
 function memberId(member) {
   return String(member?.userId || member?.user_id || "").trim();
@@ -56,7 +57,9 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
           ? await api(`/api/orgs/${encodeURIComponent(orgId)}/members`)
           : { members: [], meUserId: shareData?.meUserId || "" };
         if (!alive) return;
-        const nextMembers = Array.isArray(memberData?.members) ? memberData.members : [];
+        let nextMembers = Array.isArray(memberData?.members) ? memberData.members : [];
+        const orgKey = getCachedOrgKey(orgId);
+        if (orgKey && nextMembers.length) nextMembers = await decryptRows(orgKey, nextMembers);
         const selfId = String(memberData?.meUserId || shareData?.meUserId || "");
         const next = {};
         if (Array.isArray(shareData?.grants)) {
