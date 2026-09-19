@@ -472,7 +472,11 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
 
           <div className="bf-organizing-newsletter-copy">
             <strong>No tracking-pixel nonsense.</strong>
-            <p>Bondfire stores the website signup. Riseup handles mailing-list confirmation and delivery.</p>
+            <p>
+              {state.data?.private_mode
+                ? "Bondfire encrypts the website signup for branch admins. Riseup handles mailing-list confirmation and delivery."
+                : "Bondfire stores the website signup. Riseup handles mailing-list confirmation and delivery."}
+            </p>
             {newsletterInfo?.subscribe_url ? (
               <a
                 className="bf-organizing-button"
