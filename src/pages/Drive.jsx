@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { api } from "../utils/api.js";
 import DriveSidebar from "../components/drive/DriveSidebar.jsx";
 import NoteEditor from "../components/drive/NoteEditor.jsx";
@@ -9,9 +9,11 @@ import Breadcrumbs from "../components/drive/Breadcrumbs.jsx";
 import NoteInspector from "../components/drive/NoteInspector.jsx";
 import RichTextToolbar from "../components/drive/RichTextToolbar.jsx";
 import DriveCreateModal from "../components/drive/DriveCreateModal.jsx";
+import DriveShareModal from "../components/drive/DriveShareModal.jsx";
 import SpreadsheetFileView from "../components/drive/SpreadsheetFileView.jsx";
 import FormFileView from "../components/drive/FormFileView.jsx";
 import { renderTemplate } from "../components/drive/templateEngine.js";
+import { buildDriveSharePreparation, cacheDriveShareKey, resolveDriveShareKey } from "../lib/driveSharing.js";
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
@@ -139,6 +141,7 @@ function withFileUrls(orgId, file) {
 
 export default function Drive() {
   const { orgId = "" } = useParams();
+  const location = useLocation();
   const uiStorageKey = `bf_drive_ui_v14_${orgId}`;
 
   const [folders, setFolders] = useState([]);
@@ -165,6 +168,8 @@ export default function Drive() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth <= 900 : false));
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState(null);
+  const [sharedItems, setSharedItems] = useState([]);
 
   const saveTimer = useRef(null);
   const skipNextSave = useRef(false);
@@ -173,6 +178,7 @@ export default function Drive() {
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
   const objectUrlRegistry = useRef(new Set());
+  const deepLinkHandled = useRef("");
 
   useEffect(() => {
     try {
@@ -190,6 +196,16 @@ export default function Drive() {
       localStorage.setItem(uiStorageKey, JSON.stringify({ sidebarWidth, splitRatio, viewMode, inspectorOpen, propertiesCollapsed }));
     } catch {}
   }, [uiStorageKey, sidebarWidth, splitRatio, viewMode, inspectorOpen, propertiesCollapsed]);
+
+  async function loadSharedItems() {
+    if (!orgId) return;
+    try {
+      const data = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares?mine=1`);
+      setSharedItems(Array.isArray(data?.items) ? data.items : []);
+    } catch {
+      setSharedItems([]);
+    }
+  }
 
   async function loadDrive({ preserveSelection = true } = {}) {
     if (!orgId) return;
@@ -228,6 +244,7 @@ export default function Drive() {
         }
       }
       setLoadState("ready");
+      loadSharedItems();
     } catch (e) {
       setLoadError(String(e?.message || e || "Failed to load Drive"));
       setLoadState("error");
@@ -237,6 +254,34 @@ export default function Drive() {
   useEffect(() => {
     loadDrive({ preserveSelection: false });
   }, [orgId]);
+
+  useEffect(() => {
+    const raw = new URLSearchParams(location.search || "").get("item") || "";
+    if (!raw || raw === deepLinkHandled.current || loadState !== "ready") return;
+    const splitAt = raw.indexOf(":");
+    if (splitAt < 1) return;
+    const kind = raw.slice(0, splitAt);
+    const id = raw.slice(splitAt + 1);
+    if (!id) return;
+    if (kind === "drive/folders" && folders.some((row) => row.id === id)) {
+      setCurrentFolder(id);
+      deepLinkHandled.current = raw;
+      return;
+    }
+    if (kind === "drive/notes" && notes.some((row) => row.id === id)) {
+      const note = notes.find((row) => row.id === id);
+      setCurrentFolder(note?.parentId || null);
+      selectNote(id);
+      deepLinkHandled.current = raw;
+      return;
+    }
+    if (kind === "drive/files" && files.some((row) => row.id === id)) {
+      const file = files.find((row) => row.id === id);
+      setCurrentFolder(file?.parentId || null);
+      openFile(file);
+      deepLinkHandled.current = raw;
+    }
+  }, [location.search, loadState, folders, notes, files]);
 
   useEffect(() => {
     const folderInput = folderInputRef.current;
@@ -300,6 +345,8 @@ export default function Drive() {
   const fileIsEditable = isEditableTextFile(selectedFile);
   const fileIsMarkdown = isMarkdownFile(selectedFile);
   const isStructuredDriveDoc = selectedFileSubtype === "sheet" || selectedFileSubtype === "form";
+  const selectedAccessItem = selectedKind === "note" ? selectedNote : selectedFile;
+  const canEditSelected = selectedAccessItem?.sharePermission !== "view";
 
   const noteMap = useMemo(() => {
     const map = new Map();
@@ -644,6 +691,10 @@ export default function Drive() {
 
   async function saveNow() {
     if (!selectedId) return;
+    if (!canEditSelected) {
+      setStatus("view only");
+      return;
+    }
     try {
       if (selectedKind === "note") {
         const parsed = parseFrontmatter(content);
@@ -992,6 +1043,125 @@ export default function Drive() {
     setTemplates((prev) => prev.filter((tpl) => tpl.id !== id));
   }
 
+  async function fetchDriveRecord(kind, id) {
+    const segment = kind === "drive/folders" ? "folders" : kind === "drive/notes" ? "notes" : kind === "drive/files" ? "files" : "";
+    if (!segment) throw new Error("Unsupported Drive share target.");
+    const data = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/${segment}/${encodeURIComponent(id)}`);
+    return kind === "drive/folders" ? data?.folder : kind === "drive/notes" ? data?.note : data?.file;
+  }
+
+  async function resealDriveRecord(kind, id) {
+    const row = await fetchDriveRecord(kind, id);
+    if (!row) throw new Error("A Drive item disappeared while its access was being updated.");
+    const parentId = row.parentId || null;
+    if (kind === "drive/folders") {
+      await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: row.name || "Folder", parentId }),
+      });
+      return;
+    }
+    if (kind === "drive/notes") {
+      await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/notes/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title: row.title || "untitled", body: row.body || "", tags: Array.isArray(row.tags) ? row.tags : [], parentId }),
+      });
+      return;
+    }
+    const payload = {
+      name: row.name || "file",
+      mime: row.mime || "application/octet-stream",
+      size: Number(row.size || 0),
+      parentId,
+    };
+    if (row.dataUrl) payload.dataUrl = row.dataUrl;
+    else if (row.textContent !== undefined) payload.textContent = String(row.textContent || "");
+    await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  function shareTargetsFor(target) {
+    if (target.kind !== "drive/folders") return [{ kind: target.kind, id: target.id }];
+    const folderIds = new Set([target.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const folder of folders) {
+        if (!folder.parentId || !folderIds.has(folder.parentId) || folderIds.has(folder.id)) continue;
+        const directOverride = folder.id !== target.id
+          && folder.shareRestricted
+          && folder.shareRootKind === "drive/folders"
+          && folder.shareRootId === folder.id;
+        if (directOverride) continue;
+        folderIds.add(folder.id);
+        changed = true;
+      }
+    }
+    const targets = [...folderIds].map((id) => ({ kind: "drive/folders", id }));
+    for (const note of notes) {
+      if (!note.parentId || !folderIds.has(note.parentId)) continue;
+      const directOverride = note.shareRestricted && note.shareRootKind === "drive/notes" && note.shareRootId === note.id;
+      if (!directOverride) targets.push({ kind: "drive/notes", id: note.id });
+    }
+    for (const file of files) {
+      if (!file.parentId || !folderIds.has(file.parentId)) continue;
+      const directOverride = file.shareRestricted && file.shareRootKind === "drive/files" && file.shareRootId === file.id;
+      if (!directOverride) targets.push({ kind: "drive/files", id: file.id });
+    }
+    return targets;
+  }
+
+  async function applyDriveShare({ target, members, meUserId, grants }) {
+    if (!target?.id || !target?.kind) throw new Error("Choose a Drive item to share.");
+    let resumeKey = null;
+    try {
+      const pending = await resolveDriveShareKey(orgId, target.kind, target.id, api, { preferPending: true });
+      if (pending?.pendingVersion && pending?.key) resumeKey = pending.key;
+    } catch {}
+
+    const prepared = await buildDriveSharePreparation({
+      orgId,
+      kind: target.kind,
+      itemId: target.id,
+      members,
+      meUserId,
+      grants,
+      itemKey: resumeKey,
+    });
+
+    const stage = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares`, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "prepare",
+        kind: target.kind,
+        itemId: target.id,
+        grants: prepared.grants,
+        wraps: prepared.wraps,
+      }),
+    });
+    const version = Number(stage?.version || 0);
+    if (!version) throw new Error("The sharing key rotation was not prepared.");
+    cacheDriveShareKey(orgId, target.kind, target.id, version, prepared.itemKey);
+
+    const targets = shareTargetsFor(target);
+    setDriveNotice(`Updating encrypted access for ${targets.length} Drive item${targets.length === 1 ? "" : "s"}…`);
+    try {
+      for (const item of targets) await resealDriveRecord(item.kind, item.id);
+      await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares`, {
+        method: "POST",
+        body: JSON.stringify({ action: "finalize", kind: target.kind, itemId: target.id }),
+      });
+      await loadDrive({ preserveSelection: true });
+      await loadSharedItems();
+      setDriveNotice(`Sharing updated for "${target.label || "Drive item"}".`);
+    } catch (error) {
+      setDriveNotice("Sharing update is incomplete. Retry the same sharing change to resume safely; the pending item key has been preserved.");
+      throw error;
+    }
+  }
+
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     const media = window.matchMedia("(max-width: 900px)");
@@ -1010,8 +1180,8 @@ export default function Drive() {
   }, [isMobile]);
 
   const showEditableDocument = selectedKind === "note" || (selectedKind === "file" && fileIsEditable);
-  const showEditor = showEditableDocument && (isStructuredDriveDoc || viewMode !== "read");
-  const showPreview = showEditableDocument && !isStructuredDriveDoc && viewMode !== "edit";
+  const showEditor = canEditSelected && showEditableDocument && (isStructuredDriveDoc || viewMode !== "read");
+  const showPreview = showEditableDocument && (!canEditSelected || (!isStructuredDriveDoc && viewMode !== "edit"));
   const workspaceHeight = focusMode ? "100vh" : "calc(100vh - 86px)";
   const createModalActions = [
     { id: "folder", label: "Folder", hint: "Create a new folder in the current location.", icon: "📁", onClick: createFolder },
@@ -1075,6 +1245,8 @@ export default function Drive() {
                     onDeleteFile={deleteFile}
                     onDownloadFile={downloadFile}
                     onOpenFileInBrowser={openFileInBrowser}
+                    onShareItem={setShareTarget}
+                    sharedItems={sharedItems}
                     templates={templates}
                     onApplyTemplate={applyTemplate}
                     onNewFromTemplate={createNoteFromTemplate}
@@ -1129,6 +1301,8 @@ export default function Drive() {
                 onDeleteFile={deleteFile}
                 onDownloadFile={downloadFile}
                 onOpenFileInBrowser={openFileInBrowser}
+                onShareItem={setShareTarget}
+                sharedItems={sharedItems}
                 templates={templates}
                 onApplyTemplate={applyTemplate}
                 onNewFromTemplate={createNoteFromTemplate}
@@ -1178,10 +1352,23 @@ export default function Drive() {
                   className={isStructuredDriveDoc ? "bf-drive-titleInput is-structured" : "bf-drive-titleInput"}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  readOnly={!canEditSelected}
                   placeholder="Untitled"
                   style={{ flex: 1, minWidth: isMobile ? 120 : 220 }}
                 />
-                <span className="helper">{status}</span>
+                <span className="helper">{canEditSelected ? status : "view only"}</span>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => setShareTarget({
+                    kind: selectedKind === "note" ? "drive/notes" : "drive/files",
+                    id: selectedId,
+                    label: selectedKind === "note" ? (selectedNote?.title || "Untitled note") : (selectedFile?.name || "File"),
+                  })}
+                  style={{ padding: "6px 9px" }}
+                >
+                  Share
+                </button>
                 {selectedFile && !fileIsEditable ? <span className="helper">read only</span> : null}
               </div>
 
@@ -1223,7 +1410,7 @@ export default function Drive() {
                     )}
                   </div>
                 ) : null}
-                {!isStructuredDriveDoc && !isMobile && viewMode === "split" ? <div onMouseDown={() => beginResize("split")} style={{ cursor: "col-resize", background: "rgba(255,255,255,0.03)", minHeight: focusMode ? "84vh" : "72vh" }} title="Drag to resize split" /> : null}
+                {canEditSelected && !isStructuredDriveDoc && !isMobile && viewMode === "split" ? <div onMouseDown={() => beginResize("split")} style={{ cursor: "col-resize", background: "rgba(255,255,255,0.03)", minHeight: focusMode ? "84vh" : "72vh" }} title="Drag to resize split" /> : null}
                 {showPreview ? (
                   <div style={{ minWidth: 0 }}>
                     {selectedFileSubtype === "sheet" ? (
@@ -1245,6 +1432,8 @@ export default function Drive() {
                 <h2 style={{ margin: 0, fontSize: 20 }}>{selectedFile.name}</h2>
                 <span className="helper">{selectedFile.mime || "file"}</span>
                 <span className="helper">{Math.round((Number(selectedFile.size || 0) / 1024) * 10) / 10} KB</span>
+                <button className="btn" type="button" onClick={() => setShareTarget({ kind: "drive/files", id: selectedFile.id, label: selectedFile.name || "File" })}>Share</button>
+                {selectedFile.sharePermission === "view" ? <span className="helper">view only</span> : null}
               </div>
               <DriveFilePreview file={selectedFile} />
             </>
@@ -1274,6 +1463,13 @@ export default function Drive() {
       </div>
 
       <DriveCreateModal open={createModalOpen} onClose={() => setCreateModalOpen(false)} actions={createModalActions} />
+      <DriveShareModal
+        open={!!shareTarget}
+        orgId={orgId}
+        target={shareTarget}
+        onClose={() => setShareTarget(null)}
+        onApply={applyDriveShare}
+      />
 
       {inspectorOpen && selectedNote ? (
         <div style={{ position: "fixed", top: isMobile ? "auto" : (focusMode ? 8 : 94), right: isMobile ? 8 : 8, left: isMobile ? 8 : "auto", bottom: isMobile ? 8 : "auto", width: isMobile ? "auto" : 250, maxHeight: isMobile ? "55vh" : (focusMode ? "calc(100vh - 16px)" : "calc(100vh - 102px)"), overflow: "auto", zIndex: 90 }}>

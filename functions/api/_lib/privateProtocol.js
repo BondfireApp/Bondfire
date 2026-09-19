@@ -6,10 +6,11 @@ import { getDb, requireOrgRole } from './auth.js';
 import { bad, json } from './http.js';
 import { ensurePrivateSchema, getPrivateMode } from './privateStore.js';
 import { migrationInventory, migrationPage, migrateRecord, cleanupPrivateSources, legacyPrivateFile } from './privateMigration.js';
-import { deletePrivateBlob, getPrivateBlob, putPrivateBlob } from './privateBlobs.js';
+import { deletePrivateBlob, getPrivateBlob, putPrivateBlob, ensurePrivateBlobs } from './privateBlobs.js';
 import { contentContext, isCiphertext } from '../../../shared/privateContent.js';
 import {publishPrivateCopy,reservePublicSlug} from './privatePublication.js';
 import { publishColophonCopy } from './privateColophonPublication.js';
+import { driveAccessForUser } from './driveShares.js';
 
 export async function privateProtocol({env,request,orgId,path=''}) {
   if(path==='submissions')return readPrivateSubmissions({env,request,orgId});
@@ -53,17 +54,40 @@ export async function privateProtocol({env,request,orgId,path=''}) {
     }
     if(!mode) return bad(409,'PRIVATE_MODE_NOT_STARTED');
     if(path.startsWith('blob/')) {
+      await ensurePrivateBlobs(db);
       const id=path.slice(5);
-      if(request.method==='GET') return json({ok:true,ciphertext:await getPrivateBlob(env,orgId,id)});
+      const blobRow=await db.prepare('SELECT file_id FROM org_private_blobs WHERE org_id=? AND id=?').bind(orgId,id).first();
+      if(request.method==='GET') {
+        if(blobRow?.file_id) {
+          const file=await db.prepare("SELECT id FROM org_private_records WHERE org_id=? AND kind='drive/files' AND id=?").bind(orgId,blobRow.file_id).first();
+          if(file) {
+            const access=await driveAccessForUser(db,orgId,'drive/files',blobRow.file_id,gate.user.sub);
+            if(!access.allowed) return bad(403,'DRIVE_SHARE_ACCESS_DENIED');
+          }
+        }
+        return json({ok:true,ciphertext:await getPrivateBlob(env,orgId,id)});
+      }
       if(request.method==='POST') {
         const body=await request.json();
-        if(Object.keys(body).some(k=>!['ciphertext','fileId'].includes(k))) return bad(400,'PLAINTEXT_FIELDS_FORBIDDEN');
-        await putPrivateBlob(env,orgId,id,body.ciphertext,body.fileId);
+        if(Object.keys(body).some(k=>!['ciphertext','fileId','parentId'].includes(k))) return bad(400,'PLAINTEXT_FIELDS_FORBIDDEN');
+        const file=await db.prepare("SELECT id FROM org_private_records WHERE org_id=? AND kind='drive/files' AND id=?").bind(orgId,body.fileId).first();
+        if(file) {
+          const access=await driveAccessForUser(db,orgId,'drive/files',body.fileId,gate.user.sub);
+          if(!access.allowed||access.permission==='view') return bad(403,'DRIVE_SHARE_READ_ONLY');
+        } else if(body.parentId) {
+          const parentAccess=await driveAccessForUser(db,orgId,'drive/folders',body.parentId,gate.user.sub);
+          if(!parentAccess.allowed||parentAccess.permission==='view') return bad(403,'DRIVE_SHARE_READ_ONLY');
+        }
+        await putPrivateBlob(env,orgId,id,body.ciphertext,body.fileId,body.parentId);
         return json({ok:true,id});
       }
       if(request.method==='DELETE') {
         const body=await request.json().catch(()=>({}));
         if(Object.keys(body).some(k=>k!=='fileId')) return bad(400,'PLAINTEXT_FIELDS_FORBIDDEN');
+        if(body.fileId) {
+          const access=await driveAccessForUser(db,orgId,'drive/files',body.fileId,gate.user.sub);
+          if(!access.allowed||access.permission==='view') return bad(403,'DRIVE_SHARE_READ_ONLY');
+        }
         await deletePrivateBlob(env,orgId,id,body.fileId);
         return json({ok:true,id});
       }

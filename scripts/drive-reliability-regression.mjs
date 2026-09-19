@@ -42,6 +42,6 @@ assert.match(sheet, /cellContextItems/, "Drive sheet cells must expose contextua
 assert.match(sheet, /Delete row/, "Drive sheet context menus must expose row deletion");
 assert.match(sheet, /Delete column/, "Drive sheet context menus must expose column deletion");
 assert.match(sidebar, /bf-drive-treeRow/, "Drive explorer must use the compact tree row layout");
-assert.match(drive, /showPreview = showEditableDocument && !isStructuredDriveDoc/, "Structured Drive documents must not render a duplicate split preview");
+assert.match(drive, /showPreview = showEditableDocument && \(!canEditSelected \|\| \(!isStructuredDriveDoc && viewMode !== "edit"\)\)/, "Drive preview selection must preserve structured-document and view-only behavior");
 
 console.log("PASS: Drive tree, sheet workspace, folder import, recursive deletion, and preview regressions");
