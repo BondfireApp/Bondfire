@@ -472,8 +472,18 @@
     font-size: 1.05rem;
   }
 
-  .bf-history-reader-top-actions button:not(.is-close) {
+  .bf-history-reader-top-actions .is-nav {
     display: none;
+  }
+
+  .bf-history-reader-top-actions {
+    gap: 6px;
+  }
+
+  .bf-history-reader-top-actions .is-fullscreen {
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: .78rem;
   }
 
   .bf-history-reader-page {
@@ -527,7 +537,7 @@
   }
 
   .bf-history-reader-title strong {
-    max-width: 64vw;
+    max-width: 48vw;
   }
 
   .bf-history-reader-kicker {
