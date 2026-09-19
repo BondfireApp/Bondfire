@@ -16,17 +16,39 @@ function htmlEscape(value) {
 }
 
 function renderMarkdownText(value) {
-  let html = htmlEscape(value);
-  html = html.replace(/`([^`]+)`/gim, "<code>$1</code>");
-  html = html.replace(/\*\*(.+?)\*\*/gim, "<strong>$1</strong>");
-  html = html.replace(/\*(.+?)\*/gim, "<em>$1</em>");
-  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gim, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
-  return html
-    .split(/\n{2,}/)
-    .map((block) => `<p>${block.replace(/\n/g, "<br />")}</p>`)
-    .join("");
+  const applyInline = (text) => {
+    let html = htmlEscape(text);
+    html = html.replace(/`([^`]+)`/gim, "<code>$1</code>");
+    html = html.replace(/\*\*(.+?)\*\*/gim, "<strong>$1</strong>");
+    html = html.replace(/\*(.+?)\*/gim, "<em>$1</em>");
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gim, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+    return html;
+  };
+  const lines = String(value || "").replace(/\r\n/g, "\n").split("\n");
+  let html = "";
+  let listTag = "";
+  const closeList = () => { if (listTag) { html += `</${listTag}>`; listTag = ""; } };
+  for (const raw of lines) {
+    const trimmed = raw.trim();
+    if (!trimmed) { closeList(); continue; }
+    const heading = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) { closeList(); const level = heading[1].length; html += `<h${level}>${applyInline(heading[2])}</h${level}>`; continue; }
+    if (/^---+$/.test(trimmed) || /^\*\*\*+$/.test(trimmed)) { closeList(); html += "<hr />"; continue; }
+    if (trimmed.startsWith(">")) { closeList(); html += `<blockquote>${applyInline(trimmed.replace(/^>\s?/, ""))}</blockquote>`; continue; }
+    const bullet = trimmed.match(/^[-*]\s+(.*)$/);
+    const ordered = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    if (bullet || ordered) {
+      const tag = ordered ? "ol" : "ul";
+      if (listTag !== tag) { closeList(); listTag = tag; html += `<${tag}>`; }
+      html += `<li>${applyInline(bullet ? bullet[1] : ordered[2])}</li>`;
+      continue;
+    }
+    closeList();
+    html += `<p>${applyInline(trimmed)}</p>`;
+  }
+  closeList();
+  return html;
 }
-
 function normalizeField(field, idx) {
   const type = ["text", "paragraph", "choice", "checkbox", "date"].includes(String(field?.type || "")) ? field.type : "text";
   return {
@@ -207,7 +229,7 @@ body{margin:0;font-family:Inter,system-ui,sans-serif;background:#090909;color:#f
 .card{display:grid;gap:10px;padding:18px;border:1px solid #242424;border-radius:14px;background:#131315;margin-top:14px}
 button{padding:12px 18px;border-radius:12px;border:1px solid #333;background:#17181c;color:#fff;font-weight:700;cursor:pointer}
 .small{font-size:13px;color:#a8a8ad}.success{color:#9be7ac}.error{color:#ff9a9a}
-.bf-public-form-markdown p{margin:0 0 8px}.bf-public-form-markdown p:last-child{margin-bottom:0}.bf-public-form-markdown strong{color:#fff}.bf-public-form-markdown code{background:#1c1c1f;padding:1px 4px;border-radius:4px}.bf-public-form-markdown a{color:#9ed0ff}
+.bf-public-form-markdown{font-size:15px;line-height:1.62;color:#d7d7dc}.bf-public-form-markdown h1,.bf-public-form-markdown h2,.bf-public-form-markdown h3,.bf-public-form-markdown h4,.bf-public-form-markdown h5,.bf-public-form-markdown h6{margin:18px 0 8px;color:#fff;line-height:1.25}.bf-public-form-markdown h1:first-child,.bf-public-form-markdown h2:first-child,.bf-public-form-markdown h3:first-child{margin-top:0}.bf-public-form-markdown p{margin:0 0 10px}.bf-public-form-markdown p:last-child{margin-bottom:0}.bf-public-form-markdown ul,.bf-public-form-markdown ol{margin:0 0 10px;padding-left:24px}.bf-public-form-markdown li{margin:0 0 4px}.bf-public-form-markdown blockquote{margin:0 0 10px;padding-left:12px;border-left:3px solid #555;color:#bbb}.bf-public-form-markdown strong{color:#fff}.bf-public-form-markdown code{background:#1c1c1f;padding:1px 4px;border-radius:4px}.bf-public-form-markdown a{color:#9ed0ff}.bf-public-form-markdown hr{border:0;border-top:1px solid #2b2b2f;margin:16px 0}
 </style>
 </head>
 <body>
