@@ -83,6 +83,9 @@ assert.doesNotMatch(shareStore, /plaintext|text_content|body TEXT/i, "Drive shar
 
 assert.match(shares, /PRIVATE_MODE_REQUIRED/, "Encrypted sharing must require private mode");
 assert.match(shares, /DRIVE_SHARE_RECIPIENT_KEY_REQUIRED/, "Every selected recipient must have a wrapped item key");
+assert.match(shares, /detail\.restricted && !detail\.permission/, "Restricted Drive shares must not grant implicit administrator access");
+assert.match(shares, /ownerUserId && ownerUserId !== String\(gate\.user\.sub\)/, "Restricted Drive share changes must remain controlled by the cryptographic share owner");
+
 assert.match(shares, /pending_version/, "Drive sharing must use staged key versions for safe rotation");
 assert.match(shares, /active_version/, "Drive sharing must keep an explicit active key version");
 
