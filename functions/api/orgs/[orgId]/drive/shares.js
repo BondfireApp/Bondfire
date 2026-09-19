@@ -93,6 +93,8 @@ export async function onRequest({ env, request, params }) {
     const deviceId = String(url.searchParams.get('deviceId') || '').trim();
     const parentId = url.searchParams.has('parentId') ? (String(url.searchParams.get('parentId') || '').trim() || null) : undefined;
     if (!itemId) return bad(400, 'MISSING_ITEM_ID');
+    const item = await record(db, orgId, kind, itemId);
+    if (!item) return bad(404, 'NOT_FOUND');
 
     const detail = await getShareDetail(db, orgId, kind, itemId, gate.user.sub, deviceId, {
       preferPending: url.searchParams.get('pending') === '1',
@@ -100,7 +102,11 @@ export async function onRequest({ env, request, params }) {
     });
     if (detail.restricted && !detail.permission) return bad(403, 'DRIVE_SHARE_ACCESS_DENIED');
 
-    const canManage = detail.canManage || (!detail.restricted && String(gate.role || '') !== 'viewer');
+    const creatorUserId = String(item.created_by || '').trim();
+    const legacyManager = !creatorUserId && ['admin', 'owner'].includes(String(gate.role || ''));
+    const canManage = detail.canManage || (!detail.restricted && (
+      creatorUserId === String(gate.user.sub) || legacyManager
+    ));
     let grants = [];
     if (canManage && detail.policyKind && detail.policyItemId) {
       const version = url.searchParams.get('pending') === '1' && detail.pendingVersion
@@ -134,6 +140,7 @@ export async function onRequest({ env, request, params }) {
   const existing = await policy(db, orgId, kind, itemId);
   const ownerUserId = String(existing?.owner_user_id || item.created_by || '').trim();
   if (ownerUserId && ownerUserId !== String(gate.user.sub)) return bad(403, 'DRIVE_SHARE_MANAGER_REQUIRED');
+  if (!ownerUserId && !['admin', 'owner'].includes(String(gate.role || ''))) return bad(403, 'DRIVE_SHARE_LEGACY_MANAGER_REQUIRED');
 
   const action = String(body.action || 'prepare');
   if (action === 'cancel') {
