@@ -128,6 +128,9 @@ async function uploadPayload(key,orgId,bytes,transport,fileId,parentId) {
 }
 export { uploadPayload };
 export async function dispatchPrivate(path,opts,transport) {
+  const baseTransport=transport;
+  const inheritedSignal=opts?.signal;
+  transport=(nextPath,nextOpts={})=>baseTransport(nextPath,inheritedSignal&&!nextOpts.signal?{...nextOpts,signal:inheritedSignal}:nextOpts);
   const url=new URL(path,window.location.origin);
   const m=url.pathname.match(/^\/api\/orgs\/([^/]+)\/(.*)$/);
   if(!m||['create','index'].includes(m[1])) return null;

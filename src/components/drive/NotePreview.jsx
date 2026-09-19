@@ -35,7 +35,7 @@ function flushList(stack, targetIndent = -1) {
   }
   return html;
 }
-function markdownToHtml(md) {
+export function markdownToHtml(md) {
   let taskIndex = 0;
   const lines = String(md || "").replace(/\r\n/g, "\n").split("\n");
   let html = "";
