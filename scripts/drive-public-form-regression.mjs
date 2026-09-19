@@ -120,7 +120,7 @@ assert.match(formView, /openSubmission/);
 assert.match(formView, /encrypted in their browser before Bondfire receives them/);
 assert.match(privateGate, /if\(form\) return null/);
 assert.match(privateGate, /route==='drive\/shares'\|\|route==='drive\/forms-public'/);
-assert.match(privateClient, /drive\\\/\(\?:shares\|forms-public\)/);
+assert.match(privateClient, /tail==='drive\/forms-public'/);
 assert.match(publicHandler, /storePublicDriveFormResponse/);
 assert.match(publicHandler, /submission\/drive-form/);
 assert.match(publicHandler, /script nonce/);
