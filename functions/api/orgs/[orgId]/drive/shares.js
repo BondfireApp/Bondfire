@@ -1,6 +1,7 @@
 import { requireOrgRole, getDb } from '../../../_lib/auth.js';
 import { bad, json } from '../../../_lib/http.js';
 import { requireCookieCsrf } from '../../../_lib/csrf.js';
+import { ensurePrivateSchema, getPrivateMode } from '../../../_lib/privateStore.js';
 import {
   ensureDriveShareSchema,
   normalizeDriveShareKind,
@@ -72,6 +73,9 @@ export async function onRequest({ env, request, params }) {
   const orgId = params.orgId;
   const db = getDb(env);
   if (!db) return bad(500, 'NO_DB_BINDING');
+  const privateMode = await getPrivateMode(env, orgId);
+  if (privateMode?.state !== 'enabled') return bad(409, 'PRIVATE_MODE_REQUIRED');
+  await ensurePrivateSchema(db);
   await ensureDriveShareSchema(db);
 
   if (request.method === 'GET') {
@@ -98,7 +102,7 @@ export async function onRequest({ env, request, params }) {
       return bad(403, 'DRIVE_SHARE_ACCESS_DENIED');
     }
 
-    const canManage = detail.canManage || ['admin', 'owner'].includes(String(gate.role || ''));
+    const canManage = detail.canManage || ['admin', 'owner'].includes(String(gate.role || '')) || (!detail.restricted && String(gate.role || '') !== 'viewer');
     let grants = [];
     if (canManage && detail.policyKind && detail.policyItemId) {
       const version = url.searchParams.get('pending') === '1' && detail.pendingVersion
@@ -133,7 +137,6 @@ export async function onRequest({ env, request, params }) {
   const ownerUserId = String(existing?.owner_user_id || item.created_by || '').trim();
   const adminish = ['admin', 'owner'].includes(String(gate.role || ''));
   if (ownerUserId && ownerUserId !== String(gate.user.sub) && !adminish) return bad(403, 'DRIVE_SHARE_MANAGER_REQUIRED');
-  if (!ownerUserId && !adminish) return bad(403, 'DRIVE_SHARE_OWNER_UNKNOWN');
 
   const action = String(body.action || 'prepare');
   if (action === 'cancel') {
