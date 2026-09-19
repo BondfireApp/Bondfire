@@ -186,11 +186,13 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
     }
   }
 
+  const responseKeyFingerprint = JSON.stringify(form.publicShare.recipientPrivateKey || null);
+
   useEffect(() => {
     loadPublicResponses();
-  }, [orgId, fileId, form.publicShare.recipientPrivateKey]);
+  }, [orgId, fileId, responseKeyFingerprint]);
 
-  const publicUrl = form.publicShare.enabled && form.publicShare.token && fileId
+  const publicUrl = form.publicShare.enabled && form.publicShare.token && form.publicShare.recipientPublicKey && form.publicShare.recipientPrivateKey && fileId
     ? `${window.location.origin}/api/public/forms/${encodeURIComponent(fileId)}?token=${encodeURIComponent(form.publicShare.token)}`
     : "";
 
