@@ -38,7 +38,7 @@ export async function resolveDriveShareKey(orgId, kind, itemId, transport, {
   const deviceId = await deviceKeyId(device.pubJwk);
   const params = new URLSearchParams({ kind, itemId, deviceId });
   if (preferPending) params.set('pending', '1');
-  if (parentId !== undefined && parentId !== null && parentId !== '') params.set('parentId', String(parentId));
+  if (parentId !== undefined) params.set('parentId', parentId === null ? '' : String(parentId));
   const detail = await transport(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares?${params.toString()}`);
   if (!detail?.restricted && !detail?.pendingVersion) return { ...detail, key: null };
 
