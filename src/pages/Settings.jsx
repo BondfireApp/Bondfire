@@ -792,15 +792,34 @@ React.useEffect(() => {
   const [newsletterPrivateMode, setNewsletterPrivateMode] = React.useState(false);
   const exportSubscribersCsv = async () => {
     if (!orgId) return;
-
     setNlMsg("");
     setNlBusy(true);
-
     try {
-      if (isDemoMode() || privateMode) {
-        const rows=privateMode?(await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter/subscribers`)).subscribers:[];
-        const quote=value=>'"'+String(value??'').replaceAll('"','""')+'"';
-        const csv=privateMode?['name,email',...rows.map(row=>[quote(row.name),quote(row.email)].join(','))].join('\r\n'):getDemoSubscribersCsv();
+      const rows = isDemoMode()
+        ? []
+        : subscribers.filter((row) => String(row?.email || "").trim() && row.email !== "__encrypted__");
+
+      if (isDemoMode()) {
+        const blob = new Blob([getDemoSubscribersCsv()], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `subscribers-${orgId}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        const quote = (value) => '"' + String(value ?? "").replaceAll('"', '""') + '"';
+        const csv = [
+          "name,email,joined",
+          ...rows.map((row) => [
+            quote(row.name),
+            quote(row.email),
+            quote(row.created_at ? new Date(row.created_at).toISOString() : ""),
+          ].join(",")),
+        ].join("\r\n");
+
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -810,49 +829,7 @@ React.useEffect(() => {
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        setNlMsg("Exported.");
-        setTimeout(() => setNlMsg(""), 1200);
-        return;
       }
-
-      const token = getToken();
-      const path = `/api/orgs/${encodeURIComponent(orgId)}/newsletter/subscribers?format=csv`;
-
-      const headers = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
-
-      // Same origin first (Pages Functions), then API_BASE
-      let res = await fetch(path, { method: "GET", headers });
-      if (!res.ok && API_BASE) {
-        res = await fetch(`${API_BASE}${path}`, { method: "GET", headers });
-      }
-
-      if (!res.ok) {
-        // backend might return JSON errors sometimes
-        const ct = res.headers.get("content-type") || "";
-        if (ct.includes("application/json")) {
-          const j = await res.json().catch(() => ({}));
-          throw new Error(j.error || j.message || `HTTP ${res.status}`);
-        }
-        const t = await res.text().catch(() => "");
-        throw new Error(t || `HTTP ${res.status}`);
-      }
-
-      const blob = await res.blob();
-
-      // Try to use server filename if present
-      const dispo = res.headers.get("content-disposition") || "";
-      const m = dispo.match(/filename="([^"]+)"/i);
-      const filename = m?.[1] || `subscribers-${orgId}.csv`;
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
 
       setNlMsg("Exported.");
       setTimeout(() => setNlMsg(""), 1200);
