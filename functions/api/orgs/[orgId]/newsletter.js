@@ -4,6 +4,18 @@ import { getDB } from "../../_bf.js";
 
 
 
+async function ensureNewsletterSettingsTable(db) {
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS newsletter_settings (
+      org_id TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 0,
+      list_address TEXT,
+      blurb TEXT,
+      updated_at INTEGER NOT NULL DEFAULT 0
+    )
+  `).run();
+}
+
 // D1 tables expected:
 // - newsletter_settings(org_id TEXT PRIMARY KEY, enabled INTEGER, list_address TEXT, blurb TEXT, updated_at INTEGER)
 
@@ -17,6 +29,7 @@ export async function onRequest(ctx) {
   if (!orgId) return err(400, "BAD_ORG_ID");
 
   const method = (request.method || "GET").toUpperCase();
+  await ensureNewsletterSettingsTable(db);
 
   // Reads are for members, writes for admins/owners.
   if (method === "GET") {
