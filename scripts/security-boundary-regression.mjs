@@ -78,7 +78,7 @@ assert.match(gatewayRouter, /createColophonGatewayRequest\([\s\S]*context\.env,[
 assert.match(blobs, /export const privateBlobObjectKey=/);
 assert.match(destruction, /import \{ privateBlobObjectKey \} from ['"]\.\/privateBlobs\.js['"]/);
 assert.match(blobs, /export async function deletePrivateBlob\(/);
-assert.match(protocol, /import \{ deletePrivateBlob, getPrivateBlob, putPrivateBlob \} from ['"]\.\/privateBlobs\.js['"]/);
+assert.match(protocol, /import \{ deletePrivateBlob, getPrivateBlob, putPrivateBlob(?:, ensurePrivateBlobs)? \} from ['"]\.\/privateBlobs\.js['"]/);
 assert.match(protocol, /request\.method===['"]DELETE['"]/);
 assert.match(protocol, /deletePrivateBlob\(env,orgId,id,body\.fileId\)/);
 
