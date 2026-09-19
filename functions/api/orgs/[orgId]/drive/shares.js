@@ -56,10 +56,11 @@ async function validateRecipients(db, orgId, grants, wraps) {
   const userIds = [...new Set([...grants.map((row) => row.userId), ...wraps.map((row) => row.userId)])];
   if (!userIds.length) return true;
   const placeholders = userIds.map(() => '?').join(',');
-  const members = await db.prepare(`SELECT user_id FROM org_memberships WHERE org_id=? AND user_id IN (${placeholders})`)
+  const members = await db.prepare(`SELECT user_id,role FROM org_memberships WHERE org_id=? AND user_id IN (${placeholders})`)
     .bind(orgId, ...userIds).all();
-  const allowedUsers = new Set((members.results || []).map((row) => String(row.user_id)));
-  if (userIds.some((id) => !allowedUsers.has(id))) return false;
+  const memberRoles = new Map((members.results || []).map((row) => [String(row.user_id), String(row.role || 'member')]));
+  if (userIds.some((id) => !memberRoles.has(id))) return false;
+  if (grants.some((grant) => grant.permission === 'edit' && memberRoles.get(grant.userId) === 'viewer')) return false;
 
   for (const row of wraps) {
     const device = await db.prepare('SELECT device_id FROM user_device_keys WHERE user_id=? AND device_id=?')
