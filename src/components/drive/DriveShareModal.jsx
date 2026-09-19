@@ -216,7 +216,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
                       >
                         <option value="">No access</option>
                         <option value="view">Can view</option>
-                        <option value="edit">Can edit</option>
+                        <option value="edit" disabled={String(member?.role || "") === "viewer"}>Can edit</option>
                       </select>
                     </div>
                   );
