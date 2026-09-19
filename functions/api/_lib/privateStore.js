@@ -5,6 +5,7 @@ import { requireCookieCsrf } from './csrf.js';
 import { PRIVATE_CONTENT, PRIVATE_KINDS, contentContext, isCiphertext } from '../../../shared/privateContent.js';
 import {ensurePublicationSchema} from './privatePublication.js';
 import { ensureDriveShareSchema, driveAccessForUser, decorateDriveRecord, deleteDriveShareMetadata, DRIVE_SHARE_KINDS } from './driveShares.js';
+import { deletePublicDriveFormData } from './publicDriveForms.js';
 
 export async function ensurePrivateSchema(db) {
   for (const sql of [
@@ -107,6 +108,7 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
       }
       await deletePrivateFileBlobs(env,orgId,id);
       await db.prepare('DELETE FROM org_private_records WHERE org_id=? AND kind=? AND id=? AND revision=? AND deleting=1').bind(orgId,kind,id,revision).run();
+      if (kind === 'drive/files') await deletePublicDriveFormData(db, orgId, id);
       if (DRIVE_SHARE_KINDS.has(kind)) await deleteDriveShareMetadata(db, orgId, [{ kind, id }]);
       return json({ok:true,deleted:true,id});
     }
@@ -131,6 +133,9 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
         db.prepare(`DELETE FROM org_private_records WHERE org_id=? AND kind='drive/folders' AND id IN (${placeholders})`).bind(orgId,...folderIds),
       ];
       await db.batch(statements);
+      for (const fileRow of (childRows.results || []).filter((row) => row.kind === 'drive/files')) {
+        await deletePublicDriveFormData(db, orgId, fileRow.id);
+      }
       await deleteDriveShareMetadata(db, orgId, [
         ...folderIds.map((folderId) => ({ kind: 'drive/folders', id: folderId })),
         ...(childRows.results || []).map((row) => ({ kind: row.kind, id: row.id })),
