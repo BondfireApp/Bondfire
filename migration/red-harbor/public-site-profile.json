@@ -118,7 +118,7 @@
     "contact_title": "Contact Red Harbor",
     "contact_intro": "Reach out if you want to join, organize your workplace, ask for solidarity, or learn more about the branch.",
     "contact_card_title": "Red Harbor IWW",
-    "contact_card_body": "Email redharboriww@gmail.com",
+    "contact_card_body": "Email contact@redharbor.org",
     "member_access_title": "Member area",
     "member_access_body": "Red Harbor members can sign in to the private Bondfire organization workspace for meetings, files, organizing work, chat, and branch administration.",
     "primary_actions": [
@@ -142,7 +142,7 @@
       },
       {
         "label": "Email Red Harbor",
-        "url": "mailto:redharboriww@gmail.com"
+        "url": "mailto:contact@redharbor.org"
       },
       {
         "label": "Membership",
