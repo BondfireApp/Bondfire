@@ -71,6 +71,13 @@ assert.match(drive, /shareTargetsFor/, "Folder sharing must include descendants"
 assert.match(drive, /directOverride[\s\S]*shareRootId === folder\.id/, "Parent folder rotations must preserve nested direct folder shares");
 assert.match(drive, /canEditSelected/, "Drive UI must enforce view-only editing");
 assert.match(drive, /pending item key has been preserved/, "Interrupted share rotations must be resumable");
+assert.match(drive, /flushPendingDriveSave/, "Sharing the selected item must wait for any active Drive save");
+assert.match(drive, /apiWithTimeout/, "Drive sharing requests must have bounded network waits");
+assert.match(drive, /onProgress\?\./, "Drive sharing must report which encryption step is running");
+assert.match(drive, /Promise\.allSettled/, "Post-share Drive refresh must not keep the sharing modal blocked");
+assert.match(modal, /busyLabel/, "Share modal must show progress instead of an indefinite generic spinner");
+assert.match(modal, /Preparing encrypted access/, "Share modal must expose the current sharing stage");
+assert.match(client, /inheritedSignal/, "Private Drive subrequests must inherit cancellation from the outer operation");
 
 assert.match(client, /__driveShared/, "Restricted Drive content must use an inner item-key envelope");
 assert.match(client, /resolveDriveShareKey/, "Private Drive reads and writes must resolve the item key");
