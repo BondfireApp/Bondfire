@@ -68,7 +68,16 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
             if (userId) next[userId] = grant?.permission === "view" ? "view" : "edit";
           }
         }
-        if (!shareData?.restricted && selfId) next[selfId] = "edit";
+        if (!shareData?.restricted) {
+          for (const member of nextMembers) {
+            const userId = memberId(member);
+            if (!userId) continue;
+            next[userId] = String(member?.role || "") === "viewer" ? "view" : "edit";
+          }
+          if (!nextMembers.length && selfId) {
+            next[selfId] = String(shareData?.role || "") === "viewer" ? "view" : "edit";
+          }
+        }
         setMembers(nextMembers);
         setMeUserId(selfId);
         setDetail(shareData || {});
