@@ -155,7 +155,7 @@ export default function Settings({ privateMode = false }) {
     } catch (e) {
       setInviteMsg(e.message || "Failed to load invites");
     }
-  }, [orgId, orgName]);
+  }, [orgId]);
 
   const createInvite = async () => {
     if (!orgId) return;
@@ -880,7 +880,7 @@ React.useEffect(() => {
     } finally {
       setNlBusy(false);
     }
-  }, [orgId]);
+  }, [orgId, orgName]);
 
   const loadSubscribers = React.useCallback(async () => {
     if (!orgId) return;
