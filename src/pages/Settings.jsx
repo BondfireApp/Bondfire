@@ -689,7 +689,7 @@ const loadPublic = React.useCallback(async () => {
   };
 
 React.useEffect(() => {
-  if (tab === "public") {
+  if (tab === "public" || tab === "newsletter") {
     loadPublic();
   }
   if (tab === "public-inbox") {
@@ -869,8 +869,12 @@ React.useEffect(() => {
         method: "GET",
       });
       const cfg = r?.newsletter || r?.settings || r || {};
+      const nextBlurb = String(cfg.blurb || "");
+      setNlEnabled(!!cfg.enabled);
       setNlListAddress(String(cfg.list_address || cfg.listAddress || ""));
-      setNlBlurb(String(cfg.blurb || ""));
+      setNlBlurb(nextBlurb);
+      setNlSubject(`${orgName || "Organization"} update`);
+      setNlDraft(defaultNewsletterBody(nextBlurb, orgName || "Organization"));
     } catch (e) {
       setNlMsg(e.message || "Failed to load newsletter settings");
     } finally {
@@ -903,9 +907,21 @@ React.useEffect(() => {
     setNlBusy(true);
     try {
       await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter`, {
-        method: "PUT", body: {list_address:nlListAddress,blurb:nlBlurb},
+        method: "PUT",
+        body: {
+          enabled: !!nlEnabled,
+          list_address: nlListAddress,
+          blurb: nlBlurb,
+        },
       });
-      setNlMsg("Saved.");
+      await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/public/save`, {
+        method: "POST",
+        body: {
+          newsletter_enabled: !!publicNewsletterEnabled,
+          show_newsletter_card: !!publicNewsletterEnabled && !!showNewsletterCard,
+        },
+      });
+      setNlMsg("Newsletter settings saved.");
       setTimeout(() => setNlMsg(""), 1200);
     } catch (e) {
       setNlMsg(e.message || "Failed to save newsletter settings");
