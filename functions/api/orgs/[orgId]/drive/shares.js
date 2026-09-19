@@ -98,11 +98,9 @@ export async function onRequest({ env, request, params }) {
       preferPending: url.searchParams.get('pending') === '1',
       parentId,
     });
-    if (detail.restricted && !detail.permission && !['admin', 'owner'].includes(String(gate.role || ''))) {
-      return bad(403, 'DRIVE_SHARE_ACCESS_DENIED');
-    }
+    if (detail.restricted && !detail.permission) return bad(403, 'DRIVE_SHARE_ACCESS_DENIED');
 
-    const canManage = detail.canManage || ['admin', 'owner'].includes(String(gate.role || '')) || (!detail.restricted && String(gate.role || '') !== 'viewer');
+    const canManage = detail.canManage || (!detail.restricted && String(gate.role || '') !== 'viewer');
     let grants = [];
     if (canManage && detail.policyKind && detail.policyItemId) {
       const version = url.searchParams.get('pending') === '1' && detail.pendingVersion
@@ -135,8 +133,7 @@ export async function onRequest({ env, request, params }) {
 
   const existing = await policy(db, orgId, kind, itemId);
   const ownerUserId = String(existing?.owner_user_id || item.created_by || '').trim();
-  const adminish = ['admin', 'owner'].includes(String(gate.role || ''));
-  if (ownerUserId && ownerUserId !== String(gate.user.sub) && !adminish) return bad(403, 'DRIVE_SHARE_MANAGER_REQUIRED');
+  if (ownerUserId && ownerUserId !== String(gate.user.sub)) return bad(403, 'DRIVE_SHARE_MANAGER_REQUIRED');
 
   const action = String(body.action || 'prepare');
   if (action === 'cancel') {
