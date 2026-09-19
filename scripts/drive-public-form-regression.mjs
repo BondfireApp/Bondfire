@@ -114,7 +114,7 @@ const legacyFile = fs.readFileSync(new URL('../functions/api/orgs/[orgId]/drive/
 
 assert.match(drive, /syncPublicFormProjection/);
 assert.match(drive, /drive\/forms-public/);
-assert.match(drive, /if \(selectedFileSubtype === "form"\) await syncPublicFormProjection/);
+assert.match(drive, /if \(snapshot\.fileSubtype === "form"\) await syncPublicFormProjection\(snapshot\.id, snapshot\.content\)/);
 assert.match(formView, /makeSubmissionRecipient/);
 assert.match(formView, /openSubmission/);
 assert.match(formView, /encrypted in their browser before Bondfire receives them/);
