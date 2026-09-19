@@ -468,6 +468,32 @@ export default function Drive() {
   async function createNote() {
     await createNoteWithPayload({ title: "untitled", body: "", parentId: currentFolder, tags: [] });
   }
+  async function syncPublicFormProjection(fileId, rawContent) {
+    const parsed = safeJsonParse(rawContent, null);
+    if (!parsed || parsed.type !== "bondfire-form") return;
+    const publicShare = parsed.publicShare && typeof parsed.publicShare === "object" ? parsed.publicShare : {};
+    if (publicShare.enabled && (!publicShare.token || !publicShare.recipientPublicKey || !publicShare.recipientPrivateKey)) {
+      throw new Error("Public form encryption is still initializing. Wait for Saved before opening the public link.");
+    }
+    await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/forms-public`, {
+      method: "POST",
+      body: JSON.stringify({
+        fileId,
+        enabled: !!publicShare.enabled,
+        token: String(publicShare.token || ""),
+        recipientEpoch: Number(publicShare.recipientEpoch || 1),
+        recipientPublicKey: publicShare.recipientPublicKey || null,
+        form: {
+          type: "bondfire-form",
+          version: 2,
+          title: String(parsed.title || "Untitled form"),
+          description: String(parsed.description || ""),
+          fields: Array.isArray(parsed.fields) ? parsed.fields : [],
+        },
+      }),
+    });
+  }
+
   async function createFileWithPayload(payload) {
     const mime = String(payload?.mime || "text/plain;charset=utf-8");
     const textContent = String(payload?.textContent || "");
@@ -490,6 +516,7 @@ export default function Drive() {
     setSelectedKind("file");
     setTitle(file.name || "untitled");
     setContent(file.textContent || textContent);
+    if (isBondfireFormFile(file, textContent)) await syncPublicFormProjection(file.id, textContent);
     setStatus("saved");
     return file;
   }
@@ -726,10 +753,12 @@ export default function Drive() {
         if (res?.file) {
           setFiles((prev) => prev.map((file) => (file.id === selectedId ? withFileUrls(orgId, { ...file, ...res.file }) : file)));
         }
+        if (selectedFileSubtype === "form") await syncPublicFormProjection(selectedId, content);
         setStatus("saved");
       }
-    } catch {
+    } catch (error) {
       setStatus("error");
+      setDriveNotice(`Save failed: ${String(error?.message || error || "unknown error")}`);
     }
   }
 
@@ -821,6 +850,7 @@ export default function Drive() {
         previewObjectUrl: localPreviewUrl || undefined,
       });
       setFiles((prev) => [nextFile, ...prev.filter((existing) => existing.id !== tempId && existing.id !== nextFile.id)]);
+      if (isBondfireFormFile(nextFile, record.textContent)) await syncPublicFormProjection(nextFile.id, record.textContent);
       return nextFile;
     } catch (error) {
       setFiles((prev) => prev.filter((existing) => existing.id !== tempId));
