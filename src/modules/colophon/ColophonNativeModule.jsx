@@ -253,6 +253,126 @@ function NativeLogoUploadBridge() {
   return createPortal(<NativeLogoUploadControl targetInput={target.input} />, target.host);
 }
 
+function NativeNewsletterPublishBridge({ orgId }) {
+  const location = useLocation();
+  const [target, setTarget] = React.useState(null);
+  const [post, setPost] = React.useState({ title: "", slug: "", status: "draft" });
+  const [busy, setBusy] = React.useState(false);
+  const [message, setMessage] = React.useState("");
+
+  const onPostEditor = /\/wp-admin\/(?:add-new|post|edit)(?:\/|$)/.test(location.pathname)
+    || location.pathname.includes("/wp-admin/add-new");
+
+  React.useEffect(() => {
+    if (!onPostEditor || typeof document === "undefined") {
+      setTarget(null);
+      return undefined;
+    }
+
+    let host = null;
+
+    const readField = (labelText) => {
+      const labels = Array.from(document.querySelectorAll(
+        ".bondfire-colophon-native-shell .native-bridge-sidebar .native-content-editor__field",
+      ));
+      const field = labels.find((label) => String(label.querySelector("span")?.textContent || "").trim() === labelText);
+      return field?.querySelector("input, select, textarea") || null;
+    };
+
+    const sync = () => {
+      const publishBoxes = Array.from(document.querySelectorAll(
+        ".bondfire-colophon-native-shell .native-bridge-sidebar .wp-meta-box",
+      ));
+      const publishBox = publishBoxes.find((box) => String(box.querySelector("h2")?.textContent || "").trim() === "Publish");
+      if (!publishBox) return;
+
+      host = publishBox.querySelector("[data-bondfire-newsletter-publish-host]");
+      if (!host) {
+        host = document.createElement("div");
+        host.setAttribute("data-bondfire-newsletter-publish-host", "true");
+        publishBox.appendChild(host);
+      }
+      setTarget((current) => current === host ? current : host);
+
+      const titleInput = document.querySelector(
+        ".bondfire-colophon-native-shell .native-content-editor__title-field input",
+      );
+      const permalinkInput = document.querySelector(
+        ".bondfire-colophon-native-shell .native-content-editor__permalink input",
+      );
+      const permalinkCode = document.querySelector(
+        ".bondfire-colophon-native-shell .native-content-editor__permalink code",
+      );
+      const statusInput = readField("Publication status");
+      setPost({
+        title: String(titleInput?.value || "").trim(),
+        slug: String(permalinkInput?.value || permalinkCode?.textContent || "").trim(),
+        status: String(statusInput?.value || "draft").trim().toLowerCase(),
+      });
+    };
+
+    const onInput = () => sync();
+    sync();
+    document.addEventListener("input", onInput, true);
+    document.addEventListener("change", onInput, true);
+    const observer = new MutationObserver(sync);
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
+    return () => {
+      document.removeEventListener("input", onInput, true);
+      document.removeEventListener("change", onInput, true);
+      observer.disconnect();
+      host?.remove();
+      setTarget(null);
+    };
+  }, [onPostEditor, location.pathname]);
+
+  async function prepareNewsletter() {
+    if (!post.slug || post.status !== "published" || busy) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const relation = await api(`/api/orgs/${encodeURIComponent(orgId)}/public/publication`, { method: "GET" }).catch(() => null);
+      const publicationBase = String(relation?.connected_publication?.url || "").trim().replace(/\/+$/, "");
+      const articleUrl = publicationBase
+        ? `${publicationBase}/post/${encodeURIComponent(post.slug)}`
+        : `${window.location.origin}/#/org/${encodeURIComponent(orgId)}/colophon/post/${encodeURIComponent(post.slug)}`;
+
+      sessionStorage.setItem("bf_newsletter_handoff_v1", JSON.stringify({
+        orgId: String(orgId || ""),
+        title: post.title || "New article",
+        url: articleUrl,
+        source: "colophon",
+        createdAt: Date.now(),
+      }));
+
+      window.location.hash = `#/org/${encodeURIComponent(orgId)}/settings?tab=newsletter&from=colophon`;
+    } catch (error) {
+      setMessage(String(error?.message || "Could not prepare newsletter draft."));
+      setBusy(false);
+    }
+  }
+
+  if (!onPostEditor || !target) return null;
+
+  const ready = post.status === "published" && Boolean(post.slug);
+  return createPortal(
+    <div className="bondfire-colophon-newsletter-bridge">
+      <strong>Newsletter</strong>
+      <p>
+        {ready
+          ? "Turn this published post into an editable newsletter draft in Bondfire."
+          : "Publish the post first, then you can prepare it for the newsletter."}
+      </p>
+      <button className="button" type="button" onClick={prepareNewsletter} disabled={!ready || busy}>
+        {busy ? "Preparing…" : "Draft newsletter from this post"}
+      </button>
+      {message ? <small className="is-error">{message}</small> : null}
+    </div>,
+    target,
+  );
+}
+
 function NativePublicationDomainSettingsBridge({ orgId }) {
   const location = useLocation();
   const [target, setTarget] = React.useState(null);
@@ -538,6 +658,7 @@ export default function ColophonNativeModule({ Workspace }) {
       <ColophonNativeStyles />
       <NativeLogoUploadBridge />
       <NativePublicationDomainSettingsBridge orgId={orgId} />
+      <NativeNewsletterPublishBridge orgId={orgId} />
       <NativePublicAdminToolbarBridge routeBase={host.routeBase} capabilities={host.capabilities} />
       <NativeColophonFooterLinkBridge />
       <ColophonPublicLinkGuard routeBase={host.routeBase} />
