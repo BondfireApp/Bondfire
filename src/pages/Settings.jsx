@@ -3,6 +3,8 @@ import { api } from '../utils/api.js';
 import * as React from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { decryptWithOrgKey, encryptWithOrgKey, getCachedOrgKey } from "../lib/zk.js";
+import { loadScopedKeys } from "../lib/privateKeyScopes.js";
+import { openSubmission } from "../../shared/privateSubmission.js";
 import Security from "./Security.jsx";
 import { isDemoMode } from "../demo/demoMode.js";
 import { demoHandle, getDemoSubscribersCsv, ensureDemoOrgList } from "../demo/demoStore.js";
@@ -787,6 +789,7 @@ React.useEffect(() => {
   const [nlMsg, setNlMsg] = React.useState("");
   const [nlBusy, setNlBusy] = React.useState(false);
   const [subscribers, setSubscribers] = React.useState([]);
+  const [newsletterPrivateMode, setNewsletterPrivateMode] = React.useState(false);
   const exportSubscribersCsv = async () => {
     if (!orgId) return;
 
