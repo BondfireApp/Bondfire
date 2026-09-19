@@ -265,7 +265,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
   const modalCopy = activeModal === "get_help"
     ? {
         title: "Request Assistance",
-        intro: "Tell Red Harbor what you need and how to reach you.",
+        intro: `Tell ${title} what you need and how to reach you.`,
         details: "What assistance do you need?",
         extra: "Urgency, timing, or anything else we should know",
         submit: "Send Request",
@@ -273,14 +273,14 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
     : activeModal === "volunteer"
       ? {
           title: "Volunteer",
-          intro: "Tell Red Harbor how you would like to help.",
+          intro: `Tell ${title} how you would like to help.`,
           details: "Skills, interests, or what you want to help with",
           extra: "Availability or scheduling notes",
           submit: "Send Volunteer Info",
         }
       : {
           title: "Offer Resources",
-          intro: "Tell Red Harbor what you can offer and how to reach you.",
+          intro: `Tell ${title} what you can offer and how to reach you.`,
           details: "What resources can you offer?",
           extra: "Quantity, timing, pickup details, or other notes",
           submit: "Send Offer",
@@ -418,7 +418,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
           <div className="bf-organizing-modal" role="dialog" aria-modal="true" aria-labelledby="bf-organizing-intake-title">
             <div className="bf-organizing-modal-head">
               <div>
-                <div className="bf-organizing-kicker">RED HARBOR IWW</div>
+                <div className="bf-organizing-kicker">{pub.branch_label || title}</div>
                 <h2 id="bf-organizing-intake-title">{modalCopy.title}</h2>
                 <p>{modalCopy.intro}</p>
               </div>
