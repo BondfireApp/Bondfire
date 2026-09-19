@@ -118,6 +118,10 @@ assert.match(drive, /if \(snapshot\.fileSubtype === "form"\) await syncPublicFor
 assert.match(formView, /makeSubmissionRecipient/);
 assert.match(formView, /openSubmission/);
 assert.match(formView, /encrypted in their browser before Bondfire receives them/);
+assert.match(formView, /markdownToHtml\(form\.description\)/, "In-app form preview must render Markdown descriptions");
+assert.match(publicHandler, /heading = trimmed\.match/, "Public forms must render Markdown headings");
+assert.match(publicHandler, /<h\\$\\{level\\}>/, "Public forms must emit heading elements instead of raw Markdown");
+assert.match(publicHandler, /bf-public-form-markdown h1/, "Public form Markdown headings must be styled");
 assert.match(drive, /verifyPublicFormProjection/, "Opening a public form must verify the deployed projection first");
 assert.match(drive, /Public form check/, "Public form verification must have a bounded wait");
 assert.match(formView, /Preparing encrypted public form/, "Public form popup must show progress instead of a blank page");
