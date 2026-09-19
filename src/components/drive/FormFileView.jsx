@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../../utils/api.js";
+import { makeSubmissionRecipient, openSubmission } from "../../../shared/privateSubmission.js";
 
 const DEFAULT_FORM = {
   type: "bondfire-form",
@@ -10,7 +12,7 @@ const DEFAULT_FORM = {
     { id: "field_2", type: "paragraph", label: "Details", required: false, options: [] },
   ],
   responses: [],
-  publicShare: { enabled: false, token: "" },
+  publicShare: { enabled: false, token: "", recipientEpoch: 1, recipientPublicKey: null, recipientPrivateKey: null },
 };
 
 function makeToken() {
@@ -56,6 +58,9 @@ function normalizeForm(input) {
     publicShare: {
       enabled: !!input?.publicShare?.enabled,
       token: String(input?.publicShare?.token || ""),
+      recipientEpoch: Number.isSafeInteger(Number(input?.publicShare?.recipientEpoch)) && Number(input.publicShare.recipientEpoch) > 0 ? Number(input.publicShare.recipientEpoch) : 1,
+      recipientPublicKey: input?.publicShare?.recipientPublicKey && typeof input.publicShare.recipientPublicKey === "object" ? input.publicShare.recipientPublicKey : null,
+      recipientPrivateKey: input?.publicShare?.recipientPrivateKey && typeof input.publicShare.recipientPrivateKey === "object" ? input.publicShare.recipientPrivateKey : null,
     },
   };
 }
@@ -114,12 +119,76 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
   const [draftAnswers, setDraftAnswers] = useState({});
   const [responseStatus, setResponseStatus] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
+  const [remoteResponses, setRemoteResponses] = useState([]);
+  const [remoteResponseStatus, setRemoteResponseStatus] = useState("");
+  const recipientProvisioning = useRef(false);
 
   useEffect(() => {
     if (!copyStatus) return undefined;
     const timer = setTimeout(() => setCopyStatus(""), 1800);
     return () => clearTimeout(timer);
   }, [copyStatus]);
+
+  useEffect(() => {
+    if (readOnly || !form.publicShare.enabled || !onChange) return undefined;
+    if (form.publicShare.recipientPublicKey && form.publicShare.recipientPrivateKey) return undefined;
+    if (recipientProvisioning.current) return undefined;
+    recipientProvisioning.current = true;
+    let alive = true;
+    (async () => {
+      try {
+        const recipient = await makeSubmissionRecipient();
+        if (!alive) return;
+        onChange(serialize({
+          ...form,
+          publicShare: {
+            ...form.publicShare,
+            recipientEpoch: 1,
+            recipientPublicKey: recipient.publicKey,
+            recipientPrivateKey: recipient.privateKey,
+          },
+        }));
+      } catch {
+        if (alive) setCopyStatus("Could not initialize encrypted public responses");
+      } finally {
+        recipientProvisioning.current = false;
+      }
+    })();
+    return () => { alive = false; };
+  }, [readOnly, form.publicShare.enabled, form.publicShare.recipientPublicKey, form.publicShare.recipientPrivateKey, onChange]);
+
+  async function loadPublicResponses() {
+    if (!orgId || !fileId || !form.publicShare.recipientPrivateKey) {
+      setRemoteResponses([]);
+      return;
+    }
+    setRemoteResponseStatus("Loading public responses…");
+    try {
+      const data = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/forms-public?fileId=${encodeURIComponent(fileId)}`);
+      const opened = [];
+      for (const row of Array.isArray(data?.responses) ? data.responses : []) {
+        try {
+          const clear = await openSubmission(orgId, row, form.publicShare.recipientPrivateKey);
+          if (String(clear?.fileId || "") !== String(fileId)) continue;
+          opened.push(normalizeResponse({
+            id: row.id,
+            submittedAt: Number(clear?.submittedAt || row.created_at || Date.now()),
+            source: "public",
+            answers: clear?.answers || {},
+          }, opened.length));
+        } catch {}
+      }
+      setRemoteResponses(opened);
+      setRemoteResponseStatus("");
+    } catch (error) {
+      setRemoteResponses([]);
+      setRemoteResponseStatus(String(error?.message || error || "Could not load public responses."));
+    }
+  }
+
+  useEffect(() => {
+    loadPublicResponses();
+  }, [orgId, fileId, form.publicShare.recipientPrivateKey]);
 
   const publicUrl = form.publicShare.enabled && form.publicShare.token && fileId
     ? `${window.location.origin}/api/public/forms/${encodeURIComponent(fileId)}?token=${encodeURIComponent(form.publicShare.token)}`
@@ -140,18 +209,31 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
     setDraftAnswers((prev) => ({ ...prev, [fieldId]: nextValue }));
   };
 
-  const togglePublicShare = (enabled) => {
-    commit({
-      ...form,
-      publicShare: {
-        enabled,
-        token: enabled ? (form.publicShare.token || makeToken()) : form.publicShare.token,
-      },
-    });
+  const togglePublicShare = async (enabled) => {
+    let publicShare = {
+      ...form.publicShare,
+      enabled,
+      token: enabled ? (form.publicShare.token || makeToken()) : form.publicShare.token,
+    };
+    if (enabled && (!publicShare.recipientPublicKey || !publicShare.recipientPrivateKey)) {
+      try {
+        const recipient = await makeSubmissionRecipient();
+        publicShare = {
+          ...publicShare,
+          recipientEpoch: 1,
+          recipientPublicKey: recipient.publicKey,
+          recipientPrivateKey: recipient.privateKey,
+        };
+      } catch {
+        setCopyStatus("Could not initialize encrypted public responses");
+        return;
+      }
+    }
+    commit({ ...form, publicShare });
   };
 
   const regeneratePublicLink = () => {
-    commit({ ...form, publicShare: { enabled: true, token: makeToken() } });
+    commit({ ...form, publicShare: { ...form.publicShare, enabled: true, token: makeToken() } });
     setCopyStatus("New link generated");
   };
 
@@ -175,6 +257,12 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
     if (!standaloneEditorUrl) return;
     window.open(standaloneEditorUrl, "_blank", "noopener,noreferrer");
   };
+
+  const allResponses = useMemo(() => {
+    const byId = new Map();
+    for (const response of [...form.responses, ...remoteResponses]) byId.set(response.id, response);
+    return [...byId.values()].sort((a, b) => Number(a.submittedAt || 0) - Number(b.submittedAt || 0));
+  }, [form.responses, remoteResponses]);
 
   const submitResponse = () => {
     const missingRequired = form.fields.filter((field) => field.required).find((field) => {
@@ -232,10 +320,10 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 16 }}>Public response link</div>
-              <div className="helper">Anyone with this link can submit without a Bondfire account.</div>
+              <div className="helper">Anyone with this link can submit without a Bondfire account. Public answers are encrypted in their browser before Bondfire receives them.</div>
             </div>
             <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 700 }}>
-              <input type="checkbox" checked={form.publicShare.enabled} onChange={(e) => togglePublicShare(e.target.checked)} />
+              <input type="checkbox" checked={form.publicShare.enabled} onChange={(e) => { void togglePublicShare(e.target.checked); }} />
               Enable public submissions
             </label>
           </div>
@@ -293,11 +381,15 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
         </div>
       ) : null}
 
-      {form.responses.length ? (
+      {allResponses.length || remoteResponseStatus ? (
         <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid #1f1f1f", borderRadius: 10, padding: 12 }}>
-          <div style={{ fontWeight: 700, marginBottom: 10 }}>Responses ({form.responses.length})</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <div style={{ fontWeight: 700 }}>Responses ({allResponses.length})</div>
+            {fileId && form.publicShare.recipientPrivateKey ? <button className="btn" type="button" onClick={() => { void loadPublicResponses(); }} style={{ padding: "5px 8px", fontSize: 12 }}>Refresh responses</button> : null}
+          </div>
+          {remoteResponseStatus ? <div className="helper" style={{ marginBottom: 8 }}>{remoteResponseStatus}</div> : null}
           <div style={{ display: "grid", gap: 8 }}>
-            {form.responses.slice().reverse().map((response) => (
+            {allResponses.slice().reverse().map((response) => (
               <div key={response.id} style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: 10, background: "rgba(255,255,255,0.02)" }}>
                 <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 8 }}>{new Date(response.submittedAt).toLocaleString()} · {response.source === "public" ? "public" : "internal"}</div>
                 <div style={{ display: "grid", gap: 6 }}>
