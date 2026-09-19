@@ -1208,7 +1208,7 @@ export default function Drive() {
     if (!row) throw new Error("A Drive item disappeared while its access was being updated.");
     const parentId = row.parentId || null;
     if (kind === "drive/folders") {
-      await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, {
+      await request(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, {
         method: "PATCH",
         body: JSON.stringify({ name: row.name || "Folder", parentId }),
       });
@@ -1229,7 +1229,7 @@ export default function Drive() {
     };
     if (row.dataUrl) payload.dataUrl = row.dataUrl;
     else if (row.textContent !== undefined) payload.textContent = String(row.textContent || "");
-    await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, {
+    await request(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     });
