@@ -345,6 +345,8 @@ export default function Drive() {
   const fileIsEditable = isEditableTextFile(selectedFile);
   const fileIsMarkdown = isMarkdownFile(selectedFile);
   const isStructuredDriveDoc = selectedFileSubtype === "sheet" || selectedFileSubtype === "form";
+  const selectedAccessItem = selectedKind === "note" ? selectedNote : selectedFile;
+  const canEditSelected = selectedAccessItem?.sharePermission !== "view";
 
   const noteMap = useMemo(() => {
     const map = new Map();
@@ -689,6 +691,10 @@ export default function Drive() {
 
   async function saveNow() {
     if (!selectedId) return;
+    if (!canEditSelected) {
+      setStatus("view only");
+      return;
+    }
     try {
       if (selectedKind === "note") {
         const parsed = parseFrontmatter(content);
@@ -1162,8 +1168,8 @@ export default function Drive() {
   }, [isMobile]);
 
   const showEditableDocument = selectedKind === "note" || (selectedKind === "file" && fileIsEditable);
-  const showEditor = showEditableDocument && (isStructuredDriveDoc || viewMode !== "read");
-  const showPreview = showEditableDocument && !isStructuredDriveDoc && viewMode !== "edit";
+  const showEditor = canEditSelected && showEditableDocument && (isStructuredDriveDoc || viewMode !== "read");
+  const showPreview = showEditableDocument && (!canEditSelected || (!isStructuredDriveDoc && viewMode !== "edit"));
   const workspaceHeight = focusMode ? "100vh" : "calc(100vh - 86px)";
   const createModalActions = [
     { id: "folder", label: "Folder", hint: "Create a new folder in the current location.", icon: "📁", onClick: createFolder },
@@ -1227,6 +1233,8 @@ export default function Drive() {
                     onDeleteFile={deleteFile}
                     onDownloadFile={downloadFile}
                     onOpenFileInBrowser={openFileInBrowser}
+                    onShareItem={setShareTarget}
+                    sharedItems={sharedItems}
                     templates={templates}
                     onApplyTemplate={applyTemplate}
                     onNewFromTemplate={createNoteFromTemplate}
@@ -1281,6 +1289,8 @@ export default function Drive() {
                 onDeleteFile={deleteFile}
                 onDownloadFile={downloadFile}
                 onOpenFileInBrowser={openFileInBrowser}
+                onShareItem={setShareTarget}
+                sharedItems={sharedItems}
                 templates={templates}
                 onApplyTemplate={applyTemplate}
                 onNewFromTemplate={createNoteFromTemplate}
@@ -1330,10 +1340,23 @@ export default function Drive() {
                   className={isStructuredDriveDoc ? "bf-drive-titleInput is-structured" : "bf-drive-titleInput"}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  readOnly={!canEditSelected}
                   placeholder="Untitled"
                   style={{ flex: 1, minWidth: isMobile ? 120 : 220 }}
                 />
-                <span className="helper">{status}</span>
+                <span className="helper">{canEditSelected ? status : "view only"}</span>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => setShareTarget({
+                    kind: selectedKind === "note" ? "drive/notes" : "drive/files",
+                    id: selectedId,
+                    label: selectedKind === "note" ? (selectedNote?.title || "Untitled note") : (selectedFile?.name || "File"),
+                  })}
+                  style={{ padding: "6px 9px" }}
+                >
+                  Share
+                </button>
                 {selectedFile && !fileIsEditable ? <span className="helper">read only</span> : null}
               </div>
 
@@ -1375,7 +1398,7 @@ export default function Drive() {
                     )}
                   </div>
                 ) : null}
-                {!isStructuredDriveDoc && !isMobile && viewMode === "split" ? <div onMouseDown={() => beginResize("split")} style={{ cursor: "col-resize", background: "rgba(255,255,255,0.03)", minHeight: focusMode ? "84vh" : "72vh" }} title="Drag to resize split" /> : null}
+                {canEditSelected && !isStructuredDriveDoc && !isMobile && viewMode === "split" ? <div onMouseDown={() => beginResize("split")} style={{ cursor: "col-resize", background: "rgba(255,255,255,0.03)", minHeight: focusMode ? "84vh" : "72vh" }} title="Drag to resize split" /> : null}
                 {showPreview ? (
                   <div style={{ minWidth: 0 }}>
                     {selectedFileSubtype === "sheet" ? (
@@ -1397,6 +1420,8 @@ export default function Drive() {
                 <h2 style={{ margin: 0, fontSize: 20 }}>{selectedFile.name}</h2>
                 <span className="helper">{selectedFile.mime || "file"}</span>
                 <span className="helper">{Math.round((Number(selectedFile.size || 0) / 1024) * 10) / 10} KB</span>
+                <button className="btn" type="button" onClick={() => setShareTarget({ kind: "drive/files", id: selectedFile.id, label: selectedFile.name || "File" })}>Share</button>
+                {selectedFile.sharePermission === "view" ? <span className="helper">view only</span> : null}
               </div>
               <DriveFilePreview file={selectedFile} />
             </>
@@ -1426,6 +1451,13 @@ export default function Drive() {
       </div>
 
       <DriveCreateModal open={createModalOpen} onClose={() => setCreateModalOpen(false)} actions={createModalActions} />
+      <DriveShareModal
+        open={!!shareTarget}
+        orgId={orgId}
+        target={shareTarget}
+        onClose={() => setShareTarget(null)}
+        onApply={applyDriveShare}
+      />
 
       {inspectorOpen && selectedNote ? (
         <div style={{ position: "fixed", top: isMobile ? "auto" : (focusMode ? 8 : 94), right: isMobile ? 8 : 8, left: isMobile ? 8 : "auto", bottom: isMobile ? 8 : "auto", width: isMobile ? "auto" : 250, maxHeight: isMobile ? "55vh" : (focusMode ? "calc(100vh - 16px)" : "calc(100vh - 102px)"), overflow: "auto", zIndex: 90 }}>
