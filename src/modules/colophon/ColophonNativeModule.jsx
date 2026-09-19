@@ -304,11 +304,16 @@ function NativeNewsletterPublishBridge({ orgId }) {
         ".bondfire-colophon-native-shell .native-content-editor__permalink code",
       );
       const statusInput = readField("Publication status");
-      setPost({
+      const nextPost = {
         title: String(titleInput?.value || "").trim(),
         slug: String(permalinkInput?.value || permalinkCode?.textContent || "").trim(),
         status: String(statusInput?.value || "draft").trim().toLowerCase(),
-      });
+      };
+      setPost((current) => (
+        current.title === nextPost.title && current.slug === nextPost.slug && current.status === nextPost.status
+          ? current
+          : nextPost
+      ));
     };
 
     const onInput = () => sync();
