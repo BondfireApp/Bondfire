@@ -34,6 +34,9 @@ function Reader({ collection, pageIndex, setPageIndex, onClose, origins }) {
   const page = pages[pageIndex] || null;
   const touchStartX = React.useRef(null);
   const touchStartY = React.useRef(null);
+  const readerRef = React.useRef(null);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [fullscreenSupported, setFullscreenSupported] = React.useState(false);
 
   const goPrev = React.useCallback(
     () => setPageIndex((index) => Math.max(0, index - 1)),
@@ -48,20 +51,69 @@ function Reader({ collection, pageIndex, setPageIndex, onClose, origins }) {
     const priorOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
+    const fullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+    const syncFullscreen = () => setIsFullscreen(fullscreenElement() === readerRef.current);
+    const node = readerRef.current;
+    setFullscreenSupported(Boolean(
+      node?.requestFullscreen ||
+      node?.webkitRequestFullscreen
+    ));
+    syncFullscreen();
+
     const onKey = (event) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        if (fullscreenElement()) return;
+        onClose();
+      }
       if (event.key === "ArrowLeft") goPrev();
       if (event.key === "ArrowRight") goNext();
     };
 
     window.addEventListener("keydown", onKey);
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    document.addEventListener("webkitfullscreenchange", syncFullscreen);
+
     return () => {
       document.body.style.overflow = priorOverflow;
       window.removeEventListener("keydown", onKey);
+      document.removeEventListener("fullscreenchange", syncFullscreen);
+      document.removeEventListener("webkitfullscreenchange", syncFullscreen);
     };
   }, [goNext, goPrev, onClose]);
 
   if (!collection || !pages.length) return null;
+
+  const toggleFullscreen = async () => {
+    const node = readerRef.current;
+    if (!node) return;
+
+    const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+    try {
+      if (activeFullscreen) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else if (node.requestFullscreen) {
+        await node.requestFullscreen();
+      } else if (node.webkitRequestFullscreen) {
+        node.webkitRequestFullscreen();
+      }
+    } catch {
+      // Browser fullscreen can be refused by platform policy; keep the reader open normally.
+    }
+  };
+
+  const closeReader = async () => {
+    const activeFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+    if (activeFullscreen === readerRef.current) {
+      try {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } catch {
+        // Closing the reader still takes priority if exiting fullscreen is refused.
+      }
+    }
+    onClose();
+  };
 
   const start = Math.max(0, pageIndex - 2);
   const end = Math.min(pages.length, pageIndex + 3);
@@ -90,7 +142,7 @@ function Reader({ collection, pageIndex, setPageIndex, onClose, origins }) {
   };
 
   return (
-    <div className="bf-history-reader" role="dialog" aria-modal="true" aria-label={`${collection.title} reader`}>
+    <div ref={readerRef} className="bf-history-reader" role="dialog" aria-modal="true" aria-label={`${collection.title} reader`}>
       <div className="bf-history-reader-bar">
         <div className="bf-history-reader-title">
           <span className="bf-history-reader-kicker">Full reader</span>
@@ -98,9 +150,19 @@ function Reader({ collection, pageIndex, setPageIndex, onClose, origins }) {
           <span>Page {pageIndex + 1} of {pages.length}</span>
         </div>
         <div className="bf-history-reader-top-actions">
-          <button type="button" disabled={pageIndex === 0} onClick={goPrev}>Prev</button>
-          <button type="button" disabled={pageIndex === pages.length - 1} onClick={goNext}>Next</button>
-          <button type="button" className="is-close" onClick={onClose}>Close</button>
+          <button type="button" className="is-nav" disabled={pageIndex === 0} onClick={goPrev}>Prev</button>
+          <button type="button" className="is-nav" disabled={pageIndex === pages.length - 1} onClick={goNext}>Next</button>
+          {fullscreenSupported ? (
+            <button
+              type="button"
+              className="is-fullscreen"
+              onClick={toggleFullscreen}
+              aria-pressed={isFullscreen}
+            >
+              {isFullscreen ? "Exit full screen" : "Full screen"}
+            </button>
+          ) : null}
+          <button type="button" className="is-close" onClick={closeReader}>Close</button>
         </div>
       </div>
 
