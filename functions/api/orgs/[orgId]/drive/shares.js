@@ -103,10 +103,12 @@ export async function onRequest({ env, request, params }) {
     if (detail.restricted && !detail.permission) return bad(403, 'DRIVE_SHARE_ACCESS_DENIED');
 
     const creatorUserId = String(item.created_by || '').trim();
-    const legacyManager = !creatorUserId && ['admin', 'owner'].includes(String(gate.role || ''));
-    const canManage = detail.canManage || (!detail.restricted && (
+    const role = String(gate.role || '');
+    const canWrite = role !== 'viewer';
+    const legacyManager = !creatorUserId && ['admin', 'owner'].includes(role);
+    const canManage = canWrite && (detail.canManage || (!detail.restricted && (
       creatorUserId === String(gate.user.sub) || legacyManager
-    ));
+    )));
     let grants = [];
     if (canManage && detail.policyKind && detail.policyItemId) {
       const version = url.searchParams.get('pending') === '1' && detail.pendingVersion
