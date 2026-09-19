@@ -51,13 +51,13 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
       try {
         const device = await ensureDeviceKeypair();
         const deviceId = await deviceKeyId(device.pubJwk);
-        const [memberData, shareData] = await Promise.all([
-          api(`/api/orgs/${encodeURIComponent(orgId)}/members`),
-          api(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares?kind=${encodeURIComponent(target.kind)}&itemId=${encodeURIComponent(target.id)}&deviceId=${encodeURIComponent(deviceId)}`),
-        ]);
+        const shareData = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares?kind=${encodeURIComponent(target.kind)}&itemId=${encodeURIComponent(target.id)}&deviceId=${encodeURIComponent(deviceId)}`);
+        const memberData = shareData?.canManage
+          ? await api(`/api/orgs/${encodeURIComponent(orgId)}/members`)
+          : { members: [], meUserId: shareData?.meUserId || "" };
         if (!alive) return;
         const nextMembers = Array.isArray(memberData?.members) ? memberData.members : [];
-        const selfId = String(memberData?.meUserId || "");
+        const selfId = String(memberData?.meUserId || shareData?.meUserId || "");
         const next = {};
         if (Array.isArray(shareData?.grants)) {
           for (const grant of shareData.grants) {
@@ -82,7 +82,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
 
   if (!open || !target) return null;
 
-  const canManage = detail?.canManage !== false && (detail?.canManage || !detail?.restricted);
+  const canManage = !!detail?.canManage;
   const selectedCount = Object.keys(permissions).filter((id) => permissions[id]).length;
 
   function setMemberAccess(userId, value) {
