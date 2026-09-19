@@ -173,7 +173,15 @@ formEl.addEventListener('submit', async (event) => {
 });`;
 }
 
-function renderPage(form, token, recipient = null) {
+function publicFormHeaders(nonce) {
+  return {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "private, max-age=0, no-store",
+    "content-security-policy": `default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; script-src 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'`,
+  };
+}
+
+function renderPage(form, token, recipient = null, nonce = "") {
   return `<!doctype html>
 <html>
 <head>
@@ -201,7 +209,7 @@ button{padding:12px 18px;border-radius:12px;border:1px solid #333;background:#17
       </div>
     </form>
   </div>
-<script>
+<script nonce="${htmlEscape(nonce)}">
 const formEl = document.getElementById('bf-public-form');
 const statusEl = document.getElementById('status');
 ${recipient ? encryptedSubmitScript(form, recipient) : legacySubmitScript(form, token)}
@@ -224,8 +232,9 @@ export async function onRequestGet({ env, request, params }) {
   if (projected) {
     const wantsJson = new URL(request.url).searchParams.get("format") === "json" || String(request.headers.get("accept") || "").includes("application/json");
     if (wantsJson) return json({ ok: true, form: projected.form });
-    return new Response(renderPage(projected.form, token, { ...projected.recipient, fileId }), {
-      headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, max-age=0, no-store" },
+    const nonce = crypto.randomUUID().replace(/-/g, "");
+    return new Response(renderPage(projected.form, token, { ...projected.recipient, fileId }, nonce), {
+      headers: publicFormHeaders(nonce),
     });
   }
 
@@ -236,8 +245,9 @@ export async function onRequestGet({ env, request, params }) {
   if (wantsJson) {
     return json({ ok: true, form: { title: legacy.form.title, description: legacy.form.description, fields: legacy.form.fields } });
   }
-  return new Response(renderPage(legacy.form, token), {
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, max-age=0, no-store" },
+  const nonce = crypto.randomUUID().replace(/-/g, "");
+  return new Response(renderPage(legacy.form, token, null, nonce), {
+    headers: publicFormHeaders(nonce),
   });
 }
 
