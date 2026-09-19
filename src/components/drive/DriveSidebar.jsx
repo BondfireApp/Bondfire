@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, File, FileSpreadsheet, FileText, Folder, LayoutTemplate, MoreHorizontal } from "lucide-react";
+import { ChevronDown, ChevronRight, File, FileSpreadsheet, FileText, Folder, LayoutTemplate, MoreHorizontal, Share2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { api } from "../../utils/api.js";
 
@@ -315,6 +315,8 @@ export default function DriveSidebar({
   onDeleteFile,
   onDownloadFile,
   onOpenFileInBrowser,
+  onShareItem,
+  sharedItems = [],
   templates = [],
   onApplyTemplate,
   onNewFromTemplate,
@@ -537,6 +539,7 @@ export default function DriveSidebar({
 
       folderChildren.forEach((folder) => {
         const isCollapsed = !!collapsedFolders[folder.id];
+        const readOnly = folder.sharePermission === "view";
         rows.push(
           <TreeRow
             key={folder.id}
@@ -547,8 +550,8 @@ export default function DriveSidebar({
             expanded={!isCollapsed}
             onToggle={() => setCollapsedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] }))}
             onClick={() => onSelectFolder?.(folder.id)}
-            dragPayload={{ kind: "folder", id: folder.id }}
-            onDropItem={(item) => {
+            dragPayload={readOnly ? null : { kind: "folder", id: folder.id }}
+            onDropItem={readOnly ? undefined : (item) => {
               if (item.kind === "folder" && item.id === folder.id) return;
               setCollapsedFolders((prev) => ({ ...prev, [folder.id]: false }));
               moveDroppedItem(item, folder.id);
@@ -556,15 +559,17 @@ export default function DriveSidebar({
             menuItems={[
               { label: "Open", onClick: () => onSelectFolder?.(folder.id) },
               { label: isCollapsed ? "Expand" : "Collapse", onClick: () => setCollapsedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] })) },
-              { label: "Rename", onClick: () => onRenameFolder?.(folder.id) },
-              { label: "Delete folder and contents", danger: true, onClick: () => onDeleteFolder?.(folder.id) },
-            ]}
+              !readOnly ? { label: "Rename", onClick: () => onRenameFolder?.(folder.id) } : null,
+              { label: "Share", onClick: () => onShareItem?.({ kind: "drive/folders", id: folder.id, label: folder.name || "Folder" }) },
+              !readOnly ? { label: "Delete folder and contents", danger: true, onClick: () => onDeleteFolder?.(folder.id) } : null,
+            ].filter(Boolean)}
           />,
         );
         if (!isCollapsed) rows.push(...renderBranch(folder.id, depth + 1));
       });
 
       noteChildren.forEach((note) => {
+        const readOnly = note.sharePermission === "view";
         rows.push(
           <TreeRow
             key={note.id}
@@ -572,19 +577,21 @@ export default function DriveSidebar({
             active={selectedKind === "note" && selectedId === note.id}
             icon={<FileText size={15} />}
             label={note.title || "untitled"}
-            dragPayload={{ kind: "note", id: note.id }}
+            dragPayload={readOnly ? null : { kind: "note", id: note.id }}
             onClick={() => onSelectNote?.(note.id)}
             menuItems={[
               { label: "Open", onClick: () => onSelectNote?.(note.id) },
-              { label: "Rename", onClick: () => onRenameNote?.(note.id) },
-              { label: "Move", onClick: () => onMoveNote?.(note.id) },
-              { label: "Delete", danger: true, onClick: () => onDeleteNote?.(note.id) },
-            ]}
+              !readOnly ? { label: "Rename", onClick: () => onRenameNote?.(note.id) } : null,
+              !readOnly ? { label: "Move", onClick: () => onMoveNote?.(note.id) } : null,
+              { label: "Share", onClick: () => onShareItem?.({ kind: "drive/notes", id: note.id, label: note.title || "Untitled note" }) },
+              !readOnly ? { label: "Delete", danger: true, onClick: () => onDeleteNote?.(note.id) } : null,
+            ].filter(Boolean)}
           />,
         );
       });
 
       fileChildren.forEach((file) => {
+        const readOnly = file.sharePermission === "view";
         rows.push(
           <TreeRow
             key={file.id}
@@ -592,16 +599,17 @@ export default function DriveSidebar({
             active={selectedKind === "file" && selectedId === file.id}
             icon={String(file.mime || "").includes("bondfire.sheet") || /\.bfsheet$/i.test(String(file.name || "")) ? <FileSpreadsheet size={15} /> : <File size={15} />}
             label={file.name}
-            dragPayload={{ kind: "file", id: file.id }}
+            dragPayload={readOnly ? null : { kind: "file", id: file.id }}
             onClick={() => onSelectFile?.(file)}
             menuItems={[
               { label: "Open", onClick: () => onSelectFile?.(file) },
               { label: "Open in browser", onClick: () => onOpenFileInBrowser?.(file) },
               { label: "Download", onClick: () => onDownloadFile?.(file) },
-              { label: "Rename", onClick: () => onRenameFile?.(file.id) },
-              { label: "Move", onClick: () => onMoveFile?.(file.id) },
-              { label: "Delete", danger: true, onClick: () => onDeleteFile?.(file.id) },
-            ]}
+              !readOnly ? { label: "Rename", onClick: () => onRenameFile?.(file.id) } : null,
+              !readOnly ? { label: "Move", onClick: () => onMoveFile?.(file.id) } : null,
+              { label: "Share", onClick: () => onShareItem?.({ kind: "drive/files", id: file.id, label: file.name || "File" }) },
+              !readOnly ? { label: "Delete", danger: true, onClick: () => onDeleteFile?.(file.id) } : null,
+            ].filter(Boolean)}
           />,
         );
       });
@@ -610,7 +618,33 @@ export default function DriveSidebar({
     }
 
     return renderBranch();
-  }, [folders, notes, files, currentFolder, selectedId, selectedKind, search, collapsedFolders, onSelectFolder, onSelectNote, onSelectFile, onRenameFolder, onMoveFolder, onDeleteFolder, onRenameNote, onMoveNote, onDeleteNote, onRenameFile, onMoveFile, onDeleteFile, onDownloadFile, onOpenFileInBrowser]);
+  }, [folders, notes, files, currentFolder, selectedId, selectedKind, search, collapsedFolders, onSelectFolder, onSelectNote, onSelectFile, onRenameFolder, onMoveFolder, onDeleteFolder, onRenameNote, onMoveNote, onDeleteNote, onRenameFile, onMoveFile, onDeleteFile, onDownloadFile, onOpenFileInBrowser, onShareItem]);
+
+  const sharedRows = useMemo(() => {
+    const q = String(search || "").trim().toLowerCase();
+    return (sharedItems || []).map((shared) => {
+      const kind = String(shared?.kind || "");
+      const id = String(shared?.itemId || shared?.id || "");
+      let item = null;
+      if (kind === "drive/folders") item = folders.find((row) => row.id === id);
+      if (kind === "drive/notes") item = notes.find((row) => row.id === id);
+      if (kind === "drive/files") item = files.find((row) => row.id === id);
+      if (!item) return null;
+      const label = kind === "drive/folders" ? item.name : kind === "drive/notes" ? item.title : item.name;
+      if (q && !String(label || "").toLowerCase().includes(q)) return null;
+      const icon = kind === "drive/folders" ? <Folder size={15} /> : kind === "drive/notes" ? <FileText size={15} /> : <File size={15} />;
+      const onClick = kind === "drive/folders" ? () => onSelectFolder?.(id) : kind === "drive/notes" ? () => onSelectNote?.(id) : () => onSelectFile?.(item);
+      return (
+        <TreeRow
+          key={`shared-${kind}-${id}`}
+          icon={icon}
+          label={label || "Untitled"}
+          hint={shared?.permission === "edit" ? "can edit" : "view only"}
+          onClick={onClick}
+        />
+      );
+    }).filter(Boolean);
+  }, [sharedItems, folders, notes, files, search, onSelectFolder, onSelectNote, onSelectFile]);
 
   return (
     <>
@@ -618,6 +652,7 @@ export default function DriveSidebar({
         <div className="bf-drive-sidebarRail">
           <button className={activePane === "explorer" ? "bf-drive-railButton is-active" : "bf-drive-railButton"} type="button" title="Explorer" aria-label="Explorer" onClick={() => setActivePane("explorer")}><Folder size={16} /></button>
           <button className={activePane === "templates" ? "bf-drive-railButton is-active" : "bf-drive-railButton"} type="button" title="Templates" aria-label="Templates" onClick={() => setActivePane("templates")}><LayoutTemplate size={16} /></button>
+          <button className={activePane === "shared" ? "bf-drive-railButton is-active" : "bf-drive-railButton"} type="button" title="Shared with me" aria-label="Shared with me" onClick={() => setActivePane("shared")}><Share2 size={16} /></button>
         </div>
 
         <div
@@ -642,7 +677,7 @@ export default function DriveSidebar({
                 ]}
               />
             ) : null}
-            <input className="input bf-drive-searchInput" placeholder={activePane === "explorer" ? "Search Drive" : "Search templates"} value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="input bf-drive-searchInput" placeholder={activePane === "explorer" ? "Search Drive" : activePane === "templates" ? "Search templates" : "Search shared items"} value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
 
           {activePane === "explorer" ? (
@@ -664,7 +699,7 @@ export default function DriveSidebar({
                 {rootItems.length ? rootItems : <div className="helper" style={{ padding: "8px 4px" }}>Nothing here.</div>}
               </div>
             </>
-          ) : (
+          ) : activePane === "templates" ? (
             <>
               <input
                 ref={templateImportRef}
@@ -715,6 +750,15 @@ export default function DriveSidebar({
                 {!templateItems.length ? <div className="helper" style={{ padding: "8px 4px" }}>No templates yet. Create one here or save a note as a template.</div> : null}
               </div>
             </>
+          ) : (
+            <>
+              <div className="bf-drive-sectionHead">
+                <div className="bf-drive-sectionLabel">Shared with me</div>
+              </div>
+              <div className="bf-drive-tree">
+                {sharedRows.length ? sharedRows : <div className="helper" style={{ padding: "8px 4px" }}>Nothing has been shared directly with you yet.</div>}
+              </div>
+            </>
           )}
           <ContextMenu
             point={blankContextPoint}
@@ -731,7 +775,9 @@ export default function DriveSidebar({
                   },
                   { label: "New note", onClick: onNewNote },
                 ]
-              : [
+              : activePane === "shared"
+                ? []
+                : [
                   { label: "New note", onClick: onNewNote },
                   { label: "New folder", onClick: onNewFolder },
                   { label: "New sheet", onClick: onNewSpreadsheet },
