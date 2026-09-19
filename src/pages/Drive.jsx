@@ -429,7 +429,7 @@ export default function Drive() {
     if (!window.confirm(`Delete "${folder.name}" and everything inside it? This cannot be undone.`)) return;
     setDriveNotice("");
     try {
-      await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await request(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, { method: "DELETE" });
       const descendants = new Set([id]);
       let changed = true;
       while (changed) {
@@ -470,6 +470,33 @@ export default function Drive() {
   async function createNote() {
     await createNoteWithPayload({ title: "untitled", body: "", parentId: currentFolder, tags: [] });
   }
+  async function apiWithTimeout(label, path, options = {}, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await api(path, { ...options, signal: options.signal || controller.signal });
+    } catch (error) {
+      if (controller.signal.aborted && !options.signal) throw new Error(`${label} timed out. Try again.`);
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async function withDeadline(label, task, timeoutMs = 15000) {
+    let timer = null;
+    try {
+      return await Promise.race([
+        Promise.resolve().then(task),
+        new Promise((_, reject) => {
+          timer = window.setTimeout(() => reject(new Error(`${label} timed out. Try again.`)), timeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timer) window.clearTimeout(timer);
+    }
+  }
+
   async function syncPublicFormProjection(fileId, rawContent) {
     const parsed = safeJsonParse(rawContent, null);
     if (!parsed || parsed.type !== "bondfire-form") return;
@@ -477,7 +504,7 @@ export default function Drive() {
     if (publicShare.enabled && (!publicShare.token || !publicShare.recipientPublicKey || !publicShare.recipientPrivateKey)) {
       throw new Error("Public form encryption is still initializing. Wait for Saved before opening the public link.");
     }
-    await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/forms-public`, {
+    await apiWithTimeout("Public form sync", `/api/orgs/${encodeURIComponent(orgId)}/drive/forms-public`, {
       method: "POST",
       body: JSON.stringify({
         fileId,
@@ -494,6 +521,20 @@ export default function Drive() {
         },
       }),
     });
+  }
+
+  async function verifyPublicFormProjection(fileId, rawContent) {
+    const parsed = safeJsonParse(rawContent, null);
+    const publicShare = parsed?.publicShare && typeof parsed.publicShare === "object" ? parsed.publicShare : {};
+    if (!parsed || parsed.type !== "bondfire-form" || !publicShare.enabled) return true;
+    if (!publicShare.token) throw new Error("Public form token is missing.");
+    await apiWithTimeout(
+      "Public form check",
+      `/api/public/forms/${encodeURIComponent(fileId)}?token=${encodeURIComponent(String(publicShare.token))}&format=json`,
+      {},
+      10000,
+    );
+    return true;
   }
 
   async function createFileWithPayload(payload) {
@@ -611,7 +652,7 @@ export default function Drive() {
     }
   }
   async function deleteFile(id) {
-    await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await request(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, { method: "DELETE" });
     setFiles((prev) => prev.filter((f) => f.id !== id));
     if (selectedId === id && selectedKind === "file") {
       setSelectedId(null);
@@ -810,7 +851,7 @@ export default function Drive() {
     }
   }
 
-  async function flushSaveBeforePublicUse() {
+  async function flushPendingDriveSave() {
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
       saveTimer.current = null;
@@ -824,19 +865,24 @@ export default function Drive() {
         return false;
       }
     }
-    if (status === "saved") {
-      if (selectedKind === "file" && selectedFileSubtype === "form" && selectedId) {
-        try {
-          await syncPublicFormProjection(selectedId, content);
-          return true;
-        } catch (error) {
-          setDriveNotice(`Public form sync failed: ${String(error?.message || error || "unknown error")}`);
-          return false;
-        }
-      }
-      return true;
-    }
+    if (status === "saved") return true;
     return saveNow();
+  }
+
+  async function flushSaveBeforePublicUse() {
+    const saved = await flushPendingDriveSave();
+    if (!saved) return false;
+    if (selectedKind === "file" && selectedFileSubtype === "form" && selectedId) {
+      try {
+        await syncPublicFormProjection(selectedId, content);
+        await verifyPublicFormProjection(selectedId, content);
+        return true;
+      } catch (error) {
+        setDriveNotice(`Public form sync failed: ${String(error?.message || error || "unknown error")}`);
+        return false;
+      }
+    }
+    return true;
   }
 
   useEffect(() => {
@@ -1150,15 +1196,15 @@ export default function Drive() {
     setTemplates((prev) => prev.filter((tpl) => tpl.id !== id));
   }
 
-  async function fetchDriveRecord(kind, id) {
+  async function fetchDriveRecord(kind, id, request = api) {
     const segment = kind === "drive/folders" ? "folders" : kind === "drive/notes" ? "notes" : kind === "drive/files" ? "files" : "";
     if (!segment) throw new Error("Unsupported Drive share target.");
-    const data = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/${segment}/${encodeURIComponent(id)}`);
+    const data = await request(`/api/orgs/${encodeURIComponent(orgId)}/drive/${segment}/${encodeURIComponent(id)}`);
     return kind === "drive/folders" ? data?.folder : kind === "drive/notes" ? data?.note : data?.file;
   }
 
-  async function resealDriveRecord(kind, id) {
-    const row = await fetchDriveRecord(kind, id);
+  async function resealDriveRecord(kind, id, request = api) {
+    const row = await fetchDriveRecord(kind, id, request);
     if (!row) throw new Error("A Drive item disappeared while its access was being updated.");
     const parentId = row.parentId || null;
     if (kind === "drive/folders") {
@@ -1169,7 +1215,7 @@ export default function Drive() {
       return;
     }
     if (kind === "drive/notes") {
-      await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/notes/${encodeURIComponent(id)}`, {
+      await request(`/api/orgs/${encodeURIComponent(orgId)}/drive/notes/${encodeURIComponent(id)}`, {
         method: "PATCH",
         body: JSON.stringify({ title: row.title || "untitled", body: row.body || "", tags: Array.isArray(row.tags) ? row.tags : [], parentId }),
       });
@@ -1220,15 +1266,33 @@ export default function Drive() {
     return targets;
   }
 
-  async function applyDriveShare({ target, members, meUserId, grants }) {
+  async function applyDriveShare({ target, members, meUserId, grants, onProgress }) {
     if (!target?.id || !target?.kind) throw new Error("Choose a Drive item to share.");
+
+    const selectedTargetKind = selectedKind === "note" ? "drive/notes" : selectedKind === "file" ? "drive/files" : "";
+    if (selectedId === target.id && selectedTargetKind === target.kind) {
+      onProgress?.("Finishing current save…");
+      const saved = await flushPendingDriveSave();
+      if (!saved) throw new Error("The current Drive item could not finish saving. Resolve the save error before changing access.");
+    }
+
+    const request = (label, timeoutMs = 15000) => (path, options = {}) => apiWithTimeout(label, path, options, timeoutMs);
+
     let resumeKey = null;
+    onProgress?.("Checking encrypted access…");
     try {
-      const pending = await resolveDriveShareKey(orgId, target.kind, target.id, api, { preferPending: true });
+      const pending = await resolveDriveShareKey(
+        orgId,
+        target.kind,
+        target.id,
+        request("Checking encrypted access", 10000),
+        { preferPending: true },
+      );
       if (pending?.pendingVersion && pending?.key) resumeKey = pending.key;
     } catch {}
 
-    const prepared = await buildDriveSharePreparation({
+    onProgress?.("Preparing encryption keys…");
+    const prepared = await withDeadline("Preparing encryption keys", () => buildDriveSharePreparation({
       orgId,
       kind: target.kind,
       itemId: target.id,
@@ -1236,9 +1300,10 @@ export default function Drive() {
       meUserId,
       grants,
       itemKey: resumeKey,
-    });
+    }), 15000);
 
-    const stage = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares`, {
+    onProgress?.("Staging access change…");
+    const stage = await apiWithTimeout("Staging Drive sharing", `/api/orgs/${encodeURIComponent(orgId)}/drive/shares`, {
       method: "POST",
       body: JSON.stringify({
         action: "prepare",
@@ -1247,7 +1312,7 @@ export default function Drive() {
         grants: prepared.grants,
         wraps: prepared.wraps,
       }),
-    });
+    }, 15000);
     const version = Number(stage?.version || 0);
     if (!version) throw new Error("The sharing key rotation was not prepared.");
     cacheDriveShareKey(orgId, target.kind, target.id, version, prepared.itemKey);
@@ -1255,14 +1320,23 @@ export default function Drive() {
     const targets = shareTargetsFor(target);
     setDriveNotice(`Updating encrypted access for ${targets.length} Drive item${targets.length === 1 ? "" : "s"}…`);
     try {
-      for (const item of targets) await resealDriveRecord(item.kind, item.id);
-      await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares`, {
+      for (let index = 0; index < targets.length; index += 1) {
+        const item = targets[index];
+        onProgress?.(`Encrypting item ${index + 1} of ${targets.length}…`);
+        await resealDriveRecord(item.kind, item.id, request("Encrypting shared Drive item", 20000));
+      }
+      onProgress?.("Finalizing access…");
+      await apiWithTimeout("Finalizing Drive sharing", `/api/orgs/${encodeURIComponent(orgId)}/drive/shares`, {
         method: "POST",
         body: JSON.stringify({ action: "finalize", kind: target.kind, itemId: target.id }),
-      });
-      await loadDrive({ preserveSelection: true });
-      await loadSharedItems();
+      }, 15000);
       setDriveNotice(`Sharing updated for "${target.label || "Drive item"}".`);
+      Promise.resolve().then(async () => {
+        await Promise.allSettled([
+          loadDrive({ preserveSelection: true }),
+          loadSharedItems(),
+        ]);
+      });
     } catch (error) {
       setDriveNotice("Sharing update is incomplete. Retry the same sharing change to resume safely; the pending item key has been preserved.");
       throw error;
