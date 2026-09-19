@@ -22,6 +22,16 @@ async function ensureSubscriberTable(db) {
     )
   `).run();
 
+  const info = await db.prepare("PRAGMA table_info(newsletter_subscribers)").all();
+  const columns = new Set((info?.results || []).map((row) => String(row.name || "").toLowerCase()));
+  if (!columns.has("source")) {
+    try {
+      await db.prepare("ALTER TABLE newsletter_subscribers ADD COLUMN source TEXT NULL").run();
+    } catch {
+      // Another request may have added it first.
+    }
+  }
+
   await db.prepare(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_subscribers_org_email
     ON newsletter_subscribers(org_id, email)
