@@ -51,6 +51,38 @@ function safeMailto(s) {
   return encodeURIComponent(String(s || ""));
 }
 
+function riseupListName(address) {
+  const value = String(address || "").trim().toLowerCase();
+  const match = value.match(/^([^@\s]+)@lists\.riseup\.net$/i);
+  return match ? match[1] : "";
+}
+
+function riseupListInfoUrl(address) {
+  const name = riseupListName(address);
+  return name ? `https://lists.riseup.net/www/info/${encodeURIComponent(name)}` : "";
+}
+
+function defaultNewsletterBody(blurb, orgName) {
+  return [
+    String(blurb || "").trim(),
+    "Hello,",
+    "",
+    "Here is the latest update.",
+    "",
+    "News",
+    "• ",
+    "",
+    "Upcoming",
+    "• ",
+    "",
+    "Solidarity",
+    "• ",
+    "",
+    `In solidarity,`,
+    String(orgName || "").trim(),
+  ].filter((line, index, all) => !(line === "" && index > 0 && all[index - 1] === "")).join("\n");
+}
+
 function profileText(value) {
   const text = String(value || "").trim();
   if (!text || ["__encrypted__", "_encrypted_", "encrypted"].includes(text.toLowerCase())) return "";
