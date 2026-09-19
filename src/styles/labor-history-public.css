@@ -333,23 +333,56 @@
   overflow: auto;
   background: #050505;
   overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .bf-history-reader-page {
-  display: flex;
   min-height: 100%;
-  align-items: flex-start;
-  justify-content: center;
   padding: 4px;
 }
 
-.bf-history-reader-page img {
+.bf-history-reader-page-inner {
+  margin: 0 auto;
+  cursor: zoom-in;
+}
+
+.bf-history-reader-page-inner img {
   display: block;
   width: 100%;
-  max-width: 1400px;
+  max-width: none;
   height: auto;
   background: #fff;
   box-shadow: 0 18px 55px rgba(0,0,0,.52);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.bf-history-reader-zoom-controls {
+  position: sticky;
+  top: 10px;
+  z-index: 8;
+  display: flex;
+  width: max-content;
+  margin: 10px 10px -50px auto;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 14px;
+  background: rgba(0,0,0,.72);
+  box-shadow: 0 10px 28px rgba(0,0,0,.28);
+  backdrop-filter: blur(10px);
+}
+
+.bf-history-reader-zoom-controls button {
+  min-width: 38px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+.bf-history-reader-zoom-controls .is-zoom-level {
+  min-width: 58px;
+  font-variant-numeric: tabular-nums;
 }
 
 .bf-history-reader-hit {
@@ -488,6 +521,21 @@
 
   .bf-history-reader-page {
     padding: 1px;
+  }
+
+  .bf-history-reader-zoom-controls {
+    top: 6px;
+    margin: 6px 6px -46px auto;
+  }
+
+  .bf-history-reader-zoom-controls button {
+    min-width: 36px;
+    min-height: 34px;
+    padding: 5px 8px;
+  }
+
+  .bf-history-reader-zoom-controls .is-zoom-level {
+    min-width: 54px;
   }
 
   .bf-history-reader-hit {
