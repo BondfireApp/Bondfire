@@ -178,7 +178,7 @@ export async function onRequest({ env, request, params }) {
   if (grants.some((grant) => !wraps.some((wrap) => wrap.userId === grant.userId))) return bad(400, 'DRIVE_SHARE_RECIPIENT_KEY_REQUIRED');
 
   const current = existing || { active_version: 0, pending_version: 0 };
-  const nextVersion = Math.max(Number(current.active_version || 0), Number(current.pending_version || 0)) + 1;
+  const nextVersion = Number(current.pending_version || 0) || (Number(current.active_version || 0) + 1);
   const now = Date.now();
 
   await db.batch([
