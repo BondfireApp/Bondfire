@@ -61,6 +61,7 @@ assert.match(sidebar, /Shared with me/, "Drive must expose a Shared with me surf
 assert.match(sidebar, /sharePermission === "view"/, "Drive explorer must recognize view-only shared items");
 assert.match(modal, /Can view/, "Drive sharing must offer view permission");
 assert.match(modal, /Can edit/, "Drive sharing must offer edit permission");
+assert.match(modal, /disabled=\{String\(member\?\.role \|\| ""\) === "viewer"\}/, "Organization viewers must not be offered an effective edit grant");
 assert.match(modal, /Copying the link does not grant access by itself/, "Drive links must remain permission-bound");
 assert.match(modal, /Needs to sign in on a device/, "Recipients without encryption keys must be explained instead of silently failing");
 
@@ -84,6 +85,7 @@ assert.doesNotMatch(shareStore, /plaintext|text_content|body TEXT/i, "Drive shar
 
 assert.match(shares, /PRIVATE_MODE_REQUIRED/, "Encrypted sharing must require private mode");
 assert.match(shares, /DRIVE_SHARE_RECIPIENT_KEY_REQUIRED/, "Every selected recipient must have a wrapped item key");
+assert.match(shares, /grant\.permission === ['"]edit['"] && memberRoles\.get\(grant\.userId\) === ['"]viewer['"]/, "Drive edit grants must not exceed the recipient organization role");
 assert.match(shares, /detail\.restricted && !detail\.permission/, "Restricted Drive shares must not grant implicit administrator access");
 assert.match(shares, /ownerUserId && ownerUserId !== String\(gate\.user\.sub\)/, "Restricted Drive share changes must remain controlled by the cryptographic share owner");
 assert.match(shares, /DRIVE_SHARE_LEGACY_MANAGER_REQUIRED/, "Creatorless legacy Drive items must not be claimable by ordinary members");
