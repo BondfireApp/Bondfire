@@ -1,6 +1,7 @@
 import React from "react";
 import LaborHistoryArchive from "../components/LaborHistoryArchive.jsx";
 import { usePublicDocumentBrand } from "../lib/publicDocumentBrand.js";
+import { sealSubmission } from "../../shared/privateSubmission.js";
 import "../styles/organizing-public.css";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
@@ -23,6 +24,33 @@ function safeAction(raw) {
   return `https://${value}`;
 }
 
+function actionSpec(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return { kind: "none", url: "" };
+  const lowered = value.toLowerCase();
+  if (lowered === "newsletter") return { kind: "anchor", url: "#newsletter" };
+  if (value.startsWith("#")) return { kind: "anchor", url: value };
+  if (lowered.startsWith("modal:")) {
+    return { kind: "modal", modal: lowered.slice(6).trim(), url: value };
+  }
+  return { kind: "external", url: safeAction(value) };
+}
+
+async function postJson(path, body) {
+  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) throw new Error(data?.error || data?.message || `HTTP ${response.status}`);
+  return data;
+}
+
 function scrollToSection(id) {
   const target = document.getElementById(String(id || "").replace(/^#/, ""));
   target?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -40,26 +68,47 @@ function SectionButton({ id, children, className = "" }) {
   return <button type="button" className={className} onClick={() => scrollToSection(id)}>{children}</button>;
 }
 
-function Actions({ items = [] }) {
+function Actions({ items = [], onAction }) {
   const clean = (Array.isArray(items) ? items : []).filter((item) => item?.label && item?.url).slice(0, 6);
   if (!clean.length) return null;
   return (
     <div className="bf-organizing-actions">
       {clean.map((item, index) => {
-        const href = safeAction(item.url);
-        if (href.startsWith("#")) {
+        const spec = actionSpec(item.url);
+        const className = `bf-organizing-button${index === 0 ? " primary" : ""}`;
+
+        if (spec.kind === "modal") {
           return (
-            <SectionButton key={`${item.label}-${index}`} id={href} className={`bf-organizing-button${index === 0 ? " primary" : ""}`}>
+            <button
+              key={`${item.label}-${index}`}
+              type="button"
+              className={className}
+              onClick={() => onAction?.(spec, item)}
+            >
               {item.label}
-            </SectionButton>
+            </button>
           );
         }
-        const external = /^https?:\/\//i.test(href);
+
+        if (spec.kind === "anchor") {
+          return (
+            <button
+              key={`${item.label}-${index}`}
+              type="button"
+              className={className}
+              onClick={() => onAction?.(spec, item)}
+            >
+              {item.label}
+            </button>
+          );
+        }
+
+        const external = /^https?:\/\//i.test(spec.url);
         return (
           <a
             key={`${item.label}-${index}`}
-            className={`bf-organizing-button${index === 0 ? " primary" : ""}`}
-            href={href}
+            className={className}
+            href={spec.url}
             target={external ? "_blank" : undefined}
             rel={external ? "noopener noreferrer" : undefined}
           >
@@ -89,6 +138,13 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
     : { loading: true, error: "", data: null });
   const [meetings, setMeetings] = React.useState([]);
   const [historyManifest, setHistoryManifest] = React.useState(null);
+  const [activeModal, setActiveModal] = React.useState(null);
+  const [intakeName, setIntakeName] = React.useState("");
+  const [intakeContact, setIntakeContact] = React.useState("");
+  const [intakeDetails, setIntakeDetails] = React.useState("");
+  const [intakeExtra, setIntakeExtra] = React.useState("");
+  const [intakeMessage, setIntakeMessage] = React.useState("");
+  const [intakeBusy, setIntakeBusy] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
@@ -140,6 +196,96 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
   const purposeItems = Array.isArray(pub.site_purpose_items) ? pub.site_purpose_items : [];
   const eventItems = Array.isArray(pub.events_items) ? pub.events_items : [];
 
+  const openIntake = (kind) => {
+    const normalized = String(kind || "").trim().toLowerCase();
+    if (!["get_help", "volunteer", "offer_resources"].includes(normalized)) return;
+    setActiveModal(normalized);
+    setIntakeName("");
+    setIntakeContact("");
+    setIntakeDetails("");
+    setIntakeExtra("");
+    setIntakeMessage("");
+  };
+
+  const closeIntake = () => {
+    if (intakeBusy) return;
+    setActiveModal(null);
+    setIntakeMessage("");
+  };
+
+  const handleAction = (spec) => {
+    if (spec?.kind === "modal") {
+      openIntake(spec.modal);
+      return;
+    }
+    if (spec?.kind === "anchor") {
+      scrollToSection(spec.url);
+    }
+  };
+
+  const submitIntake = async (event) => {
+    event?.preventDefault();
+    if (!activeModal || intakeBusy) return;
+
+    if (!String(intakeName || "").trim() || !String(intakeContact || "").trim()) {
+      setIntakeMessage("Name and contact are required.");
+      return;
+    }
+
+    setIntakeBusy(true);
+    setIntakeMessage("");
+    try {
+      const clearBody = {
+        kind: activeModal,
+        name: String(intakeName || "").trim(),
+        contact: String(intakeContact || "").trim(),
+        details: String(intakeDetails || "").trim(),
+        extra: String(intakeExtra || "").trim(),
+      };
+
+      let body = clearBody;
+      if (state.data?.private_mode) {
+        const recipient = await fetchJson(`/api/public/${encodeURIComponent(publicSlug)}/submission-key`);
+        body = await sealSubmission(recipient, "intake", clearBody);
+      }
+
+      await postJson(`/api/p/${encodeURIComponent(publicSlug)}/intake`, body);
+      setIntakeMessage("Sent. The branch can review it in the member workspace.");
+      setTimeout(() => {
+        setActiveModal(null);
+        setIntakeMessage("");
+      }, 1100);
+    } catch (error) {
+      setIntakeMessage(error?.message || "Unable to send the form.");
+    } finally {
+      setIntakeBusy(false);
+    }
+  };
+
+  const modalCopy = activeModal === "get_help"
+    ? {
+        title: "Request Assistance",
+        intro: "Tell Red Harbor what you need and how to reach you.",
+        details: "What assistance do you need?",
+        extra: "Urgency, timing, or anything else we should know",
+        submit: "Send Request",
+      }
+    : activeModal === "volunteer"
+      ? {
+          title: "Volunteer",
+          intro: "Tell Red Harbor how you would like to help.",
+          details: "Skills, interests, or what you want to help with",
+          extra: "Availability or scheduling notes",
+          submit: "Send Volunteer Info",
+        }
+      : {
+          title: "Offer Resources",
+          intro: "Tell Red Harbor what you can offer and how to reach you.",
+          details: "What resources can you offer?",
+          extra: "Quantity, timing, pickup details, or other notes",
+          submit: "Send Offer",
+        };
+
   const sections = {
     hero: (
       <section key="hero" className="bf-organizing-hero">
@@ -147,7 +293,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
           <SectionLabel>{pub.branch_label || pub.location || "Organization"}</SectionLabel>
           <h1>{headline}</h1>
           {lede ? <p className="bf-organizing-lede">{lede}</p> : null}
-          <Actions items={pub.primary_actions} />
+          <Actions items={pub.primary_actions} onAction={handleAction} />
         </div>
         <aside className="bf-organizing-card">
           {pub.hero_image_url ? <img className="bf-organizing-hero-image" src={pub.hero_image_url} alt="" /> : null}
@@ -172,7 +318,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
         <SectionLabel>Get involved</SectionLabel>
         <h2>{pub.join_title || "Organize with us"}</h2>
         {pub.join_intro ? <p className="bf-organizing-section-copy">{pub.join_intro}</p> : null}
-        <Actions items={pub.get_involved_links} />
+        <Actions items={pub.get_involved_links} onAction={handleAction} />
       </section>
     ),
     membership: (
@@ -230,7 +376,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
         <h2>{pub.contact_title || "Get in touch"}</h2>
         {pub.contact_intro ? <p className="bf-organizing-section-copy">{pub.contact_intro}</p> : null}
         <div className="bf-organizing-grid-2">
-          {(pub.contact_card_title || pub.contact_card_body) ? <article className="bf-organizing-card"><h3>{pub.contact_card_title || "Contact"}</h3><p>{pub.contact_card_body}</p><Actions items={pub.get_involved_links} /></article> : null}
+          {(pub.contact_card_title || pub.contact_card_body) ? <article className="bf-organizing-card"><h3>{pub.contact_card_title || "Contact"}</h3><p>{pub.contact_card_body}</p><Actions items={pub.get_involved_links} onAction={handleAction} /></article> : null}
           <article className="bf-organizing-card"><h3>{pub.member_access_title || "Member access"}</h3><p>{pub.member_access_body || "Members can sign in to the private Organization Workspace."}</p><a className="bf-organizing-button" href={memberHref}>Member Sign In</a></article>
         </div>
       </section>
@@ -264,6 +410,49 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
         <div>{title}</div>
         <div>{pub.location || ""}</div>
       </footer>
+
+      {activeModal ? (
+        <div className="bf-organizing-modal-wrap" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeIntake();
+        }}>
+          <div className="bf-organizing-modal" role="dialog" aria-modal="true" aria-labelledby="bf-organizing-intake-title">
+            <div className="bf-organizing-modal-head">
+              <div>
+                <div className="bf-organizing-kicker">RED HARBOR IWW</div>
+                <h2 id="bf-organizing-intake-title">{modalCopy.title}</h2>
+                <p>{modalCopy.intro}</p>
+              </div>
+              <button type="button" className="bf-organizing-modal-close" onClick={closeIntake} disabled={intakeBusy} aria-label="Close form">×</button>
+            </div>
+
+            <form className="bf-organizing-form" onSubmit={submitIntake}>
+              <label>
+                <span>Your name</span>
+                <input value={intakeName} onChange={(event) => setIntakeName(event.target.value)} autoComplete="name" required />
+              </label>
+              <label>
+                <span>Email, phone, or other contact</span>
+                <input value={intakeContact} onChange={(event) => setIntakeContact(event.target.value)} required />
+              </label>
+              <label>
+                <span>{modalCopy.details}</span>
+                <textarea rows={5} value={intakeDetails} onChange={(event) => setIntakeDetails(event.target.value)} required />
+              </label>
+              <label>
+                <span>{modalCopy.extra}</span>
+                <textarea rows={3} value={intakeExtra} onChange={(event) => setIntakeExtra(event.target.value)} />
+              </label>
+              <div className="bf-organizing-modal-actions">
+                <button type="submit" className="bf-organizing-button primary" disabled={intakeBusy}>
+                  {intakeBusy ? "Sending…" : modalCopy.submit}
+                </button>
+                <button type="button" className="bf-organizing-button" onClick={closeIntake} disabled={intakeBusy}>Cancel</button>
+              </div>
+              {intakeMessage ? <div className="bf-organizing-form-message" role="status">{intakeMessage}</div> : null}
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
