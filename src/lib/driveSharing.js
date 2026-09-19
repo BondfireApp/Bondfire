@@ -56,8 +56,8 @@ export async function resolveDriveShareKey(orgId, kind, itemId, transport, {
   return { ...detail, version, key };
 }
 
-export async function buildDriveSharePreparation({ orgId, kind, itemId, members, meUserId, grants }) {
-  const itemKey = randomOrgKey();
+export async function buildDriveSharePreparation({ orgId, kind, itemId, members, meUserId, grants, itemKey: existingItemKey = null }) {
+  const itemKey = existingItemKey || randomOrgKey();
   const localDevice = await ensureDeviceKeypair();
   const localDeviceId = await deviceKeyId(localDevice.pubJwk);
   const normalizedGrants = [];
