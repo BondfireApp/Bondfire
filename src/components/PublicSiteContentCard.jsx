@@ -2,7 +2,7 @@ import * as React from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../utils/api.js";
 
-const SECTION_KEYS = ["hero", "archive", "about", "join", "membership", "events", "contact"];
+const SECTION_KEYS = ["hero", "archive", "about", "join", "membership", "events", "newsletter", "contact"];
 const IMAGE_LIMIT = 450_000;
 
 function lines(value) {
