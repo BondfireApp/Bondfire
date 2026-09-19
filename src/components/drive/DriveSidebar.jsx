@@ -539,6 +539,7 @@ export default function DriveSidebar({
 
       folderChildren.forEach((folder) => {
         const isCollapsed = !!collapsedFolders[folder.id];
+        const readOnly = folder.sharePermission === "view";
         rows.push(
           <TreeRow
             key={folder.id}
@@ -549,8 +550,8 @@ export default function DriveSidebar({
             expanded={!isCollapsed}
             onToggle={() => setCollapsedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] }))}
             onClick={() => onSelectFolder?.(folder.id)}
-            dragPayload={{ kind: "folder", id: folder.id }}
-            onDropItem={(item) => {
+            dragPayload={readOnly ? null : { kind: "folder", id: folder.id }}
+            onDropItem={readOnly ? undefined : (item) => {
               if (item.kind === "folder" && item.id === folder.id) return;
               setCollapsedFolders((prev) => ({ ...prev, [folder.id]: false }));
               moveDroppedItem(item, folder.id);
@@ -558,16 +559,17 @@ export default function DriveSidebar({
             menuItems={[
               { label: "Open", onClick: () => onSelectFolder?.(folder.id) },
               { label: isCollapsed ? "Expand" : "Collapse", onClick: () => setCollapsedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] })) },
-              { label: "Rename", onClick: () => onRenameFolder?.(folder.id) },
+              !readOnly ? { label: "Rename", onClick: () => onRenameFolder?.(folder.id) } : null,
               { label: "Share", onClick: () => onShareItem?.({ kind: "drive/folders", id: folder.id, label: folder.name || "Folder" }) },
-              { label: "Delete folder and contents", danger: true, onClick: () => onDeleteFolder?.(folder.id) },
-            ]}
+              !readOnly ? { label: "Delete folder and contents", danger: true, onClick: () => onDeleteFolder?.(folder.id) } : null,
+            ].filter(Boolean)}
           />,
         );
         if (!isCollapsed) rows.push(...renderBranch(folder.id, depth + 1));
       });
 
       noteChildren.forEach((note) => {
+        const readOnly = note.sharePermission === "view";
         rows.push(
           <TreeRow
             key={note.id}
@@ -575,20 +577,21 @@ export default function DriveSidebar({
             active={selectedKind === "note" && selectedId === note.id}
             icon={<FileText size={15} />}
             label={note.title || "untitled"}
-            dragPayload={{ kind: "note", id: note.id }}
+            dragPayload={readOnly ? null : { kind: "note", id: note.id }}
             onClick={() => onSelectNote?.(note.id)}
             menuItems={[
               { label: "Open", onClick: () => onSelectNote?.(note.id) },
-              { label: "Rename", onClick: () => onRenameNote?.(note.id) },
-              { label: "Move", onClick: () => onMoveNote?.(note.id) },
+              !readOnly ? { label: "Rename", onClick: () => onRenameNote?.(note.id) } : null,
+              !readOnly ? { label: "Move", onClick: () => onMoveNote?.(note.id) } : null,
               { label: "Share", onClick: () => onShareItem?.({ kind: "drive/notes", id: note.id, label: note.title || "Untitled note" }) },
-              { label: "Delete", danger: true, onClick: () => onDeleteNote?.(note.id) },
-            ]}
+              !readOnly ? { label: "Delete", danger: true, onClick: () => onDeleteNote?.(note.id) } : null,
+            ].filter(Boolean)}
           />,
         );
       });
 
       fileChildren.forEach((file) => {
+        const readOnly = file.sharePermission === "view";
         rows.push(
           <TreeRow
             key={file.id}
@@ -596,17 +599,17 @@ export default function DriveSidebar({
             active={selectedKind === "file" && selectedId === file.id}
             icon={String(file.mime || "").includes("bondfire.sheet") || /\.bfsheet$/i.test(String(file.name || "")) ? <FileSpreadsheet size={15} /> : <File size={15} />}
             label={file.name}
-            dragPayload={{ kind: "file", id: file.id }}
+            dragPayload={readOnly ? null : { kind: "file", id: file.id }}
             onClick={() => onSelectFile?.(file)}
             menuItems={[
               { label: "Open", onClick: () => onSelectFile?.(file) },
               { label: "Open in browser", onClick: () => onOpenFileInBrowser?.(file) },
               { label: "Download", onClick: () => onDownloadFile?.(file) },
-              { label: "Rename", onClick: () => onRenameFile?.(file.id) },
-              { label: "Move", onClick: () => onMoveFile?.(file.id) },
+              !readOnly ? { label: "Rename", onClick: () => onRenameFile?.(file.id) } : null,
+              !readOnly ? { label: "Move", onClick: () => onMoveFile?.(file.id) } : null,
               { label: "Share", onClick: () => onShareItem?.({ kind: "drive/files", id: file.id, label: file.name || "File" }) },
-              { label: "Delete", danger: true, onClick: () => onDeleteFile?.(file.id) },
-            ]}
+              !readOnly ? { label: "Delete", danger: true, onClick: () => onDeleteFile?.(file.id) } : null,
+            ].filter(Boolean)}
           />,
         );
       });
