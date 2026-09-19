@@ -15,6 +15,18 @@ function htmlEscape(value) {
     .replace(/'/g, "&#39;");
 }
 
+function renderMarkdownText(value) {
+  let html = htmlEscape(value);
+  html = html.replace(/`([^`]+)`/gim, "<code>$1</code>");
+  html = html.replace(/\*\*(.+?)\*\*/gim, "<strong>$1</strong>");
+  html = html.replace(/\*(.+?)\*/gim, "<em>$1</em>");
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gim, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+  return html
+    .split(/\n{2,}/)
+    .map((block) => `<p>${block.replace(/\n/g, "<br />")}</p>`)
+    .join("");
+}
+
 function normalizeField(field, idx) {
   const type = ["text", "paragraph", "choice", "checkbox", "date"].includes(String(field?.type || "")) ? field.type : "text";
   return {
@@ -195,12 +207,13 @@ body{margin:0;font-family:Inter,system-ui,sans-serif;background:#090909;color:#f
 .card{display:grid;gap:10px;padding:18px;border:1px solid #242424;border-radius:14px;background:#131315;margin-top:14px}
 button{padding:12px 18px;border-radius:12px;border:1px solid #333;background:#17181c;color:#fff;font-weight:700;cursor:pointer}
 .small{font-size:13px;color:#a8a8ad}.success{color:#9be7ac}.error{color:#ff9a9a}
+.bf-public-form-markdown p{margin:0 0 8px}.bf-public-form-markdown p:last-child{margin-bottom:0}.bf-public-form-markdown strong{color:#fff}.bf-public-form-markdown code{background:#1c1c1f;padding:1px 4px;border-radius:4px}.bf-public-form-markdown a{color:#9ed0ff}
 </style>
 </head>
 <body>
   <div class="shell">
     <h1 style="margin:0 0 8px 0;">${htmlEscape(form.title)}</h1>
-    ${form.description ? `<div class="small" style="white-space:pre-wrap;margin-bottom:8px;">${htmlEscape(form.description)}</div>` : ""}
+    ${form.description ? `<div class="small bf-public-form-markdown" style="margin-bottom:8px;">${renderMarkdownText(form.description)}</div>` : ""}
     <form id="bf-public-form" style="display:grid;gap:14px;">
       ${form.fields.map((field, idx) => `<div class="card"><div style="font-weight:800;">${idx + 1}. ${htmlEscape(field.label)} ${field.required ? '<span style="color:#ff9a9a">*</span>' : ''}</div>${renderField(field)}</div>`).join("")}
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
