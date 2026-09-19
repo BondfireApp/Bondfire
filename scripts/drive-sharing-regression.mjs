@@ -85,6 +85,7 @@ assert.match(shares, /PRIVATE_MODE_REQUIRED/, "Encrypted sharing must require pr
 assert.match(shares, /DRIVE_SHARE_RECIPIENT_KEY_REQUIRED/, "Every selected recipient must have a wrapped item key");
 assert.match(shares, /detail\.restricted && !detail\.permission/, "Restricted Drive shares must not grant implicit administrator access");
 assert.match(shares, /ownerUserId && ownerUserId !== String\(gate\.user\.sub\)/, "Restricted Drive share changes must remain controlled by the cryptographic share owner");
+assert.match(shares, /DRIVE_SHARE_LEGACY_MANAGER_REQUIRED/, "Creatorless legacy Drive items must not be claimable by ordinary members");
 
 assert.match(shares, /pending_version/, "Drive sharing must use staged key versions for safe rotation");
 assert.match(shares, /active_version/, "Drive sharing must keep an explicit active key version");
