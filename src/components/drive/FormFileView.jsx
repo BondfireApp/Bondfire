@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../utils/api.js";
 import { makeSubmissionRecipient, openSubmission } from "../../../shared/privateSubmission.js";
+import { markdownToHtml } from "./NotePreview.jsx";
 
 const DEFAULT_FORM = {
   type: "bondfire-form",
@@ -326,6 +327,7 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", display: "grid", gap: 8 }}>
+      <style>{`.bf-form-markdown{font-size:14px;line-height:1.6;color:#c9c9cf}.bf-form-markdown p{margin:0 0 8px}.bf-form-markdown p:last-child{margin-bottom:0}.bf-form-markdown strong{color:#fff}.bf-form-markdown em{font-style:italic}.bf-form-markdown code{background:rgba(255,255,255,.08);padding:1px 4px;border-radius:4px}.bf-form-markdown a{color:#9ed0ff;text-decoration:underline}.bf-form-markdown ul,.bf-form-markdown ol{margin:0 0 8px;padding-left:22px}.bf-form-markdown blockquote{margin:0 0 8px;padding-left:10px;border-left:3px solid #666;color:#bbb}`}</style>
       {!readOnly ? (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <button className="btn" type="button" onClick={() => addField("text")}>Add text</button>
@@ -340,7 +342,13 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
         {readOnly ? (
           <>
             <h2 style={{ marginTop: 0, marginBottom: 8 }}>{form.title}</h2>
-            {form.description ? <div className="helper" style={{ whiteSpace: "pre-wrap", marginBottom: 8 }}>{form.description}</div> : null}
+            {form.description ? (
+              <div
+                className="bf-form-markdown"
+                style={{ marginBottom: 8 }}
+                dangerouslySetInnerHTML={{ __html: markdownToHtml(form.description) }}
+              />
+            ) : null}
           </>
         ) : (
           <div style={{ display: "grid", gap: 8 }}>
