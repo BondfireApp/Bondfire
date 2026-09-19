@@ -1,5 +1,6 @@
 import { projectOrganizationPageConfig } from "../_lib/publicSurface.js";
 import { listPublicSiteDomains, publicDomainScope } from "../_lib/publicSiteDomains.js";
+import { getPrivateMode } from "../_lib/privateStore.js";
 
 function riseupSubscribeUrl(address) {
   const value = String(address || "").trim().toLowerCase();
@@ -34,6 +35,13 @@ export async function onRequestGet({ env, params }) {
   const projected = projectOrganizationPageConfig(cfg);
   const db = env?.BF_DB || env?.DB || null;
   let newsletter = null;
+  let privateMode = false;
+
+  try {
+    privateMode = (await getPrivateMode(env, orgId))?.state === "enabled";
+  } catch {
+    privateMode = false;
+  }
   if (db?.prepare) {
     try {
       if (projected.newsletter_enabled) {
@@ -68,6 +76,7 @@ export async function onRequestGet({ env, params }) {
     ok: true,
     public: projected,
     newsletter,
+    private_mode: privateMode,
     orgId,
   });
 }
