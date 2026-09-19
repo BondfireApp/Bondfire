@@ -113,7 +113,7 @@ function answerSummary(field, value) {
   return String(value || "—");
 }
 
-export default function FormFileView({ value, onChange, mode = "edit", fileId = "", orgId = "" }) {
+export default function FormFileView({ value, onChange, mode = "edit", fileId = "", orgId = "", saveStatus = "saved", onBeforePublicUse }) {
   const form = useMemo(() => normalizeForm(safeParse(value)), [value]);
   const readOnly = mode === "preview";
   const [draftAnswers, setDraftAnswers] = useState({});
@@ -239,8 +239,21 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
     setCopyStatus("New link generated");
   };
 
+  const ensurePublicFormSaved = async () => {
+    if (!onBeforePublicUse) return saveStatus === "saved";
+    try {
+      return (await onBeforePublicUse()) !== false;
+    } catch {
+      return false;
+    }
+  };
+
   const copyPublicUrl = async () => {
     if (!publicUrl) return;
+    if (!await ensurePublicFormSaved()) {
+      setCopyStatus("Save failed; public link was not copied");
+      return;
+    }
     try {
       await navigator.clipboard.writeText(publicUrl);
       setCopyStatus("Link copied");
@@ -250,8 +263,19 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
   };
 
 
-  const openPublicUrl = () => {
+  const openPublicUrl = async () => {
     if (!publicUrl) return;
+    const popup = window.open("about:blank", "_blank");
+    if (!await ensurePublicFormSaved()) {
+      try { popup?.close(); } catch {}
+      setCopyStatus("Save failed; public form was not opened");
+      return;
+    }
+    if (popup) {
+      popup.opener = null;
+      popup.location.replace(publicUrl);
+      return;
+    }
     window.open(publicUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -330,11 +354,12 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
             </label>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <button className="btn" type="button" onClick={openPublicUrl} disabled={!publicUrl}>Open public form</button>
-            <button className="btn" type="button" onClick={copyPublicUrl} disabled={!publicUrl}>Copy public link</button>
+            <button className="btn" type="button" onClick={() => { void openPublicUrl(); }} disabled={!publicUrl}>Open public form</button>
+            <button className="btn" type="button" onClick={() => { void copyPublicUrl(); }} disabled={!publicUrl}>Copy public link</button>
             <button className="btn" type="button" onClick={regeneratePublicLink} disabled={!form.publicShare.enabled}>Regenerate link</button>
           </div>
-          <input className="input" readOnly value={publicUrl || "Enable public submissions to generate a public share URL."} style={{ padding: "8px 10px" }} />
+          <input className="input" readOnly value={publicUrl || (form.publicShare.enabled ? "Preparing encrypted public link…" : "Enable public submissions to generate a public share URL.")} style={{ padding: "8px 10px" }} />
+          {form.publicShare.enabled && saveStatus !== "saved" ? <div className="helper">Public link will open after the current form save finishes.</div> : null}
           {copyStatus ? <div className="helper">{copyStatus}</div> : null}
         </div>
       ) : null}
