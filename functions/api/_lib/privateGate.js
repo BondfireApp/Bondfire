@@ -31,11 +31,10 @@ export async function privateRequestGate({env,request}) {
   if(!m) {
     const page=path.match(/^\/api\/(p|public)\/([^/]+)/);
     const form=path.match(/^\/api\/public\/forms\/([^/]+)/);
+    if(form) return null;
     let orgId='';
-    if(form) orgId=(await getDb(env).prepare('SELECT org_id FROM drive_files WHERE id=?').bind(decodeURIComponent(form[1])).first())?.org_id;
-    else if(page&&env.BF_PUBLIC) orgId=await env.BF_PUBLIC.get(`slug:${decodeURIComponent(page[2])}`);
+    if(page&&env.BF_PUBLIC) orgId=await env.BF_PUBLIC.get(`slug:${decodeURIComponent(page[2])}`);
     if(orgId&&await getPrivateMode(env,orgId)) {
-      if(form) return bad(404,'NOT_FOUND');
       // The Organization Page config is deliberately public and authoritative in BF_PUBLIC.
       // Private module content still flows through explicit public projections below.
       if(page?.[1]==='public' && /^\/api\/public\/[^/]+\/?$/.test(path)) return null;
@@ -81,7 +80,7 @@ export async function privateRequestGate({env,request}) {
   // REC management is metadata-only and role-gated by its own handlers. The server never sees recovery phrases or recording plaintext.
   if(/^rec\/(claim|archive)$/.test(route)) return null;
   if(mode.state==='migrating') return bad(409,'PRIVATE_MIGRATION_IN_PROGRESS');
-  if(route==='drive/shares') return null;
+  if(route==='drive/shares'||route==='drive/forms-public') return null;
   // These endpoints only manage intentionally public configuration/hostnames.
   // Their own handlers still enforce org roles and write lockdown.
   if((route==='public/get'&&request.method==='GET')||(route==='public/save'&&request.method==='POST')||route==='public/publication'||route==='public/domains') return null;
