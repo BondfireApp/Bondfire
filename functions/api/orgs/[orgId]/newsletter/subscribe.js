@@ -32,10 +32,20 @@ async function ensureSubscriberTable(db) {
     }
   }
 
-  await db.prepare(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_subscribers_org_email
-    ON newsletter_subscribers(org_id, email)
-  `).run();
+  // Older installs may already contain duplicate test rows, so a unique-index
+  // migration must not be allowed to break public signup. The write path below
+  // performs its own idempotent lookup/update.
+  try {
+    await db.prepare(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_subscribers_org_email
+      ON newsletter_subscribers(org_id, email)
+    `).run();
+  } catch {
+    await db.prepare(`
+      CREATE INDEX IF NOT EXISTS idx_newsletter_subscribers_org_email_lookup
+      ON newsletter_subscribers(org_id, email)
+    `).run();
+  }
 }
 
 export async function onRequest(context) {
@@ -74,22 +84,40 @@ export async function onRequest(context) {
 
   await ensureSubscriberTable(db);
 
+  const existing = await db
+    .prepare(
+      `SELECT id, name
+         FROM newsletter_subscribers
+        WHERE org_id = ? AND lower(email) = lower(?)
+        ORDER BY created_at DESC
+        LIMIT 1`
+    )
+    .bind(orgId, email)
+    .first();
+
+  if (existing?.id) {
+    await db
+      .prepare(
+        `UPDATE newsletter_subscribers
+            SET name = CASE WHEN ? != '' THEN ? ELSE name END,
+                source = COALESCE(NULLIF(source, ''), 'public-site')
+          WHERE org_id = ? AND id = ?`
+      )
+      .bind(name, name, orgId, existing.id)
+      .run();
+
+    return json({ ok: true, saved: true, existing: true });
+  }
+
   const now = Date.now();
   const id = crypto.randomUUID();
-
   await db
     .prepare(
       `INSERT INTO newsletter_subscribers (id, org_id, email, name, source, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(org_id, email) DO UPDATE SET
-         name = CASE
-           WHEN excluded.name IS NOT NULL AND excluded.name != ''
-           THEN excluded.name
-           ELSE newsletter_subscribers.name
-         END`
+       VALUES (?, ?, ?, ?, ?, ?)`
     )
     .bind(id, orgId, email, name, "public-site", now)
     .run();
 
-  return json({ ok: true, saved: true });
+  return json({ ok: true, saved: true, id });
 }
