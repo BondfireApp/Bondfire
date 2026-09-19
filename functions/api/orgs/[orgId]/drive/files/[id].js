@@ -1,6 +1,7 @@
 import { bad } from "../../../../_lib/http.js";
 import { requireOrgRole } from "../../../../_lib/auth.js";
 import { ensureDriveSchema, getDb, normalizeNullableId, json, now, getFileRecord, saveFileBlob, deleteFileBlob } from "../../../../_lib/drive.js";
+import { deletePublicDriveFormData } from "../../../../_lib/publicDriveForms.js";
 
 export async function onRequestGet({ env, request, params }) {
   const orgId = params.orgId;
@@ -63,5 +64,6 @@ export async function onRequestDelete({ env, request, params }) {
   if (!existing) return bad(404, "NOT_FOUND");
   await deleteFileBlob(env, { orgId, fileId, storageKey: existing.storage_key || null });
   await db.prepare(`DELETE FROM drive_files WHERE org_id = ? AND id = ?`).bind(orgId, fileId).run();
+  await deletePublicDriveFormData(db, orgId, fileId);
   return json({ ok: true, deleted: true, id: fileId });
 }
