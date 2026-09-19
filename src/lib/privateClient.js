@@ -3,6 +3,9 @@ import { decryptWithOrgKey } from './zk.js';
 import { PRIVATE_CONTENT, privateRoute } from '../../shared/privateContent.js';
 import { encryptPrivate, decryptPrivate, loadPrivateKey } from './privateCrypto.js';
 import {PUBLIC_FIELDS,selectPublicFields,wantsPublication} from '../../shared/publicProjection.js';
+import { resolveDriveShareKey } from './driveSharing.js';
+
+const DRIVE_SHARE_KINDS=new Set(['drive/folders','drive/notes','drive/files']);
 
 function recArchiveId(record) {
   const direct=String(record?.rec_archive_id||'').trim();
@@ -68,9 +71,26 @@ export async function decodeLegacyRecord(key,kind,row,{normalize=true}={}) {
 async function reveal(key,orgId,kind,row,transport,hydrate=false) {
   if(!row) return row;
   if(!row.ciphertext) throw new Error('Private storage returned an unencrypted record.');
-  const clear=normalizePrivateRecord(kind,await decryptPrivate(key,row.ciphertext,orgId,kind,row.id));
-  const result={...clear,id:row.id,revision:row.revision,deleting:!!row.deleting,createdAt:clear.createdAt??row.createdAt,updatedAt:row.updatedAt,
-    created_at:clear.created_at??row.created_at,updated_at:row.updated_at,encrypted:true};
+  const outer=await decryptPrivate(key,row.ciphertext,orgId,kind,row.id);
+  let clear=outer,contentKey=key;
+  if(DRIVE_SHARE_KINDS.has(kind)&&outer?.__driveShared?.ciphertext) {
+    let share=await resolveDriveShareKey(orgId,kind,row.id,transport,{parentId:row.parentId??null});
+    if(!share?.key) throw new Error('This shared Drive item cannot be opened on this device because its item key is missing.');
+    try {
+      clear=await decryptPrivate(share.key,outer.__driveShared.ciphertext,orgId,kind,row.id);
+      contentKey=share.key;
+    } catch(error) {
+      const pending=await resolveDriveShareKey(orgId,kind,row.id,transport,{preferPending:true,parentId:row.parentId??null});
+      if(!pending?.key||pending.key===share.key) throw error;
+      clear=await decryptPrivate(pending.key,outer.__driveShared.ciphertext,orgId,kind,row.id);
+      contentKey=pending.key;
+    }
+  }
+  clear=normalizePrivateRecord(kind,clear);
+  const result={...clear,id:row.id,revision:row.revision,deleting:!!row.deleting,createdBy:row.createdBy||null,createdAt:clear.createdAt??row.createdAt,updatedAt:row.updatedAt,
+    created_at:clear.created_at??row.created_at,updated_at:row.updated_at,encrypted:true,
+    sharePermission:row.sharePermission||'',shareRestricted:!!row.shareRestricted,shareOwnerUserId:row.shareOwnerUserId||null,
+    shareRootKind:row.shareRootKind||null,shareRootId:row.shareRootId||null,shareInherited:!!row.shareInherited};
   const contract=PRIVATE_CONTENT[kind];
   if(contract?.parent) result[contract.parent]=row.parentId||null;
   // Public URLs are never synthesized for private files. Binary previews are
@@ -80,7 +100,7 @@ async function reveal(key,orgId,kind,row,transport,hydrate=false) {
     result.url='';result.downloadUrl='';result.previewUrl='';
     if(hydrate&&result.payloadId) {
       const payload=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/blob/${result.payloadId}`);
-      const bytes=await decryptPrivate(key,payload.ciphertext,orgId,'drive/blob',result.payloadId,true);
+      const bytes=await decryptPrivate(contentKey,payload.ciphertext,orgId,'drive/blob',result.payloadId,true);
       const blob=new Blob([bytes],{type:result.mime||'application/octet-stream'});
       result.dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob);});
       if(String(result.mime||'').startsWith('text/')||/\.(bfform|bfsheet|json|md|csv)$/i.test(result.name||'')) result.textContent=new TextDecoder().decode(bytes);
@@ -92,11 +112,11 @@ async function deletePayload(orgId,payloadId,fileId,transport) {
   if(!payloadId)return;
   await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/blob/${payloadId}`,{method:'DELETE',body:JSON.stringify({fileId})});
 }
-async function uploadPayload(key,orgId,bytes,transport,fileId) {
+async function uploadPayload(key,orgId,bytes,transport,fileId,parentId) {
   const payloadId=crypto.randomUUID();
   const ciphertext=await encryptPrivate(key,bytes,orgId,'drive/blob',payloadId);
   try {
-    await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/blob/${payloadId}`,{method:'POST',body:JSON.stringify({ciphertext,fileId})});
+    await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/blob/${payloadId}`,{method:'POST',body:JSON.stringify({ciphertext,fileId,parentId:parentId??null})});
     const check=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/blob/${payloadId}`);
     if(check.ciphertext!==ciphertext) throw new Error('Encrypted upload verification failed.');
     return payloadId;
@@ -111,7 +131,7 @@ export async function dispatchPrivate(path,opts,transport) {
   const m=url.pathname.match(/^\/api\/orgs\/([^/]+)\/(.*)$/);
   if(!m||['create','index'].includes(m[1])) return null;
   const orgId=decodeURIComponent(m[1]), tail=m[2];
-  if(/^(privacy|crypto|zk|emergency|members|modules|invites)(\/|$)/.test(tail)) return null;
+  if(/^(privacy|crypto|zk|emergency|members|modules|invites|drive\/shares)(\/|$)/.test(tail)) return null;
   const status=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy`);
   if(status.state==='off') return null;
   if(status.state!=='enabled') throw new Error('Finish the encrypted-data conversion in Settings → Security before editing this organization.');
@@ -300,9 +320,18 @@ export async function dispatchPrivate(path,opts,transport) {
       const current=await transport(currentPath);
       previous=await reveal(key,orgId,kind,current[contract.one],transport);
     }
+    let driveShareForWrite=null;
+    if(DRIVE_SHARE_KINDS.has(kind)) {
+      const desiredParent=Object.prototype.hasOwnProperty.call(clear,'parentId')
+        ? (clear.parentId||null)
+        : (previous?.parentId??null);
+      driveShareForWrite=await resolveDriveShareKey(orgId,kind,id,transport,{preferPending:true,parentId:desiredParent});
+    }
     let uploadedPayloadId=null;
     if(kind==='drive/files'&&uploadBytes) {
-      uploadedPayloadId=await uploadPayload(key,orgId,uploadBytes,transport,id);
+      const payloadKey=driveShareForWrite?.key||key;
+      const desiredParent=Object.prototype.hasOwnProperty.call(clear,'parentId')?(clear.parentId||null):(previous?.parentId??null);
+      uploadedPayloadId=await uploadPayload(payloadKey,orgId,uploadBytes,transport,id,desiredParent);
       clear.payloadId=uploadedPayloadId;
       clear.size=uploadBytes.length;
     }
@@ -325,7 +354,12 @@ export async function dispatchPrivate(path,opts,transport) {
         // Content is authoritative inside the envelope. IDs and revisions are checked
         // independently; never merge decrypted content over these protocol fields.
         for(const k of ['ciphertext','encrypted_blob','encryptedBlob','revision','encrypted','previewUrl','downloadUrl','url','storage_key','storageKey']) delete combined[k];
-        const ciphertext=await encryptPrivate(key,combined,orgId,kind,id);
+        let sealedContent=combined;
+        if(DRIVE_SHARE_KINDS.has(kind)&&driveShareForWrite?.key) {
+          const inner=await encryptPrivate(driveShareForWrite.key,combined,orgId,kind,id);
+          sealedContent={__driveShared:{v:1,version:Number(driveShareForWrite.version||0),ciphertext:inner}};
+        }
+        const ciphertext=await encryptPrivate(key,sealedContent,orgId,kind,id);
         data=await transport(path,{method,body:JSON.stringify({id,ciphertext,revision:previous?.revision||0,...(contract.parent?{parentId:combined[contract.parent]||null}:{})})});
         if(kind==='witness'&&method==='POST'&&recManagementToken) {
           const archiveId=recArchiveId(combined);
