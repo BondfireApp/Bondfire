@@ -115,7 +115,7 @@ export async function onRequest({ env, request, params }) {
         grants = (rows.results || []).map((row) => ({ userId: row.user_id, permission: row.permission }));
       }
     }
-    return json({ ok: true, ...detail, canManage, grants });
+    return json({ ok: true, ...detail, canManage, grants, meUserId: gate.user.sub, role: gate.role });
   }
 
   const gate = await requireOrgRole({ env, request, orgId, minRole: 'member' });
