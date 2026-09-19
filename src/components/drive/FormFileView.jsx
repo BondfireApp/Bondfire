@@ -266,13 +266,22 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
   const openPublicUrl = async () => {
     if (!publicUrl) return;
     const popup = window.open("about:blank", "_blank");
+    if (popup) {
+      try {
+        popup.opener = null;
+        popup.document.title = "Preparing public form";
+        popup.document.body.style.cssText = "margin:0;background:#090909;color:#fff;font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;padding:24px";
+        popup.document.body.textContent = "Preparing encrypted public form…";
+      } catch {}
+    }
     if (!await ensurePublicFormSaved()) {
-      try { popup?.close(); } catch {}
-      setCopyStatus("Save failed; public form was not opened");
+      if (popup) {
+        try { popup.document.body.textContent = "The public form could not be prepared. Return to Bondfire and try again."; } catch {}
+      }
+      setCopyStatus("Public form could not be prepared");
       return;
     }
     if (popup) {
-      popup.opener = null;
       popup.location.replace(publicUrl);
       return;
     }
