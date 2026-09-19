@@ -867,11 +867,43 @@ React.useEffect(() => {
     setNlMsg("");
     setNlBusy(true);
     try {
+      const privacy = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/privacy`, { method: "GET" }).catch(() => null);
+
+      if (privacy?.state === "enabled") {
+        const scoped = await loadScopedKeys(orgId, authFetch);
+        const adminScope = scoped?.key?.scopes?.admin;
+        const inbox = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/privacy/submissions`, { method: "GET" });
+        const rows = Array.isArray(inbox?.submissions) ? inbox.submissions.filter((row) => row?.type === "newsletter") : [];
+        const clear = [];
+
+        for (const row of rows) {
+          try {
+            const privateKey = adminScope?.submissions?.[row.epoch];
+            if (!privateKey) continue;
+            const opened = await openSubmission(orgId, row, privateKey);
+            clear.push({
+              id: row.id,
+              email: String(opened?.email || "").trim(),
+              name: String(opened?.name || "").trim(),
+              created_at: row.created_at ?? null,
+              encrypted: true,
+            });
+          } catch {
+            // Keep unreadable encrypted submissions out of the plaintext UI.
+          }
+        }
+
+        setNewsletterPrivateMode(true);
+        setSubscribers(clear);
+        return;
+      }
+
       const r = await authFetch(
         `/api/orgs/${encodeURIComponent(orgId)}/newsletter/subscribers`,
         { method: "GET" }
       );
       const _subs = Array.isArray(r.subscribers) ? r.subscribers : [];
+      setNewsletterPrivateMode(false);
       setSubscribers(await tryDecryptList(orgId, _subs));
     } catch (e) {
       setSubscribers([]);
