@@ -4,7 +4,7 @@ import { bad, json } from './http.js';
 import { requireCookieCsrf } from './csrf.js';
 import { PRIVATE_CONTENT, PRIVATE_KINDS, contentContext, isCiphertext } from '../../../shared/privateContent.js';
 import {ensurePublicationSchema} from './privatePublication.js';
-import { ensureDriveShareSchema, driveAccessForUser, decorateDriveRecord, DRIVE_SHARE_KINDS } from './driveShares.js';
+import { ensureDriveShareSchema, driveAccessForUser, decorateDriveRecord, deleteDriveShareMetadata, DRIVE_SHARE_KINDS } from './driveShares.js';
 
 export async function ensurePrivateSchema(db) {
   for (const sql of [
@@ -99,6 +99,7 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
       }
       await deletePrivateFileBlobs(env,orgId,id);
       await db.prepare('DELETE FROM org_private_records WHERE org_id=? AND kind=? AND id=? AND revision=? AND deleting=1').bind(orgId,kind,id,revision).run();
+      if (DRIVE_SHARE_KINDS.has(kind)) await deleteDriveShareMetadata(db, orgId, [{ kind, id }]);
       return json({ok:true,deleted:true,id});
     }
     if (kind === 'drive/folders') {
@@ -113,15 +114,19 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
       const folderIds=(subtree.results||[]).map(row=>String(row.id||'')).filter(Boolean);
       if (!folderIds.length) return bad(404,'NOT_FOUND');
       const placeholders=folderIds.map(()=>'?').join(',');
-      const fileRows=await db.prepare(
-        `SELECT id FROM org_private_records WHERE org_id=? AND kind='drive/files' AND parent_id IN (${placeholders})`
+      const childRows=await db.prepare(
+        `SELECT kind,id FROM org_private_records WHERE org_id=? AND kind IN ('drive/notes','drive/files') AND parent_id IN (${placeholders})`
       ).bind(orgId,...folderIds).all();
-      for (const fileRow of fileRows.results||[]) await deletePrivateFileBlobs(env,orgId,fileRow.id);
+      for (const fileRow of (childRows.results||[]).filter(row=>row.kind==='drive/files')) await deletePrivateFileBlobs(env,orgId,fileRow.id);
       const statements=[
         db.prepare(`DELETE FROM org_private_records WHERE org_id=? AND kind IN ('drive/notes','drive/files') AND parent_id IN (${placeholders})`).bind(orgId,...folderIds),
         db.prepare(`DELETE FROM org_private_records WHERE org_id=? AND kind='drive/folders' AND id IN (${placeholders})`).bind(orgId,...folderIds),
       ];
       await db.batch(statements);
+      await deleteDriveShareMetadata(db, orgId, [
+        ...folderIds.map((folderId) => ({ kind: 'drive/folders', id: folderId })),
+        ...(childRows.results || []).map((row) => ({ kind: row.kind, id: row.id })),
+      ]);
       return json({ok:true,deleted:true,id,deletedFolderIds:folderIds});
     }
     const statements = [];
@@ -130,6 +135,7 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
     statements.push(db.prepare('DELETE FROM org_private_records WHERE org_id=? AND kind=? AND id=? AND revision=?').bind(orgId, kind, id, body.revision));
     const result = await db.batch(statements);
     if (Number(result.at(-1)?.meta?.changes || 0) !== 1) return bad(409, 'PRIVATE_REVISION_CONFLICT');
+    if (DRIVE_SHARE_KINDS.has(kind)) await deleteDriveShareMetadata(db, orgId, [{ kind, id }]);
     return json({ ok: true, deleted: true, id });
   }
   if (existing?.deleting) return bad(409,'PRIVATE_FILE_DELETION_IN_PROGRESS');
