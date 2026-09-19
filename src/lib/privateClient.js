@@ -353,7 +353,7 @@ export async function dispatchPrivate(path,opts,transport) {
         if(PUBLIC_FIELDS[kind]&&(wantsPublication(kind,combined)||wantsPublication(kind,previous||{}))&&!['admin','owner'].includes(status.role))throw new Error('An administrator must publish or change a published record.');
         // Content is authoritative inside the envelope. IDs and revisions are checked
         // independently; never merge decrypted content over these protocol fields.
-        for(const k of ['ciphertext','encrypted_blob','encryptedBlob','revision','encrypted','previewUrl','downloadUrl','url','storage_key','storageKey']) delete combined[k];
+        for(const k of ['ciphertext','encrypted_blob','encryptedBlob','revision','encrypted','previewUrl','downloadUrl','url','storage_key','storageKey','sharePermission','shareRestricted','shareOwnerUserId','shareRootKind','shareRootId','shareInherited','createdBy']) delete combined[k];
         let sealedContent=combined;
         if(DRIVE_SHARE_KINDS.has(kind)&&driveShareForWrite?.key) {
           const inner=await encryptPrivate(driveShareForWrite.key,combined,orgId,kind,id);
