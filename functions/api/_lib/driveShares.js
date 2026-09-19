@@ -194,3 +194,22 @@ export async function getShareDetail(db, orgId, kind, itemId, userId, deviceId, 
     wrappedKey: wrapped?.wrapped_key || null,
   };
 }
+
+
+export async function deleteDriveShareMetadata(db, orgId, items = []) {
+  await ensureDriveShareSchema(db);
+  const unique = new Map();
+  for (const item of items || []) {
+    const kind = String(item?.kind || "").trim();
+    const itemId = String(item?.itemId || item?.id || "").trim();
+    if (!DRIVE_SHARE_KINDS.has(kind) || !itemId) continue;
+    unique.set(`${kind}\u0000${itemId}`, { kind, itemId });
+  }
+  for (const { kind, itemId } of unique.values()) {
+    await db.batch([
+      db.prepare("DELETE FROM drive_share_keys WHERE org_id=? AND kind=? AND item_id=?").bind(orgId, kind, itemId),
+      db.prepare("DELETE FROM drive_share_grants WHERE org_id=? AND kind=? AND item_id=?").bind(orgId, kind, itemId),
+      db.prepare("DELETE FROM drive_share_policies WHERE org_id=? AND kind=? AND item_id=?").bind(orgId, kind, itemId),
+    ]);
+  }
+}
