@@ -824,7 +824,18 @@ export default function Drive() {
         return false;
       }
     }
-    if (status === "saved") return true;
+    if (status === "saved") {
+      if (selectedKind === "file" && selectedFileSubtype === "form" && selectedId) {
+        try {
+          await syncPublicFormProjection(selectedId, content);
+          return true;
+        } catch (error) {
+          setDriveNotice(`Public form sync failed: ${String(error?.message || error || "unknown error")}`);
+          return false;
+        }
+      }
+      return true;
+    }
     return saveNow();
   }
 
