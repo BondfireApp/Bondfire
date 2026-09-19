@@ -23,8 +23,9 @@ function errorMessage(error, fallback) {
   return error?.message || fallback;
 }
 
-export function AdminPublicConfigCard() {
+export const AdminPublicConfigCard = React.forwardRef(function AdminPublicConfigCard(_, ref) {
   const { orgId } = useParams();
+  const contentRef = React.useRef(null);
   const [connection, setConnection] = React.useState({
     publication_id: "",
     publication_name: "",
@@ -41,6 +42,10 @@ export function AdminPublicConfigCard() {
   const [message, setMessage] = React.useState("");
   const [canManageConnection, setCanManageConnection] = React.useState(true);
   const [profileRevision, setProfileRevision] = React.useState(0);
+
+  React.useImperativeHandle(ref, () => ({
+    saveSiteContent: () => contentRef.current?.save?.(),
+  }), []);
 
   const relationPath = React.useMemo(
     () => `/api/orgs/${encodeURIComponent(orgId || "")}/public/publication`,
@@ -282,8 +287,8 @@ export function AdminPublicConfigCard() {
         </div>
       </section>
 
-      <PublicSiteContentCard key={profileRevision} />
+      <PublicSiteContentCard key={profileRevision} ref={contentRef} />
       <PublicSiteProfileTransfer onImported={() => setProfileRevision((value) => value + 1)} />
     </>
   );
-}
+});
