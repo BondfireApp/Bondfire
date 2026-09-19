@@ -156,6 +156,7 @@
       "membership",
       "archive",
       "events",
+      "newsletter",
       "contact"
     ],
     "section_visibility": {
@@ -165,7 +166,8 @@
       "membership": true,
       "archive": true,
       "events": true,
-      "contact": true
+      "contact": true,
+      "newsletter": true
     },
     "logo_url": "/red-harbor/red-harbor-logo.png"
   }
