@@ -132,7 +132,7 @@ export async function dispatchPrivate(path,opts,transport) {
   const m=url.pathname.match(/^\/api\/orgs\/([^/]+)\/(.*)$/);
   if(!m||['create','index'].includes(m[1])) return null;
   const orgId=decodeURIComponent(m[1]), tail=m[2];
-  if(/^(privacy|crypto|zk|emergency|members|modules|invites|drive\/(?:shares|forms-public))(\/|$)/.test(tail)) return null;
+  if(/^(privacy|crypto|zk|emergency|members|modules|invites|drive\/shares)(\/|$)/.test(tail)||tail==='drive/forms-public') return null;
   const status=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy`);
   if(status.state==='off') return null;
   if(status.state!=='enabled') throw new Error('Finish the encrypted-data conversion in Settings → Security before editing this organization.');
