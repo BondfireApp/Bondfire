@@ -1832,117 +1832,254 @@ Outreach`} />
 
       {/* Newsletter */}
       {tab === "newsletter" && (
-        <div className="card" style={{ padding: 16 }}>
-          <h2 style={{ marginTop: 0 }}>Newsletter</h2>
-          <div className="helper">
-            Bondfire stores subscribers. Riseup sends the newsletter.
+        <div className="card bf-newsletter-admin" style={{ padding: 16 }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Newsletter</h2>
+              <p className="helper" style={{ margin: "6px 0 0", maxWidth: 760 }}>
+                Website signups are collected in Bondfire. Riseup remains the delivery list, so confirmed Riseup membership is the source of truth for who actually receives mail.
+              </p>
+            </div>
+            <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <span className={publicNewsletterEnabled ? "bf-newsletter-status is-on" : "bf-newsletter-status"}>
+                {publicNewsletterEnabled ? "Signups on" : "Signups off"}
+              </span>
+              <span className="bf-newsletter-status">{subscribers.length} website signup{subscribers.length === 1 ? "" : "s"}</span>
+            </div>
           </div>
 
-          <div className="grid" style={{ gap: 10, marginTop: 10 }}>
+          <div className="grid" style={{ gap: 14, marginTop: 16 }}>
+            <section className="card bf-newsletter-panel" style={{ padding: 14 }}>
+              <div className="bf-newsletter-panel-head">
+                <div>
+                  <h3>Public signup</h3>
+                  <p className="helper">Control whether visitors can join from the public Organization Page.</p>
+                </div>
+              </div>
 
-            <label className="grid" style={{ gap: 6 }}>
-              <span className="helper">Riseup list address</span>
-              <input
-                className="input"
-                value={nlListAddress}
-                onChange={(e) => setNlListAddress(e.target.value)}
-                placeholder="example-list@riseup.net"
-              />
-            </label>
+              <div className="grid" style={{ gap: 10 }}>
+                <label className="row bf-newsletter-toggle" style={{ gap: 10, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={!!publicNewsletterEnabled}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setPublicNewsletterEnabled(checked);
+                      if (!checked) setShowNewsletterCard(false);
+                    }}
+                  />
+                  <span>
+                    <strong>Accept newsletter signups</strong>
+                    <span className="helper">Visitors may submit their name and email through the public site.</span>
+                  </span>
+                </label>
 
-            <label className="grid" style={{ gap: 6 }}>
-              <span className="helper">Default blurb</span>
-              <textarea
-                className="textarea"
-                rows={3}
-                value={nlBlurb}
-                onChange={(e) => setNlBlurb(e.target.value)}
-                placeholder="One paragraph you usually include at the top."
-              />
-            </label>
+                <label className="row bf-newsletter-toggle" style={{ gap: 10, alignItems: "center", opacity: publicNewsletterEnabled ? 1 : .55 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!showNewsletterCard}
+                    onChange={(event) => setShowNewsletterCard(event.target.checked)}
+                    disabled={!publicNewsletterEnabled}
+                  />
+                  <span>
+                    <strong>Show the signup section publicly</strong>
+                    <span className="helper">Adds a Stay Connected section to supported public layouts.</span>
+                  </span>
+                </label>
+              </div>
+            </section>
 
-            <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <button className="btn-red" type="button" onClick={saveNewsletter} disabled={nlBusy}>
-                {nlBusy ? "Saving…" : "Save"}
-              </button>
-              <button className="btn" type="button" onClick={openRiseupDraft}>
-                Open email draft
-              </button>
-              <button className="btn" type="button" onClick={() => loadSubscribers()} disabled={nlBusy}>
-                Refresh subscribers
-              </button>
+            <div className="bf-newsletter-two">
+              <section className="card bf-newsletter-panel" style={{ padding: 14 }}>
+                <div className="bf-newsletter-panel-head">
+                  <div>
+                    <h3>Delivery through Riseup</h3>
+                    <p className="helper">This is the mailing-list address you send newsletters to.</p>
+                  </div>
+                </div>
 
-              <button className="btn" type="button" onClick={() => exportSubscribersCsv().catch(console.error)} disabled={nlBusy}>
-                Export CSV
-              </button>
+                <label className="grid" style={{ gap: 6 }}>
+                  <span className="helper">Riseup list address</span>
+                  <input
+                    className="input"
+                    type="email"
+                    value={nlListAddress}
+                    onChange={(event) => setNlListAddress(event.target.value)}
+                    placeholder="your-list@lists.riseup.net"
+                    autoComplete="off"
+                    spellCheck="false"
+                  />
+                </label>
 
+                <label className="grid" style={{ gap: 6, marginTop: 10 }}>
+                  <span className="helper">Default opening blurb</span>
+                  <textarea
+                    className="textarea"
+                    rows={4}
+                    value={nlBlurb}
+                    onChange={(event) => setNlBlurb(event.target.value)}
+                    placeholder="A short paragraph you usually include near the top."
+                  />
+                </label>
 
+                <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+                  <button className="btn-red" type="button" onClick={saveNewsletter} disabled={nlBusy}>
+                    {nlBusy ? "Saving…" : "Save newsletter settings"}
+                  </button>
+                  {riseupInfoUrl ? (
+                    <a className="btn" href={riseupInfoUrl} target="_blank" rel="noopener noreferrer">
+                      Open Riseup list
+                    </a>
+                  ) : null}
+                </div>
 
+                <p className="helper" style={{ marginBottom: 0, marginTop: 10 }}>
+                  Bondfire does not impersonate subscribers or silently add them to Riseup. Riseup handles list confirmation and delivery.
+                </p>
+              </section>
 
+              <section className="card bf-newsletter-panel" style={{ padding: 14 }}>
+                <div className="bf-newsletter-panel-head">
+                  <div>
+                    <h3>Write and send</h3>
+                    <p className="helper">Draft here, then open the message in your email app addressed to the Riseup list.</p>
+                  </div>
+                </div>
 
-              {nlMsg && <span className={nlMsg.toLowerCase().includes("fail") ? "error" : "helper"}>{nlMsg}</span>}
+                <label className="grid" style={{ gap: 6 }}>
+                  <span className="helper">Subject</span>
+                  <input
+                    className="input"
+                    value={nlSubject}
+                    onChange={(event) => setNlSubject(event.target.value)}
+                    placeholder={`${orgName || "Organization"} update`}
+                  />
+                </label>
+
+                <label className="grid" style={{ gap: 6, marginTop: 10 }}>
+                  <span className="helper">Message</span>
+                  <textarea
+                    className="textarea bf-newsletter-compose"
+                    rows={12}
+                    value={nlDraft}
+                    onChange={(event) => setNlDraft(event.target.value)}
+                    placeholder="Write the newsletter here…"
+                  />
+                </label>
+
+                <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+                  <button className="btn-red" type="button" onClick={openRiseupDraft} disabled={!String(nlListAddress || "").trim()}>
+                    Open in email app
+                  </button>
+                  <button className="btn" type="button" onClick={copyNewsletterDraft}>
+                    Copy draft
+                  </button>
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={() => {
+                      setNlSubject(`${orgName || "Organization"} update`);
+                      setNlDraft(defaultNewsletterBody(nlBlurb, orgName || "Organization"));
+                    }}
+                  >
+                    Reset draft
+                  </button>
+                </div>
+              </section>
             </div>
 
-            <div className="card" style={{ padding: 12, border: "1px solid #222" }}>
-              <h3 style={{ marginTop: 0 }}>Subscribers</h3>
+            <section className="card bf-newsletter-panel" style={{ padding: 14 }}>
+              <div className="bf-newsletter-panel-head">
+                <div>
+                  <h3>Website signups</h3>
+                  <p className="helper">
+                    These are people who used the Bondfire signup form. They are not necessarily confirmed Riseup list members yet.
+                  </p>
+                </div>
+                <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <button className="btn" type="button" onClick={() => loadSubscribers()} disabled={nlBusy}>Refresh</button>
+                  <button className="btn" type="button" onClick={copySubscriberEmails} disabled={nlBusy || subscribers.length === 0}>Copy addresses</button>
+                  <button className="btn" type="button" onClick={() => exportSubscribersCsv().catch(console.error)} disabled={nlBusy}>Export CSV</button>
+                </div>
+              </div>
+
+              {riseupInfoUrl && subscribers.length > 0 ? (
+                <div className="bf-newsletter-note">
+                  To move website signups into Riseup, open the Riseup list, go to Members → Multiple add, and paste the copied addresses. Riseup sends the subscription notice instead of Bondfire silently enrolling people.
+                </div>
+              ) : null}
+
               {subscribers.length === 0 ? (
-                <div className="helper">No subscribers yet.</div>
+                <div className="bf-newsletter-empty">
+                  <strong>No website signups yet.</strong>
+                  <span>Once the public signup section is enabled, new submissions will appear here.</span>
+                </div>
               ) : (
-                <><div className="bf-table-desktop">
+                <>
+                  <div className="bf-table-desktop" style={{ marginTop: 12 }}>
                     <table className="table">
                       <thead>
                         <tr>
                           <th>Email</th>
                           <th>Name</th>
                           <th>Joined</th>
+                          <th aria-label="Actions"></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {subscribers.slice(0, 200).map((s) => (
-                          <tr key={s.id || s.email}>
-                            <td>
-                              <code>{s.email}</code>
+                        {subscribers.slice(0, 200).map((subscriber) => (
+                          <tr key={subscriber.id || subscriber.email}>
+                            <td><code>{subscriber.email}</code></td>
+                            <td>{subscriber.name || ""}</td>
+                            <td>{subscriber.created_at ? new Date(subscriber.created_at).toLocaleString() : ""}</td>
+                            <td style={{ textAlign: "right" }}>
+                              <button className="btn" type="button" onClick={() => removeSubscriber(subscriber)} disabled={nlBusy}>Remove</button>
                             </td>
-                            <td>{s.name || ""}</td>
-                            <td>{s.created_at ? new Date(s.created_at).toLocaleString() : ""}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  </div><div className="bf-cards-mobile" style={{ marginTop: 12 }}>
-                    {subscribers.slice(0, 200).map((s) => (
-                      <div key={s.id || s.email} className="bf-rowcard">
-                        <div className="bf-rowcard-top">
-                          <div className="bf-rowcard-title">{s.name || s.email || "subscriber"}</div>
-                        </div>
+                  </div>
 
-                        <div className="bf-two">
+                  <div className="bf-cards-mobile" style={{ marginTop: 12 }}>
+                    {subscribers.slice(0, 200).map((subscriber) => (
+                      <div key={subscriber.id || subscriber.email} className="bf-rowcard">
+                        <div className="bf-rowcard-top">
+                          <div className="bf-rowcard-title">{subscriber.name || subscriber.email || "Subscriber"}</div>
+                          <button className="btn" type="button" onClick={() => removeSubscriber(subscriber)} disabled={nlBusy}>Remove</button>
+                        </div>
+                        <div className="bf-field">
+                          <div className="bf-field-label">email</div>
+                          <div style={{ overflowWrap: "anywhere" }}>{subscriber.email || ""}</div>
+                        </div>
+                        {subscriber.name ? (
                           <div className="bf-field">
                             <div className="bf-field-label">name</div>
-                            <div style={{ overflowWrap: "anywhere" }}>{s.name || ""}</div>
+                            <div>{subscriber.name}</div>
                           </div>
-                          <div className="bf-field">
-                            <div className="bf-field-label">email</div>
-                            <div style={{ overflowWrap: "anywhere" }}>{s.email || ""}</div>
-                          </div>
-                        </div>
-
+                        ) : null}
                         <div className="bf-field">
                           <div className="bf-field-label">joined</div>
-                          <div style={{ opacity: 0.85 }}>
-                            {s.created_at ? new Date(s.created_at).toLocaleString() : ""}
-                          </div>
+                          <div style={{ opacity: .85 }}>{subscriber.created_at ? new Date(subscriber.created_at).toLocaleString() : ""}</div>
                         </div>
                       </div>
                     ))}
-                  </div></>
+                  </div>
+                </>
               )}
+
               {subscribers.length > 200 ? (
                 <div className="helper" style={{ marginTop: 8 }}>
-                  Showing first 200. Use Export CSV for the full list.
+                  Showing first 200. Export CSV for the full list.
                 </div>
               ) : null}
-            </div>
+            </section>
+
+            {nlMsg ? (
+              <div className={nlMsg.toLowerCase().includes("fail") || nlMsg.toLowerCase().includes("could not") ? "error" : "bf-newsletter-save-message"} role="status">
+                {nlMsg}
+              </div>
+            ) : null}
           </div>
         </div>
       )}
