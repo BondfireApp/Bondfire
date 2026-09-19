@@ -216,11 +216,19 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
     setNewsletterBusy(true);
     setNewsletterMessage("");
     try {
-      await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, {
+      const clearBody = {
         name: String(newsletterName || "").trim(),
         email,
         website: newsletterWebsite,
-      });
+      };
+
+      let body = clearBody;
+      if (state.data?.private_mode) {
+        const recipient = await fetchJson(`/api/public/${encodeURIComponent(publicSlug)}/submission-key`);
+        body = await sealSubmission(recipient, "newsletter", clearBody);
+      }
+
+      await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, body);
       setNewsletterName("");
       setNewsletterEmail("");
       setNewsletterWebsite("");
@@ -233,6 +241,8 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
       const code = String(error?.message || "");
       if (code.includes("RATE_LIMIT")) setNewsletterMessage("Too many signup attempts. Try again later.");
       else if (code.includes("INVALID_EMAIL")) setNewsletterMessage("Enter a valid email address.");
+      else if (code.includes("ENCRYPTED_SUBMISSIONS_NOT_READY")) setNewsletterMessage("Newsletter signup is temporarily unavailable while the branch updates its encryption keys.");
+      else if (code.includes("ORG_LOCKDOWN_ACTIVE")) setNewsletterMessage("Newsletter signup is temporarily unavailable.");
       else setNewsletterMessage("Could not save the signup. Try again in a moment.");
     } finally {
       setNewsletterBusy(false);
