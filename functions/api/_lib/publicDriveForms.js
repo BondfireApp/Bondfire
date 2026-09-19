@@ -147,6 +147,14 @@ export async function storePublicDriveFormResponse(db, record, body) {
   return id;
 }
 
+export async function deletePublicDriveFormData(db, orgId, fileId) {
+  await ensurePublicDriveFormsSchema(db);
+  await db.batch([
+    db.prepare('DELETE FROM drive_public_forms WHERE org_id=? AND file_id=?').bind(orgId, fileId),
+    db.prepare('DELETE FROM drive_public_form_responses WHERE org_id=? AND file_id=?').bind(orgId, fileId),
+  ]);
+}
+
 export async function listPublicDriveFormResponses(db, orgId, fileId) {
   await ensurePublicDriveFormsSchema(db);
   const rows = await db.prepare(`SELECT id,epoch,sender_pub,salt,ciphertext,created_at
