@@ -9,6 +9,7 @@ import {
   storePublicDriveFormResponse,
   listPublicDriveFormResponses,
   unpublishPublicDriveForm,
+  deletePublicDriveFormData,
 } from '../functions/api/_lib/publicDriveForms.js';
 
 const sql = new DatabaseSync(':memory:');
@@ -22,6 +23,18 @@ const db = {
       async first() { return stmt.get(...values) || null; },
       async all() { return { results: stmt.all(...values) }; },
     };
+  },
+  async batch(statements) {
+    sql.exec('BEGIN');
+    try {
+      const out = [];
+      for (const statement of statements) out.push(await statement.run());
+      sql.exec('COMMIT');
+      return out;
+    } catch (error) {
+      sql.exec('ROLLBACK');
+      throw error;
+    }
   },
 };
 await ensurePublicDriveFormsSchema(db);
@@ -86,12 +99,18 @@ await assert.rejects(
 await unpublishPublicDriveForm(db, orgId, fileId);
 assert.equal(await readPublicDriveForm(db, fileId, token), null);
 assert.equal((await listPublicDriveFormResponses(db, orgId, fileId)).length, 1, 'unpublishing must not destroy encrypted responses');
+await publishPublicDriveForm(db, { orgId, fileId, token, form, recipientEpoch: 1, recipientPublicKey: recipient.publicKey });
+await deletePublicDriveFormData(db, orgId, fileId);
+assert.equal(await readPublicDriveForm(db, fileId, token), null);
+assert.equal((await listPublicDriveFormResponses(db, orgId, fileId)).length, 0, 'deleting a Drive form must remove orphaned encrypted public responses');
 
 const drive = fs.readFileSync(new URL('../src/pages/Drive.jsx', import.meta.url), 'utf8');
 const formView = fs.readFileSync(new URL('../src/components/drive/FormFileView.jsx', import.meta.url), 'utf8');
 const privateGate = fs.readFileSync(new URL('../functions/api/_lib/privateGate.js', import.meta.url), 'utf8');
 const privateClient = fs.readFileSync(new URL('../src/lib/privateClient.js', import.meta.url), 'utf8');
 const publicHandler = fs.readFileSync(new URL('../functions/api/public/forms/[id].js', import.meta.url), 'utf8');
+const privateStore = fs.readFileSync(new URL('../functions/api/_lib/privateStore.js', import.meta.url), 'utf8');
+const legacyFile = fs.readFileSync(new URL('../functions/api/orgs/[orgId]/drive/files/[id].js', import.meta.url), 'utf8');
 
 assert.match(drive, /syncPublicFormProjection/);
 assert.match(drive, /drive\/forms-public/);
@@ -104,7 +123,11 @@ assert.match(privateGate, /route==='drive\/shares'\|\|route==='drive\/forms-publ
 assert.match(privateClient, /drive\\\/\(\?:shares\|forms-public\)/);
 assert.match(publicHandler, /storePublicDriveFormResponse/);
 assert.match(publicHandler, /submission\/drive-form/);
+assert.match(publicHandler, /script nonce/);
+assert.match(publicHandler, /content-security-policy/);
 assert.match(publicHandler, /getLegacyPublicForm[\s\S]*getPrivateMode\(env, row\.org_id\)[\s\S]*return null/);
+assert.match(privateStore, /deletePublicDriveFormData/);
+assert.match(legacyFile, /deletePublicDriveFormData/);
 
 sql.close();
 console.log('PASS: private Drive public forms use explicit public projections and encrypted browser submissions');
