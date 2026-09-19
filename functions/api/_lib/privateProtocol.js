@@ -6,7 +6,7 @@ import { getDb, requireOrgRole } from './auth.js';
 import { bad, json } from './http.js';
 import { ensurePrivateSchema, getPrivateMode } from './privateStore.js';
 import { migrationInventory, migrationPage, migrateRecord, cleanupPrivateSources, legacyPrivateFile } from './privateMigration.js';
-import { deletePrivateBlob, getPrivateBlob, putPrivateBlob } from './privateBlobs.js';
+import { deletePrivateBlob, getPrivateBlob, putPrivateBlob, ensurePrivateBlobs } from './privateBlobs.js';
 import { contentContext, isCiphertext } from '../../../shared/privateContent.js';
 import {publishPrivateCopy,reservePublicSlug} from './privatePublication.js';
 import { publishColophonCopy } from './privateColophonPublication.js';
@@ -54,6 +54,7 @@ export async function privateProtocol({env,request,orgId,path=''}) {
     }
     if(!mode) return bad(409,'PRIVATE_MODE_NOT_STARTED');
     if(path.startsWith('blob/')) {
+      await ensurePrivateBlobs(db);
       const id=path.slice(5);
       const blobRow=await db.prepare('SELECT file_id FROM org_private_blobs WHERE org_id=? AND id=?').bind(orgId,id).first();
       if(request.method==='GET') {
