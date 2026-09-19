@@ -500,7 +500,12 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
   };
 
   const defaultOrder = ["hero", "about", "join", "membership", "archive", "events", "newsletter", "contact"];
-  const requestedOrder = Array.isArray(pub.section_order) && pub.section_order.length ? pub.section_order : defaultOrder;
+  const requestedOrder = Array.isArray(pub.section_order) && pub.section_order.length ? [...pub.section_order] : [...defaultOrder];
+  if (newsletterVisible && !requestedOrder.includes("newsletter")) {
+    const contactIndex = requestedOrder.indexOf("contact");
+    if (contactIndex >= 0) requestedOrder.splice(contactIndex, 0, "newsletter");
+    else requestedOrder.push("newsletter");
+  }
   const orderedKeys = [...new Set([...requestedOrder, ...defaultOrder])].filter((key) => sections[key] && visible(pub, key));
 
   return (
