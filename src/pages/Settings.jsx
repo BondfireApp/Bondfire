@@ -455,6 +455,7 @@ export default function Settings({ privateMode = false }) {
   const [publicInboxBusy, setPublicInboxBusy] = React.useState(false);
   const [publicInboxMsg, setPublicInboxMsg] = React.useState("");
   const [publicInboxFilter, setPublicInboxFilter] = React.useState("all");
+  const publicConfigRef = React.useRef(null);
 
   const actionTypeOptions = React.useMemo(() => ([
     { value: "none", label: "Hide this button" },
@@ -675,6 +676,8 @@ React.useEffect(() => {
     e?.preventDefault();
     setMsg("");
     try {
+      await publicConfigRef.current?.saveSiteContent?.();
+
       const payload = {
         enabled,
         newsletter_enabled: !!publicNewsletterEnabled,
@@ -1405,7 +1408,7 @@ React.useEffect(() => {
           </div>
 
           <form id="public-page-settings-form" onSubmit={savePublic} className="grid" style={{ gap: 12, marginTop: 12 }}>
-            <AdminPublicConfigCard />
+            <AdminPublicConfigCard ref={publicConfigRef} />
             <PublicDomainCard slug={slug} />
 
             <label className="row" style={{ gap: 8, alignItems: "center" }}>
