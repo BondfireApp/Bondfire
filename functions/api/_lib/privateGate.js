@@ -6,6 +6,7 @@ import { privateRoute } from '../../../shared/privateContent.js';
 import { privateStudio } from './privateStudio.js';
 import {publicPrivateResponse} from './privatePublication.js';
 import { isOrgModuleEnabled } from './orgModules.js';
+import { decorateDriveRecord } from './driveShares.js';
 
 function isMembershipCiphertext(value) {
   if (typeof value !== 'string' || value.length < 24 || value.length > 1024 * 1024) return false;
@@ -80,6 +81,7 @@ export async function privateRequestGate({env,request}) {
   // REC management is metadata-only and role-gated by its own handlers. The server never sees recovery phrases or recording plaintext.
   if(/^rec\/(claim|archive)$/.test(route)) return null;
   if(mode.state==='migrating') return bad(409,'PRIVATE_MIGRATION_IN_PROGRESS');
+  if(route==='drive/shares') return null;
   // These endpoints only manage intentionally public configuration/hostnames.
   // Their own handlers still enforce org roles and write lockdown.
   if((route==='public/get'&&request.method==='GET')||(route==='public/save'&&request.method==='POST')||route==='public/publication'||route==='public/domains') return null;
@@ -98,7 +100,14 @@ export async function privateRequestGate({env,request}) {
     const gate=await requireOrgRole({env,request,orgId,minRole:'viewer'}); if(!gate.ok) return gate.resp;
     const rows=await getDb(env).prepare("SELECT * FROM org_private_records WHERE org_id=? AND kind LIKE 'drive/%' ORDER BY created_at").bind(orgId).all();
     const data={ok:true,folders:[],notes:[],files:[],templates:[]};
-    for(const row of rows.results||[]) data[row.kind.slice(6)]?.push(storedRecord(row));
+    for(const row of rows.results||[]) {
+      const kind=row.kind;
+      const stored=storedRecord(row);
+      if(['drive/folders','drive/notes','drive/files'].includes(kind)) {
+        const decorated=await decorateDriveRecord(getDb(env),orgId,kind,stored,gate.user.sub);
+        if(decorated) data[kind.slice(6)]?.push(decorated);
+      } else data[kind.slice(6)]?.push(stored);
+    }
     return json(data);
   }
   if(route==='organization' && request.method==='GET') {
