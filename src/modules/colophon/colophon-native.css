@@ -433,3 +433,48 @@ html[data-ui-theme="dark"] .bondfire-colophon-native-shell .wp-list-controls {
   align-items: stretch;
 }
 
+
+
+.bondfire-colophon-newsletter-bridge {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 12px;
+  border-top: 1px solid rgba(0,0,0,.12);
+  background: rgba(0,0,0,.025);
+}
+
+.bondfire-colophon-newsletter-bridge strong {
+  font-size: .9rem;
+}
+
+.bondfire-colophon-newsletter-bridge p {
+  margin: 0;
+  color: inherit;
+  opacity: .78;
+  font-size: .82rem;
+  line-height: 1.45;
+}
+
+.bondfire-colophon-newsletter-bridge .button {
+  justify-self: start;
+}
+
+.bondfire-colophon-newsletter-bridge small.is-error {
+  color: #b42318;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .bondfire-colophon-newsletter-bridge {
+  border-top-color: #38434c;
+  background: #0f1316;
+  color: #f0f3f5;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .bondfire-colophon-newsletter-bridge p {
+  color: #b8c2c9;
+  opacity: 1;
+}
+
+html[data-ui-theme="dark"] .bondfire-colophon-native-shell .bondfire-colophon-newsletter-bridge small.is-error {
+  color: #ff9b9b;
+}
