@@ -118,6 +118,10 @@ assert.match(drive, /if \(snapshot\.fileSubtype === "form"\) await syncPublicFor
 assert.match(formView, /makeSubmissionRecipient/);
 assert.match(formView, /openSubmission/);
 assert.match(formView, /encrypted in their browser before Bondfire receives them/);
+assert.match(drive, /verifyPublicFormProjection/, "Opening a public form must verify the deployed projection first");
+assert.match(drive, /Public form check/, "Public form verification must have a bounded wait");
+assert.match(formView, /Preparing encrypted public form/, "Public form popup must show progress instead of a blank page");
+assert.match(formView, /The public form could not be prepared/, "Public form popup must show a useful failure state");
 assert.match(privateGate, /if\(form\) return null/);
 assert.match(privateGate, /route==='drive\/shares'\|\|route==='drive\/forms-public'/);
 assert.match(privateClient, /tail==='drive\/forms-public'/);
