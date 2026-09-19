@@ -35,6 +35,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
   const [detail, setDetail] = useState(null);
   const [permissions, setPermissions] = useState({});
   const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -47,6 +48,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
     setLoading(true);
     setError("");
     setCopied(false);
+    setBusyLabel("");
 
     (async () => {
       try {
@@ -134,6 +136,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
     }
 
     setBusy(true);
+    setBusyLabel("Preparing encrypted access…");
     setError("");
     try {
       await onApply?.({
@@ -142,12 +145,14 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
         meUserId,
         grants,
         existing: detail || {},
+        onProgress: (label) => setBusyLabel(String(label || "Updating access…")),
       });
       onClose?.();
     } catch (saveError) {
       setError(String(saveError?.message || saveError || "Sharing failed."));
     } finally {
       setBusy(false);
+      setBusyLabel("");
     }
   }
 
@@ -229,7 +234,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
             <button className="btn" type="button" onClick={onClose} disabled={busy}>Cancel</button>
-            {canManage ? <button className="btn-red" type="button" onClick={save} disabled={busy || loading}>{busy ? "Updating access…" : detail?.restricted ? "Update access" : "Restrict & share"}</button> : null}
+            {canManage ? <button className="btn-red" type="button" onClick={save} disabled={busy || loading}>{busy ? (busyLabel || "Updating access…") : detail?.restricted ? "Update access" : "Restrict & share"}</button> : null}
           </div>
         </div>
       </div>
