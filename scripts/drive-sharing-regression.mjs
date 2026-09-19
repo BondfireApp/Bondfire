@@ -67,6 +67,7 @@ assert.match(modal, /Needs to sign in on a device/, "Recipients without encrypti
 assert.match(drive, /action: "prepare"/, "Drive sharing must stage key rotation before resealing content");
 assert.match(drive, /action: "finalize"/, "Drive sharing must finalize permissions only after resealing");
 assert.match(drive, /shareTargetsFor/, "Folder sharing must include descendants");
+assert.match(drive, /directOverride[\s\S]*shareRootId === folder\.id/, "Parent folder rotations must preserve nested direct folder shares");
 assert.match(drive, /canEditSelected/, "Drive UI must enforce view-only editing");
 assert.match(drive, /pending item key has been preserved/, "Interrupted share rotations must be resumable");
 
