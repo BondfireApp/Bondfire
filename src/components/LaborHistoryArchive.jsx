@@ -34,7 +34,17 @@ function Reader({ collection, pageIndex, setPageIndex, onClose, origins }) {
   const page = pages[pageIndex] || null;
   const touchStartX = React.useRef(null);
   const touchStartY = React.useRef(null);
+  const panStartX = React.useRef(null);
+  const panStartY = React.useRef(null);
+  const panStartLeft = React.useRef(0);
+  const panStartTop = React.useRef(0);
+  const pinchStartDistance = React.useRef(null);
+  const pinchStartZoom = React.useRef(1);
+  const pinchActive = React.useRef(false);
   const readerRef = React.useRef(null);
+  const stageRef = React.useRef(null);
+  const zoomRef = React.useRef(1);
+  const [zoom, setZoom] = React.useState(1);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [fullscreenSupported, setFullscreenSupported] = React.useState(false);
 
@@ -46,6 +56,22 @@ function Reader({ collection, pageIndex, setPageIndex, onClose, origins }) {
     () => setPageIndex((index) => Math.min(pages.length - 1, index + 1)),
     [pages.length, setPageIndex],
   );
+
+  const setReaderZoom = React.useCallback((value) => {
+    const resolved = typeof value === "function" ? value(zoomRef.current) : value;
+    const next = Math.min(4, Math.max(1, Math.round(Number(resolved || 1) * 20) / 20));
+    zoomRef.current = next;
+    setZoom(next);
+    return next;
+  }, []);
+
+  const zoomIn = React.useCallback(() => setReaderZoom((value) => value + .25), [setReaderZoom]);
+  const zoomOut = React.useCallback(() => setReaderZoom((value) => value - .25), [setReaderZoom]);
+  const resetZoom = React.useCallback(() => setReaderZoom(1), [setReaderZoom]);
+
+  React.useEffect(() => {
+    stageRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [pageIndex]);
 
   React.useEffect(() => {
     const priorOverflow = document.body.style.overflow;
@@ -119,14 +145,101 @@ function Reader({ collection, pageIndex, setPageIndex, onClose, origins }) {
   const end = Math.min(pages.length, pageIndex + 3);
   const visiblePages = pages.slice(start, end);
 
+  const touchDistance = (touches) => {
+    if (!touches || touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  };
+
   const handleTouchStart = (event) => {
-    const touch = event.touches?.[0];
-    if (!touch) return;
-    touchStartX.current = touch.clientX;
-    touchStartY.current = touch.clientY;
+    const touches = event.touches;
+    if (!touches?.length) return;
+
+    if (touches.length >= 2) {
+      pinchActive.current = true;
+      pinchStartDistance.current = touchDistance(touches);
+      pinchStartZoom.current = zoomRef.current;
+      touchStartX.current = null;
+      touchStartY.current = null;
+      return;
+    }
+
+    const touch = touches[0];
+    panStartX.current = touch.clientX;
+    panStartY.current = touch.clientY;
+    panStartLeft.current = stageRef.current?.scrollLeft || 0;
+    panStartTop.current = stageRef.current?.scrollTop || 0;
+
+    if (zoomRef.current <= 1.01) {
+      touchStartX.current = touch.clientX;
+      touchStartY.current = touch.clientY;
+    } else {
+      touchStartX.current = null;
+      touchStartY.current = null;
+    }
+  };
+
+  const handleTouchMove = (event) => {
+    const touches = event.touches;
+    if (!touches?.length) return;
+
+    if (touches.length >= 2) {
+      event.preventDefault();
+      const startDistance = pinchStartDistance.current || touchDistance(touches);
+      if (!startDistance) return;
+
+      const oldZoom = zoomRef.current;
+      const nextZoom = Math.min(4, Math.max(1, pinchStartZoom.current * (touchDistance(touches) / startDistance)));
+      const stage = stageRef.current;
+      let focus = null;
+
+      if (stage && oldZoom > 0) {
+        const rect = stage.getBoundingClientRect();
+        const midX = ((touches[0].clientX + touches[1].clientX) / 2) - rect.left;
+        const midY = ((touches[0].clientY + touches[1].clientY) / 2) - rect.top;
+        focus = {
+          midX,
+          midY,
+          contentX: (stage.scrollLeft + midX) / oldZoom,
+          contentY: (stage.scrollTop + midY) / oldZoom,
+        };
+      }
+
+      const appliedZoom = setReaderZoom(nextZoom);
+      if (stage && focus) {
+        requestAnimationFrame(() => {
+          stage.scrollLeft = Math.max(0, (focus.contentX * appliedZoom) - focus.midX);
+          stage.scrollTop = Math.max(0, (focus.contentY * appliedZoom) - focus.midY);
+        });
+      }
+      return;
+    }
+
+    const touch = touches[0];
+    const stage = stageRef.current;
+    if (!stage || panStartX.current === null || panStartY.current === null) return;
+
+    event.preventDefault();
+    stage.scrollLeft = panStartLeft.current - (touch.clientX - panStartX.current);
+    stage.scrollTop = panStartTop.current - (touch.clientY - panStartY.current);
   };
 
   const handleTouchEnd = (event) => {
+    if (pinchActive.current) {
+      if ((event.touches?.length || 0) < 2) {
+        pinchActive.current = false;
+        pinchStartDistance.current = null;
+      }
+      return;
+    }
+
+    if (zoomRef.current > 1.01) {
+      touchStartX.current = null;
+      touchStartY.current = null;
+      return;
+    }
+
     if (touchStartX.current === null || touchStartY.current === null) return;
     const touch = event.changedTouches?.[0];
     if (!touch) return;
@@ -167,10 +280,17 @@ function Reader({ collection, pageIndex, setPageIndex, onClose, origins }) {
       </div>
 
       <div
+        ref={stageRef}
         className="bf-history-reader-stage"
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        <div className="bf-history-reader-zoom-controls" role="group" aria-label="Reader zoom controls">
+          <button type="button" onClick={zoomOut} disabled={zoom <= 1} aria-label="Zoom out">−</button>
+          <button type="button" className="is-zoom-level" onClick={resetZoom} aria-label="Reset zoom to 100 percent">{Math.round(zoom * 100)}%</button>
+          <button type="button" onClick={zoomIn} disabled={zoom >= 4} aria-label="Zoom in">+</button>
+        </div>
         <button
           type="button"
           className="bf-history-reader-hit bf-history-reader-hit-prev"
@@ -186,13 +306,19 @@ function Reader({ collection, pageIndex, setPageIndex, onClose, origins }) {
           onClick={goNext}
         />
         <div className="bf-history-reader-page">
-          {page ? (
-            <ArchiveImage
-              page={page}
-              origins={origins}
-              alt={page.title || `${collection.title}, page ${pageIndex + 1}`}
-            />
-          ) : null}
+          <div
+            className="bf-history-reader-page-inner"
+            style={{ width: `${zoom * 100}%`, maxWidth: `${1400 * zoom}px` }}
+            onDoubleClick={() => setReaderZoom((value) => value > 1.01 ? 1 : 2)}
+          >
+            {page ? (
+              <ArchiveImage
+                page={page}
+                origins={origins}
+                alt={page.title || `${collection.title}, page ${pageIndex + 1}`}
+              />
+            ) : null}
+          </div>
         </div>
       </div>
 
