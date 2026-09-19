@@ -7,9 +7,18 @@ export async function ensureSubmissions(db) {
 }
 export async function readPrivateSubmissions({env,request,orgId}) {
  const auth=await requireOrgRole({env,request,orgId,minRole:'admin'});if(!auth.ok)return auth.resp;
- if(request.method!=='GET')return bad(405,'METHOD_NOT_ALLOWED');
  const db=getDb(env);await ensureSubmissions(db);
- return json({ok:true,submissions:(await db.prepare('SELECT * FROM org_private_submissions WHERE org_id=? ORDER BY created_at DESC').bind(orgId).all()).results});
+ if(request.method==='GET') {
+  return json({ok:true,submissions:(await db.prepare('SELECT * FROM org_private_submissions WHERE org_id=? ORDER BY created_at DESC').bind(orgId).all()).results});
+ }
+ if(request.method==='DELETE') {
+  const body=await request.json().catch(()=>({}));
+  const id=String(body?.id||'').trim();
+  if(!id)return bad(400,'MISSING_ID');
+  await db.prepare('DELETE FROM org_private_submissions WHERE org_id=? AND id=?').bind(orgId,id).run();
+  return json({ok:true,deleted:true});
+ }
+ return bad(405,'METHOD_NOT_ALLOWED');
 }
 export async function publicSubmission({env,request,orgId,tail,config}) {
  const db=getDb(env);
