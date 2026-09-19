@@ -7,8 +7,18 @@ import "../styles/organizing-public.css";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const APP_ORIGIN = (import.meta.env.VITE_APP_ORIGIN || "https://bondfireapp.org").replace(/\/+$/, "");
 
+function publicApiUrl(path) {
+  if (path.startsWith("http")) return path;
+  if (typeof window !== "undefined") {
+    const host = String(window.location.hostname || "").toLowerCase();
+    const localDev = host === "localhost" || host === "127.0.0.1";
+    if (!localDev) return path;
+  }
+  return API_BASE ? `${API_BASE}${path}` : path;
+}
+
 async function fetchJson(path) {
-  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const url = publicApiUrl(path);
   const response = await fetch(url, { headers: { Accept: "application/json" } });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) throw new Error(data?.error || data?.message || `HTTP ${response.status}`);
@@ -37,7 +47,7 @@ function actionSpec(raw) {
 }
 
 async function postJson(path, body) {
-  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const url = publicApiUrl(path);
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -243,7 +253,10 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
       else if (code.includes("INVALID_EMAIL")) setNewsletterMessage("Enter a valid email address.");
       else if (code.includes("ENCRYPTED_SUBMISSIONS_NOT_READY")) setNewsletterMessage("Newsletter signup is temporarily unavailable while the branch updates its encryption keys.");
       else if (code.includes("ORG_LOCKDOWN_ACTIVE")) setNewsletterMessage("Newsletter signup is temporarily unavailable.");
-      else setNewsletterMessage("Could not save the signup. Try again in a moment.");
+      else {
+        const safeCode = /^[A-Z0-9_ -]{3,80}$/.test(code) ? code : "";
+        setNewsletterMessage(`Could not save the signup. Try again in a moment.${safeCode ? ` Error: ${safeCode}` : ""}`);
+      }
     } finally {
       setNewsletterBusy(false);
     }
