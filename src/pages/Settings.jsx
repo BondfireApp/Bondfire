@@ -909,7 +909,7 @@ React.useEffect(() => {
       await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter`, {
         method: "PUT",
         body: {
-          enabled: !!nlEnabled,
+          enabled: !!publicNewsletterEnabled,
           list_address: nlListAddress,
           blurb: nlBlurb,
         },
