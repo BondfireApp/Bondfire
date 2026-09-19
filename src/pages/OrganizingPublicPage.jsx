@@ -145,6 +145,11 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
   const [intakeExtra, setIntakeExtra] = React.useState("");
   const [intakeMessage, setIntakeMessage] = React.useState("");
   const [intakeBusy, setIntakeBusy] = React.useState(false);
+  const [newsletterName, setNewsletterName] = React.useState("");
+  const [newsletterEmail, setNewsletterEmail] = React.useState("");
+  const [newsletterWebsite, setNewsletterWebsite] = React.useState("");
+  const [newsletterMessage, setNewsletterMessage] = React.useState("");
+  const [newsletterBusy, setNewsletterBusy] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
@@ -195,6 +200,44 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
   const archiveItems = Array.isArray(pub.archive_items) ? pub.archive_items : [];
   const purposeItems = Array.isArray(pub.site_purpose_items) ? pub.site_purpose_items : [];
   const eventItems = Array.isArray(pub.events_items) ? pub.events_items : [];
+  const newsletterInfo = state.data?.newsletter || null;
+  const newsletterVisible = !!pub.newsletter_enabled && !!pub.show_newsletter_card;
+
+  const submitNewsletter = async (event) => {
+    event?.preventDefault();
+    if (!newsletterVisible || newsletterBusy) return;
+
+    const email = String(newsletterEmail || "").trim();
+    if (!email) {
+      setNewsletterMessage("Enter an email address.");
+      return;
+    }
+
+    setNewsletterBusy(true);
+    setNewsletterMessage("");
+    try {
+      await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, {
+        name: String(newsletterName || "").trim(),
+        email,
+        website: newsletterWebsite,
+      });
+      setNewsletterName("");
+      setNewsletterEmail("");
+      setNewsletterWebsite("");
+      setNewsletterMessage(
+        newsletterInfo?.subscribe_url
+          ? "Saved here. Finish the subscription with Riseup so they can confirm your address."
+          : "Thanks. Your signup was received."
+      );
+    } catch (error) {
+      const code = String(error?.message || "");
+      if (code.includes("RATE_LIMIT")) setNewsletterMessage("Too many signup attempts. Try again later.");
+      else if (code.includes("INVALID_EMAIL")) setNewsletterMessage("Enter a valid email address.");
+      else setNewsletterMessage("Could not save the signup. Try again in a moment.");
+    } finally {
+      setNewsletterBusy(false);
+    }
+  };
 
   const openIntake = (kind) => {
     const normalized = String(kind || "").trim().toLowerCase();
@@ -370,6 +413,79 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
         ))}</div> : null}
       </section>
     ),
+    newsletter: newsletterVisible ? (
+      <section key="newsletter" id="newsletter" className="bf-organizing-section bf-organizing-newsletter">
+        <SectionLabel>Stay connected</SectionLabel>
+        <h2>Get branch updates</h2>
+        <p className="bf-organizing-section-copy">
+          {newsletterInfo?.blurb || "Sign up for branch news, meetings, solidarity actions, and other updates."}
+        </p>
+
+        <div className="bf-organizing-newsletter-card">
+          <form className="bf-organizing-newsletter-form" onSubmit={submitNewsletter}>
+            <label>
+              <span>Name <em>optional</em></span>
+              <input
+                value={newsletterName}
+                onChange={(event) => setNewsletterName(event.target.value)}
+                autoComplete="name"
+                placeholder="Your name"
+              />
+            </label>
+
+            <label>
+              <span>Email</span>
+              <input
+                type="email"
+                value={newsletterEmail}
+                onChange={(event) => setNewsletterEmail(event.target.value)}
+                autoComplete="email"
+                placeholder="you@example.org"
+                required
+              />
+            </label>
+
+            <label className="bf-organizing-newsletter-honeypot" aria-hidden="true">
+              <span>Website</span>
+              <input
+                tabIndex="-1"
+                autoComplete="off"
+                value={newsletterWebsite}
+                onChange={(event) => setNewsletterWebsite(event.target.value)}
+              />
+            </label>
+
+            <button type="submit" className="bf-organizing-button primary" disabled={newsletterBusy}>
+              {newsletterBusy ? "Signing up…" : "Sign up"}
+            </button>
+          </form>
+
+          <div className="bf-organizing-newsletter-copy">
+            <strong>No tracking-pixel nonsense.</strong>
+            <p>Bondfire stores the website signup. Riseup handles mailing-list confirmation and delivery.</p>
+            {newsletterInfo?.subscribe_url ? (
+              <a
+                className="bf-organizing-button"
+                href={newsletterInfo.subscribe_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Subscribe directly with Riseup
+              </a>
+            ) : null}
+          </div>
+        </div>
+
+        {newsletterMessage ? (
+          <div className="bf-organizing-newsletter-message" role="status">
+            <span>{newsletterMessage}</span>
+            {newsletterInfo?.subscribe_url && newsletterMessage.startsWith("Saved here") ? (
+              <a href={newsletterInfo.subscribe_url} target="_blank" rel="noopener noreferrer">Finish with Riseup</a>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+    ) : null,
     contact: (
       <section key="contact" id="contact" className="bf-organizing-section">
         <SectionLabel>Contact and members</SectionLabel>
@@ -383,7 +499,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
     ),
   };
 
-  const defaultOrder = ["hero", "about", "join", "membership", "archive", "events", "contact"];
+  const defaultOrder = ["hero", "about", "join", "membership", "archive", "events", "newsletter", "contact"];
   const requestedOrder = Array.isArray(pub.section_order) && pub.section_order.length ? pub.section_order : defaultOrder;
   const orderedKeys = [...new Set([...requestedOrder, ...defaultOrder])].filter((key) => sections[key] && visible(pub, key));
 
@@ -400,6 +516,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
           {visible(pub, "archive") && archiveItems.length ? <SectionButton id="archive">History</SectionButton> : null}
           {historyManifest ? <SectionButton id="labor-history">Labor History</SectionButton> : null}
           {publication ? <a href={publication.url} target="_blank" rel="noopener noreferrer">{publication.publication_name || "Publication"}</a> : null}
+          {newsletterVisible ? <SectionButton id="newsletter">Newsletter</SectionButton> : null}
           <a className="bf-organizing-signin" href={memberHref}>Member Sign In</a>
         </nav>
       </header>
