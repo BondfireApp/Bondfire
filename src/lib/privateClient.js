@@ -75,6 +75,7 @@ async function reveal(key,orgId,kind,row,transport,hydrate=false) {
   let clear=outer,contentKey=key;
   if(DRIVE_SHARE_KINDS.has(kind)&&outer?.__driveShared?.ciphertext) {
     let share=await resolveDriveShareKey(orgId,kind,row.id,transport,{parentId:row.parentId??null});
+    if(!share?.key) share=await resolveDriveShareKey(orgId,kind,row.id,transport,{preferPending:true,parentId:row.parentId??null});
     if(!share?.key) throw new Error('This shared Drive item cannot be opened on this device because its item key is missing.');
     try {
       clear=await decryptPrivate(share.key,outer.__driveShared.ciphertext,orgId,kind,row.id);
