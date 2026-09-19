@@ -235,102 +235,166 @@
   position: fixed;
   inset: 0;
   z-index: 10000;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  background: #101416;
-  color: #f7f1e7;
-}
-
-.bf-history-reader-bar,
-.bf-history-reader-controls {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px clamp(12px, 3vw, 22px);
-  background: #171c1f;
-  border-color: #34393c;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: rgba(0,0,0,.96);
+  color: #fff;
 }
 
 .bf-history-reader-bar {
-  border-bottom: 1px solid #34393c;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  background: rgba(0,0,0,.72);
+  backdrop-filter: blur(12px);
 }
 
-.bf-history-reader-bar > div {
+.bf-history-reader-title {
   display: grid;
   gap: 2px;
   min-width: 0;
+  padding-right: 8px;
 }
 
-.bf-history-reader-bar strong {
+.bf-history-reader-kicker {
+  color: #cfc9c0;
+  font-size: .68rem !important;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  opacity: 1 !important;
+}
+
+.bf-history-reader-title strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: clamp(1.2rem, 2.2vw, 1.55rem);
+  line-height: 1.15;
 }
 
-.bf-history-reader-bar span {
-  font-size: .78rem;
-  opacity: .72;
+.bf-history-reader-title > span:last-child {
+  margin-top: 2px;
+  color: #cfc9c0;
+  font-size: .82rem;
+}
+
+.bf-history-reader-top-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
 }
 
 .bf-history-reader button {
-  flex: 0 0 auto;
   min-height: 40px;
-  border: 1px solid #5d6265;
-  border-radius: 9px;
-  background: #22292c;
-  color: #fff;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 14px;
+  background: rgba(255,255,255,.055);
+  color: rgba(255,255,255,.86);
   padding: 8px 14px;
   font: inherit;
+  font-size: .86rem;
   font-weight: 700;
   cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 
 .bf-history-reader button:hover:not(:disabled) {
-  border-color: #8a9296;
-  background: #2c3438;
+  border-color: rgba(255,255,255,.36);
+  background: rgba(255,255,255,.1);
+  color: #fff;
 }
 
 .bf-history-reader button:disabled {
-  opacity: .38;
+  opacity: .28;
   cursor: not-allowed;
 }
 
-.bf-history-reader-stage {
-  min-height: 0;
-  overflow: auto;
-  display: grid;
-  place-items: center;
-  padding: 14px;
-  background: #090b0c;
+.bf-history-reader button.is-close {
+  border-color: #fff;
+  background: #fff;
+  color: #171717;
 }
 
-.bf-history-reader-stage img {
+.bf-history-reader button.is-close:hover {
+  background: #e8e4dc;
+  color: #111;
+}
+
+.bf-history-reader-stage {
+  position: relative;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  background: #050505;
+  overscroll-behavior: contain;
+}
+
+.bf-history-reader-page {
+  display: flex;
+  min-height: 100%;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4px;
+}
+
+.bf-history-reader-page img {
   display: block;
-  width: auto;
+  width: 100%;
+  max-width: 1400px;
   height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  box-shadow: 0 10px 45px rgba(0,0,0,.5);
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(0,0,0,.52);
+}
+
+.bf-history-reader-hit {
+  display: none;
 }
 
 .bf-history-reader-controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  border-top: 1px solid #34393c;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 9px 12px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  background: rgba(0,0,0,.82);
+  backdrop-filter: blur(12px);
+  scrollbar-width: thin;
 }
 
-.bf-history-reader-controls input {
-  width: 76px;
-  min-height: 40px;
-  padding: 8px;
-  border: 1px solid #5d6265;
-  border-radius: 8px;
-  outline: none;
-  background: #0d1113;
-  color: #fff;
-  text-align: center;
-  font: inherit;
+.bf-history-reader-controls button {
+  flex: 0 0 auto;
+  min-width: 40px;
+  min-height: 38px;
+  border-radius: 11px;
+  padding: 7px 11px;
+  font-size: .78rem;
+}
+
+.bf-history-reader-controls button.is-active {
+  border-color: rgba(255,255,255,.42);
+  background: #fff;
+  color: #1c1917;
+}
+
+.bf-history-reader-ellipsis {
+  flex: 0 0 auto;
+  padding: 0 2px;
+  color: rgba(255,255,255,.42);
+  font-size: .8rem;
+}
+
+.bf-history-reader button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--org-accent,#a11f1f) 62%, #fff);
+  outline-offset: 2px;
 }
 
 @media (max-width: 1040px) {
@@ -399,11 +463,49 @@
   }
 
   .bf-history-reader-bar {
-    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .bf-history-reader-title strong {
+    max-width: 58vw;
+    font-size: 1.05rem;
+  }
+
+  .bf-history-reader-top-actions button:not(.is-close) {
+    display: none;
+  }
+
+  .bf-history-reader-page {
+    padding: 1px;
+  }
+
+  .bf-history-reader-hit {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 2;
+    display: block;
+    width: 25%;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    opacity: 0;
+  }
+
+  .bf-history-reader-hit-prev {
+    left: 0;
+  }
+
+  .bf-history-reader-hit-next {
+    right: 0;
   }
 
   .bf-history-reader-controls {
-    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 8px;
   }
 }
 
@@ -424,26 +526,27 @@
     font-size: .94rem;
   }
 
-  .bf-history-reader-bar {
-    gap: 10px;
-    padding: 10px;
+  .bf-history-reader-title strong {
+    max-width: 64vw;
   }
 
-  .bf-history-reader-bar strong {
-    max-width: 72vw;
+  .bf-history-reader-kicker {
+    display: none;
   }
 
-  .bf-history-reader-controls {
-    gap: 8px;
-    padding: 10px;
+  .bf-history-reader-title > span:last-child {
+    font-size: .75rem;
+  }
+
+  .bf-history-reader-top-actions .is-close {
+    min-height: 36px;
+    padding: 7px 12px;
   }
 
   .bf-history-reader-controls button {
-    flex: 1 1 110px;
-  }
-
-  .bf-history-reader-controls input {
-    flex: 0 0 72px;
+    min-width: 38px;
+    min-height: 36px;
+    padding: 6px 10px;
   }
 }
 
