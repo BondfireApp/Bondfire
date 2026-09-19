@@ -80,6 +80,7 @@ export async function privateRecords({ env, request, orgId, kind, id = '' }) {
       const access = await driveAccessForUser(db, orgId, kind, id, gate.user.sub);
       if (!access.allowed) return bad(403, 'DRIVE_SHARE_ACCESS_DENIED');
       if (access.restricted && access.permission === 'view' && method !== 'GET') return bad(403, 'DRIVE_SHARE_READ_ONLY');
+      if (access.restricted && !access.canManage && requestedParentId !== (existing.parent_id || null)) return bad(403, 'DRIVE_SHARE_MOVE_REQUIRES_OWNER');
     } else if (requestedParentId) {
       const parentAccess = await driveAccessForUser(db, orgId, 'drive/folders', requestedParentId, gate.user.sub);
       if (!parentAccess.allowed || (parentAccess.restricted && parentAccess.permission === 'view')) return bad(403, 'DRIVE_SHARE_READ_ONLY');
