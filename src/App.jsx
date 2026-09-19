@@ -273,6 +273,21 @@ function Shell() {
 		return state.authed ? <Navigate to="/orgs" replace /> : <PublicStart />;
 	};
 
+	const SignInRoute = () => {
+		if (state.loading) return <div style={{ padding: 16 }} className="helper">Checking session…</div>;
+		if (!state.authed) return <SignIn />;
+
+		const params = new URLSearchParams(loc.search || "");
+		const requestedOrg = String(params.get("org") || "").trim();
+		const validOrgId = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(requestedOrg);
+		return (
+			<Navigate
+				to={validOrgId ? `/org/${encodeURIComponent(requestedOrg)}/overview` : "/orgs"}
+				replace
+			/>
+		);
+	};
+
 	const sessionSupport = React.useMemo(
 		() => createSessionSupportSnapshot({ authed: state.authed, user: state.user }),
 		[state.authed, state.user],
@@ -302,7 +317,7 @@ function Shell() {
 				<Route path="/site/:slug" element={<PublicPage />} />
 				<Route path="/public/*" element={<PublicPage />} />
 				<Route path="/p/*" element={<PublicPage />} />
-				<Route path="/signin" element={<SignIn />} />
+				<Route path="/signin" element={<SignInRoute />} />
 				<Route path="/capture" element={<PublicCapture authed={state.authed} />} />
 				<Route path="/demo" element={<DemoBoot />} />
 				<Route path="/customize" element={<Customize />} />
