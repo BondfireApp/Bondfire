@@ -234,6 +234,66 @@ export function renderNewsletterMessage({ identity, body, unsubscribeUrl }) {
   };
 }
 
+export async function sendNewsletterEmail(env, { from, to, subject, text, html, unsubscribeUrl, idempotencyKey }) {
+  const key = String(env?.RESEND_API_KEY || "").trim();
+  if (!key) {
+    const error = new Error("RESEND_NOT_CONFIGURED");
+    error.code = "RESEND_NOT_CONFIGURED";
+    throw error;
+  }
+
+  const sender = String(from || "").trim();
+  const recipient = String(to || "").trim();
+  if (!sender) {
+    const error = new Error("NEWSLETTER_FROM_NOT_CONFIGURED");
+    error.code = "NEWSLETTER_FROM_NOT_CONFIGURED";
+    throw error;
+  }
+  if (!recipient) {
+    const error = new Error("NEWSLETTER_TO_REQUIRED");
+    error.code = "NEWSLETTER_TO_REQUIRED";
+    throw error;
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + key,
+      "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": String(idempotencyKey).slice(0, 256) } : {}),
+    },
+    body: JSON.stringify({
+      from: sender,
+      to: [recipient],
+      subject: String(subject || "").trim(),
+      text: String(text || ""),
+      html: String(html || ""),
+      ...(unsubscribeUrl ? {
+        headers: {
+          "List-Unsubscribe": "<" + String(unsubscribeUrl) + ">",
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
+      } : {}),
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const code = String(
+      data?.name ||
+      data?.message ||
+      data?.error?.message ||
+      ("RESEND_HTTP_" + response.status)
+    ).slice(0, 300);
+    const error = new Error(code);
+    error.code = code;
+    error.status = response.status;
+    throw error;
+  }
+
+  return { id: String(data?.id || data?.data?.id || "") };
+}
+
 export async function sendNewsletterBatch(env, { from, messages, idempotencyKey }) {
   const key = String(env?.RESEND_API_KEY || "").trim();
   if (!key) {
