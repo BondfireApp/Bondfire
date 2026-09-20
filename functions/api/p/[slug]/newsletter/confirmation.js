@@ -9,7 +9,7 @@ import {
   newsletterRecipientHash,
   newsletterUnsubscribeUrl,
   renderNewsletterConfirmation,
-  sendNewsletterBatch,
+  sendNewsletterEmail,
   verifyNewsletterSignupReceipt,
 } from "../../../_lib/newsletterEmail.js";
 
@@ -116,15 +116,13 @@ export async function onRequestPost(context) {
       unsubscribeUrl,
     });
 
-    await sendNewsletterBatch(env, {
+    await sendNewsletterEmail(env, {
       from: identity.from,
-      messages: [{
-        to: email,
-        subject: "You're subscribed to Red Harbor IWW updates",
-        text: rendered.text,
-        html: rendered.html,
-        unsubscribeUrl,
-      }],
+      to: email,
+      subject: "You're subscribed to Red Harbor IWW updates",
+      text: rendered.text,
+      html: rendered.html,
+      unsubscribeUrl,
       idempotencyKey: `newsletter-confirmation/${orgId}/${verified.subscriberId}`,
     });
 
