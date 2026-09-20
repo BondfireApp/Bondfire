@@ -9,6 +9,8 @@ const sidebar = fs.readFileSync(new URL("../src/components/drive/DriveSidebar.js
 const modal = fs.readFileSync(new URL("../src/components/drive/DriveShareModal.jsx", import.meta.url), "utf8");
 const client = fs.readFileSync(new URL("../src/lib/privateClient.js", import.meta.url), "utf8");
 const clientSharing = fs.readFileSync(new URL("../src/lib/driveSharing.js", import.meta.url), "utf8");
+const zkClient = fs.readFileSync(new URL("../src/lib/zk.js", import.meta.url), "utf8");
+const apiClient = fs.readFileSync(new URL("../src/utils/api.js", import.meta.url), "utf8");
 const shares = fs.readFileSync(new URL("../functions/api/orgs/[orgId]/drive/shares.js", import.meta.url), "utf8");
 const shareStore = fs.readFileSync(new URL("../functions/api/_lib/driveShares.js", import.meta.url), "utf8");
 const privateStore = fs.readFileSync(new URL("../functions/api/_lib/privateStore.js", import.meta.url), "utf8");
@@ -77,6 +79,13 @@ assert.match(drive, /onProgress\?\./, "Drive sharing must report which encryptio
 assert.match(drive, /Promise\.allSettled/, "Post-share Drive refresh must not keep the sharing modal blocked");
 assert.match(modal, /busyLabel/, "Share modal must show progress instead of an indefinite generic spinner");
 assert.match(modal, /Preparing encrypted access/, "Share modal must expose the current sharing stage");
+assert.match(modal, /ensureDeviceKeypair\(\{ register: false \}\)/, "Opening Share must not perform a CSRF-protected device-key write");
+assert.match(clientSharing, /ensureDeviceKeypair\(\{ register: false \}\)/, "Resolving existing Drive share keys must remain read-only");
+assert.match(zkClient, /ensureDeviceKeypair\(\{ register = true \} = \{\}\)/, "Device-key registration must be explicitly suppressible for read paths");
+assert.match(zkClient, /if \(register\)[\s\S]*\/api\/auth\/keys/, "Writable key preparation must still register device keys when needed");
+assert.match(apiClient, /csrfPayload\?\.error === "CSRF_REQUIRED"/, "Blocked writes must recognize stale CSRF sessions");
+assert.match(apiClient, /await tryRefresh\(\)/, "Stale CSRF writes must refresh the cookie session before one safe retry");
+assert.match(apiClient, /retryHeaders\.delete\("x-csrf"\)[\s\S]*applyCsrfHeader\(retryHeaders\)/, "CSRF retry must use the newly issued token instead of replaying the stale header");
 assert.match(client, /inheritedSignal/, "Private Drive subrequests must inherit cancellation from the outer operation");
 
 assert.match(client, /__driveShared/, "Restricted Drive content must use an inner item-key envelope");

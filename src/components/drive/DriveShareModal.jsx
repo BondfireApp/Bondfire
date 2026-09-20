@@ -52,7 +52,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
 
     (async () => {
       try {
-        const device = await ensureDeviceKeypair();
+        const device = await ensureDeviceKeypair({ register: false });
         const deviceId = await deviceKeyId(device.pubJwk);
         const shareData = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares?kind=${encodeURIComponent(target.kind)}&itemId=${encodeURIComponent(target.id)}&deviceId=${encodeURIComponent(deviceId)}`);
         const memberData = shareData?.canManage

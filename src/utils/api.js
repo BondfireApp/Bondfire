@@ -73,6 +73,20 @@ function pickToken() {
     return localStorage.getItem("bf_token") || localStorage.getItem("bf_auth_token") || localStorage.getItem("bf_access_token") || localStorage.getItem("bf_accessToken") || "";
   } catch { return ""; }
 }
+
+function readCsrfCookie() {
+  try {
+    const csrf = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("bf_csrf="));
+    return csrf ? decodeURIComponent(csrf.slice(8)) : "";
+  } catch {
+    return "";
+  }
+}
+
+function applyCsrfHeader(headers) {
+  const csrf = readCsrfCookie();
+  if (csrf) headers.set("x-csrf", csrf);
+}
 function saveToken(tok) { if (!tok) return; try { localStorage.setItem("bf_token", tok); } catch {} }
 async function readJsonMaybe(res) {
   if (!res || res.status === 204 || res.status === 205) return null;
@@ -214,10 +228,7 @@ export async function api(path, options = {}) {
   const isBlob = typeof Blob !== "undefined" && body instanceof Blob;
   const isArrayBuffer = typeof ArrayBuffer !== "undefined" && (body instanceof ArrayBuffer || ArrayBuffer.isView(body));
   if (!headers.has("Content-Type") && body != null && !isFormData && !isBlob && !isArrayBuffer) headers.set("Content-Type", "application/json");
-  try {
-    const csrf = document.cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith('bf_csrf='));
-    if (csrf && !headers.has('x-csrf')) headers.set('x-csrf', decodeURIComponent(csrf.slice(8)));
-  } catch {}
+  if (!headers.has("x-csrf")) applyCsrfHeader(headers);
   const token = pickToken();
   if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
 
@@ -248,6 +259,22 @@ export async function api(path, options = {}) {
     if (token2) retryHeaders.set("Authorization", `Bearer ${token2}`);
     firstRes = await fetch(chosenUrl, { ...fetchOpts, headers: retryHeaders, credentials: "include" });
   }
+
+  if (firstRes.status === 403 && !safeToRetry) {
+    const csrfPayload = await firstRes.clone().json().catch(() => null);
+    if (csrfPayload?.error === "CSRF_REQUIRED" || csrfPayload?.error === "CSRF_INVALID") {
+      const refreshed = await tryRefresh().catch(() => null);
+      if (refreshed) {
+        const retryHeaders = new Headers(headers);
+        retryHeaders.delete("x-csrf");
+        applyCsrfHeader(retryHeaders);
+        const token3 = pickToken();
+        if (token3) retryHeaders.set("Authorization", `Bearer ${token3}`);
+        firstRes = await fetch(chosenUrl, { ...fetchOpts, headers: retryHeaders, credentials: "include" });
+      }
+    }
+  }
+
   if (!firstRes.ok) {
     const text = await firstRes.text().catch(() => "");
     let payload;
