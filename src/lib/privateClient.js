@@ -208,7 +208,6 @@ export async function dispatchPrivate(path,opts,transport) {
         const inboxOriginals=originals.filter(isPublicInboxSubmission);
         const overlays=new Map(reviews.map(row=>[row.id,row]));
         const items=inboxOriginals.map(row=>({...row,...overlays.get(row.id),title:row.source_kind||row.type,contact:row.contact||row.email||row.pledger_email||'',name:row.name||row.pledger_name||'',details:row.details||row.note||row.status||'',id:row.id}));
-        for(const row of reviews)if(!inboxOriginals.some(original=>original.id===row.id))items.push(row);
         return items;
       })():Promise.resolve([]),
     ]);
@@ -228,7 +227,6 @@ export async function dispatchPrivate(path,opts,transport) {
     const reviews=(await dispatchPrivate(`/api/orgs/${encodeURIComponent(orgId)}/intake/reviews`,{},transport)).data.items;
     const overlays=new Map(reviews.map(row=>[row.id,row]));
     const items=originals.map(row=>({...row,...overlays.get(row.id),title:row.source_kind||row.type,contact:row.contact||row.email||row.pledger_email||'',name:row.name||row.pledger_name||'',details:row.details||row.note||row.status||'',id:row.id}));
-    for(const row of reviews)if(!originals.some(original=>original.id===row.id))items.push(row);
     return {handled:true,data:{ok:true,items}};
   }
   if(tail==='newsletter') {
