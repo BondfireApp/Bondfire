@@ -1,6 +1,7 @@
 import { getDB } from "../_bf.js";
 import { getPublicCfg } from "./publicPageStore.js";
 import { listPublicSiteDomains, publicDomainScope } from "./publicSiteDomains.js";
+import { readNewsletterDeliverySettings } from "./newsletterDelivery.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -74,14 +75,10 @@ export async function newsletterIdentity(env, orgId, requestUrl = "") {
   const db = getDB(env);
 
   let settings = null;
-  if (db?.prepare) {
-    try {
-      settings = await db.prepare(
-        "SELECT sender_name, sender_email, reply_to FROM newsletter_settings WHERE org_id = ? LIMIT 1"
-      ).bind(id).first();
-    } catch {
-      settings = null;
-    }
+  try {
+    settings = await readNewsletterDeliverySettings(env, id);
+  } catch {
+    settings = null;
   }
 
   let primaryDomain = null;
