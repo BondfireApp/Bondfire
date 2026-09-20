@@ -99,11 +99,13 @@ async function hkdfAesKey(sharedBits, saltBytes, infoStr) {
   );
 }
 
-export async function ensureDeviceKeypair() {
+export async function ensureDeviceKeypair({ register = true } = {}) {
   const existing = await idbGet(DEVICE_KEY_ID);
   if (existing?.privJwk && existing?.pubJwk) {
     if (!localStorage.getItem(LS_PUB)) localStorage.setItem(LS_PUB, JSON.stringify(existing.pubJwk));
-    await api("/api/auth/keys", { method: "POST", body: JSON.stringify({ public_key: JSON.stringify(existing.pubJwk) }) });
+    if (register) {
+      await api("/api/auth/keys", { method: "POST", body: JSON.stringify({ public_key: JSON.stringify(existing.pubJwk) }) });
+    }
     return existing;
   }
 
