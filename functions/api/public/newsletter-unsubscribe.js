@@ -75,8 +75,16 @@ async function unsubscribe({ env, request }) {
 
   await ensureSubscriberTable(db);
   await ensureSubmissions(db);
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS newsletter_suppressions (
+      org_id TEXT NOT NULL,
+      email_hash TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (org_id, email_hash)
+    )
+  `).run();
 
-  const { orgId, subscriberId } = decoded;
+  const { orgId, subscriberId, emailHash } = decoded;
   const isRedHarbor = orgId === RED_HARBOR_ORG_ID;
   const homeUrl = isRedHarbor ? "https://redharbor.org/" : "/";
   const homeLabel = isRedHarbor ? "Return to Red Harbor" : "Return to the site";
@@ -84,6 +92,10 @@ async function unsubscribe({ env, request }) {
 
   try {
     await db.batch([
+      db.prepare(
+        "INSERT INTO newsletter_suppressions (org_id, email_hash, created_at) VALUES (?, ?, ?) " +
+        "ON CONFLICT(org_id, email_hash) DO UPDATE SET created_at = excluded.created_at"
+      ).bind(orgId, emailHash, Date.now()),
       db.prepare("DELETE FROM newsletter_subscribers WHERE org_id = ? AND id = ?")
         .bind(orgId, subscriberId),
       db.prepare("DELETE FROM org_private_submissions WHERE org_id = ? AND id = ? AND type = 'newsletter'")
