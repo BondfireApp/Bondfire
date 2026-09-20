@@ -81,12 +81,23 @@ export function newsletterIdentity(env, orgId, requestUrl = "") {
   };
 }
 
-export async function makeNewsletterUnsubscribeToken(env, { orgId, subscriberId }) {
+export async function newsletterRecipientHash(env, { orgId, email }) {
+  const normalizedOrgId = String(orgId || "").trim();
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedOrgId || !normalizedEmail) return "";
+  const key = await hmacKey(env);
+  const data = "newsletter-recipient:v1:" + normalizedOrgId + ":" + normalizedEmail;
+  const digest = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+  return base64UrlEncode(digest);
+}
+
+export async function makeNewsletterUnsubscribeToken(env, { orgId, subscriberId, emailHash }) {
   const payload = base64UrlEncode(
     encoder.encode(JSON.stringify({
       v: 1,
       orgId: String(orgId || "").trim(),
       subscriberId: String(subscriberId || "").trim(),
+      emailHash: String(emailHash || "").trim(),
     }))
   );
   const key = await hmacKey(env);
@@ -112,8 +123,9 @@ export async function verifyNewsletterUnsubscribeToken(env, token) {
     if (Number(data?.v) !== 1) return null;
     const orgId = String(data?.orgId || "").trim();
     const subscriberId = String(data?.subscriberId || "").trim();
-    if (!orgId || !subscriberId) return null;
-    return { orgId, subscriberId };
+    const emailHash = String(data?.emailHash || "").trim();
+    if (!orgId || !subscriberId || !/^[A-Za-z0-9_-]{40,}$/.test(emailHash)) return null;
+    return { orgId, subscriberId, emailHash };
   } catch {
     return null;
   }
