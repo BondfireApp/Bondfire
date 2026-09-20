@@ -49,21 +49,6 @@ const readJSON = (k, fallback = {}) => {
 
 const writeJSON = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
-function safeMailto(s) {
-  return encodeURIComponent(String(s || ""));
-}
-
-function riseupListName(address) {
-  const value = String(address || "").trim().toLowerCase();
-  const match = value.match(/^([^@\s]+)@lists\.riseup\.net$/i);
-  return match ? match[1] : "";
-}
-
-function riseupListInfoUrl(address) {
-  const name = riseupListName(address);
-  return name ? `https://lists.riseup.net/www/info/${encodeURIComponent(name)}` : "";
-}
-
 function defaultNewsletterBody(blurb, orgName) {
   return [
     String(blurb || "").trim(),
@@ -1073,18 +1058,6 @@ React.useEffect(() => {
     }
   };
 
-  const openRiseupDraft = () => {
-    const to = (nlListAddress || "").trim();
-    if (!to) {
-      setNlMsg("Set the mailing-list address first.");
-      return;
-    }
-    const subject = String(nlSubject || "").trim() || `${orgName || "Organization"} update`;
-    const body = String(nlDraft || "").trim() || defaultNewsletterBody(nlBlurb, orgName || "Organization");
-    const href = `mailto:${safeMailto(to)}?subject=${safeMailto(subject)}&body=${safeMailto(body)}`;
-    window.location.href = href;
-  };
-
   const copyNewsletterDraft = async () => {
     const subject = String(nlSubject || "").trim();
     const body = String(nlDraft || "").trim();
@@ -1138,7 +1111,6 @@ React.useEffect(() => {
     }
   };
 
-  const riseupInfoUrl = riseupListInfoUrl(nlListAddress);
 
   /* ========== PLEDGES (backend) ========== */
   const [pledges, setPledges] = React.useState([]);
