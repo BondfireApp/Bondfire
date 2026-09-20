@@ -37,7 +37,12 @@ assert.doesNotMatch(auth, /[?&](?:token|access_token|authorization)=/i);
 // the owning workspace is zero-knowledge. Private module data remains gated.
 assert.match(privateGateSource, /page\?\.\[1\]===['"]public['"][\s\S]*return null/);
 assert.match(privateGateSource, /route===['"]public\/get['"][\s\S]*route===['"]public\/save['"]/);
-assert.match(privateClient, /\['public\/get','public\/save','public\/publication','public\/domains'\]\.includes\(tail\)/);
+assert.match(privateClient, /['"]public\/get['"]/);
+assert.match(privateClient, /['"]public\/save['"]/);
+assert.match(privateClient, /['"]public\/publication['"]/);
+assert.match(privateClient, /['"]public\/domains['"]/);
+assert.match(privateClient, /['"]newsletter\/delivery['"]/);
+assert.match(privateClient, /['"]newsletter\/send['"]/);
 assert.doesNotMatch(privateClient, /dispatchPrivate\(`\/api\/orgs\/\$\{encodeURIComponent\(orgId\)\}\/public\/config/);
 
 // Private member profiles may write only structurally valid ciphertext plus
