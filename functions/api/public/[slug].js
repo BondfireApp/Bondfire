@@ -1,6 +1,7 @@
 import { projectOrganizationPageConfig } from "../_lib/publicSurface.js";
 import { listPublicSiteDomains, publicDomainScope } from "../_lib/publicSiteDomains.js";
 import { getPrivateMode } from "../_lib/privateStore.js";
+import { requireOrgRole } from "../_lib/auth.js";
 
 function publicationFromDomain(domain, fallback = null) {
   if (!domain?.hostname) return fallback;
@@ -12,7 +13,7 @@ function publicationFromDomain(domain, fallback = null) {
   };
 }
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, request, params }) {
   const slug = params.slug;
 
   const orgId = await env.BF_PUBLIC.get(`slug:${slug}`);
@@ -76,8 +77,17 @@ export async function onRequestGet({ env, params }) {
     }
   }
 
+  let editor = null;
+  try {
+    const auth = await requireOrgRole({ env, request, orgId, minRole: "admin" });
+    if (auth.ok) editor = { allowed: true, orgId, role: auth.role };
+  } catch {
+    // Public visitors must still receive the public page when auth state is unavailable.
+  }
+
   return Response.json({
     ok: true,
+    editor,
     public: projected,
     newsletter,
     private_mode: privateMode,

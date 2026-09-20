@@ -12,17 +12,18 @@ async function checkEditorAccess(slug) {
 }
 
 export default function PublicPageAdminBar({ slug, initialData, children, onPublished }) {
-  const [access, setAccess] = React.useState(null);
+  const [access, setAccess] = React.useState(() => initialData?.editor?.allowed ? initialData.editor : null);
   const [open, setOpen] = React.useState(false);
 
   React.useEffect(() => {
     let active = true;
-    setAccess(null);
+    const initialAccess = initialData?.editor?.allowed ? initialData.editor : null;
+    setAccess(initialAccess);
     checkEditorAccess(slug)
-      .then((result) => { if (active) setAccess(result); })
-      .catch(() => { if (active) setAccess(null); });
+      .then((result) => { if (active && result) setAccess(result); })
+      .catch(() => { /* Public visitors simply receive no admin bar. */ });
     return () => { active = false; };
-  }, [slug]);
+  }, [slug, initialData?.editor?.allowed, initialData?.editor?.orgId]);
 
   return (
     <>
