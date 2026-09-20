@@ -1,6 +1,6 @@
-const RED_HARBOR_ORG_ID = "73bdf68b-d67a-4d70-8ae8-7c3bf9c934b0";
-const RED_HARBOR_FROM = "Red Harbor IWW <newsletter@redharbor.org>";
-const RED_HARBOR_ORIGIN = "https://redharbor.org";
+import { getDB } from "../_bf.js";
+import { getPublicCfg } from "./publicPageStore.js";
+import { listPublicSiteDomains, publicDomainScope } from "./publicSiteDomains.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -48,36 +48,104 @@ async function hmacKey(env) {
   );
 }
 
-export function newsletterIdentity(env, orgId, requestUrl = "") {
+function validSenderEmail(value) {
+  const email = String(value || "").trim().toLowerCase();
+  if (!email || email.length > 254) return "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+}
+
+function configuredFromAddress(value, name) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.includes("<") && raw.includes(">")) return raw;
+  const email = validSenderEmail(raw);
+  return email ? `${String(name || "Bondfire organization").trim()} <${email}>` : "";
+}
+
+export async function newsletterIdentity(env, orgId, requestUrl = "") {
   const id = String(orgId || "").trim();
-  if (id === RED_HARBOR_ORG_ID) {
-    return {
-      name: "Red Harbor IWW",
-      from: RED_HARBOR_FROM,
-      publicOrigin: RED_HARBOR_ORIGIN,
-      signupOrigin: "redharbor.org",
-    };
+  if (!id) {
+    const error = new Error("NEWSLETTER_ORG_REQUIRED");
+    error.code = "NEWSLETTER_ORG_REQUIRED";
+    throw error;
   }
 
-  const from = String(env?.NEWSLETTER_FROM || env?.RESEND_FROM || "").trim();
+  const cfg = await getPublicCfg(env, id).catch(() => ({}));
+  const db = getDB(env);
+
+  let settings = null;
+  if (db?.prepare) {
+    try {
+      settings = await db.prepare(
+        "SELECT sender_name, sender_email, reply_to FROM newsletter_settings WHERE org_id = ? LIMIT 1"
+      ).bind(id).first();
+    } catch {
+      settings = null;
+    }
+  }
+
+  let primaryDomain = null;
+  if (db?.prepare) {
+    try {
+      const domains = await listPublicSiteDomains(db, publicDomainScope(id, "organization"));
+      primaryDomain =
+        domains.find((domain) => domain.isPrimary && domain.verificationStatus === "verified") ||
+        domains.find((domain) => domain.verificationStatus === "verified") ||
+        null;
+    } catch {
+      primaryDomain = null;
+    }
+  }
+
+  let requestOrigin = "";
+  try {
+    requestOrigin = new URL(requestUrl).origin;
+  } catch {
+    requestOrigin = "";
+  }
+
+  const name = String(
+    settings?.sender_name ||
+    cfg?.title ||
+    cfg?.branch_label ||
+    "Bondfire organization"
+  ).trim().slice(0, 160);
+
+  const senderEmail =
+    validSenderEmail(settings?.sender_email) ||
+    (primaryDomain?.hostname ? `newsletter@${primaryDomain.hostname}` : "");
+
+  let from = senderEmail ? `${name} <${senderEmail}>` : "";
+  if (!from) {
+    from = configuredFromAddress(env?.NEWSLETTER_FROM || env?.RESEND_FROM, name);
+  }
   if (!from) {
     const error = new Error("NEWSLETTER_FROM_NOT_CONFIGURED");
     error.code = "NEWSLETTER_FROM_NOT_CONFIGURED";
     throw error;
   }
 
-  let publicOrigin = "";
-  try {
-    publicOrigin = new URL(requestUrl).origin;
-  } catch {
-    publicOrigin = "";
+  const publicOrigin = primaryDomain?.hostname
+    ? `https://${primaryDomain.hostname}`
+    : requestOrigin;
+
+  let signupOrigin = primaryDomain?.hostname || "";
+  if (!signupOrigin && publicOrigin) {
+    try {
+      signupOrigin = new URL(publicOrigin).hostname;
+    } catch {
+      signupOrigin = "";
+    }
   }
+  if (!signupOrigin) signupOrigin = String(cfg?.slug || "this organization").trim();
 
   return {
-    name: "Bondfire organization",
+    name,
     from,
+    senderEmail,
+    replyTo: validSenderEmail(settings?.reply_to),
     publicOrigin,
-    signupOrigin: publicOrigin ? new URL(publicOrigin).hostname : "this organization",
+    signupOrigin,
   };
 }
 
@@ -144,7 +212,7 @@ export function renderNewsletterConfirmation({ identity, name, unsubscribeUrl })
     "",
     `You're subscribed to ${orgName} updates.`,
     "",
-    "We'll send new bulletins and branch updates to this address.",
+    "We'll send organization updates to this address.",
     "",
     "If you did not sign up, you can unsubscribe here:",
     unsubscribeUrl,
@@ -153,7 +221,7 @@ export function renderNewsletterConfirmation({ identity, name, unsubscribeUrl })
   const html = `<div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;line-height:1.65;color:#171717;max-width:680px;margin:0 auto">
     <p>${htmlEscape(greeting)}</p>
     <p>You're subscribed to <strong>${htmlEscape(orgName)}</strong> updates.</p>
-    <p>We'll send new bulletins and branch updates to this address.</p>
+    <p>We'll send organization updates to this address.</p>
     <hr style="margin:32px 0 18px;border:0;border-top:1px solid #ddd">
     <p style="font-size:12px;line-height:1.5;color:#666">If you did not sign up, <a href="${htmlEscape(unsubscribeUrl)}">unsubscribe here</a>.</p>
   </div>`;
