@@ -15,7 +15,6 @@ import { cacheOrgName, loadOrgIdentity } from "../lib/orgIdentity.js";
 
 /* ---------- API helper ---------- */
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
-const RED_HARBOR_ORG_ID = "73bdf68b-d67a-4d70-8ae8-7c3bf9c934b0";
 
 function getToken() {
   // Back-compat: older builds stored a JWT in storage.
@@ -782,10 +781,14 @@ React.useEffect(() => {
   }, [publicInboxItems, publicInboxFilter]);
 
   /* ========== NEWSLETTER (backend + delivery) ========== */
-  const redHarborResend = String(orgId || "") === RED_HARBOR_ORG_ID;
   const [nlEnabled, setNlEnabled] = React.useState(false);
   const [nlListAddress, setNlListAddress] = React.useState("");
   const [nlBlurb, setNlBlurb] = React.useState("");
+  const [nlSenderName, setNlSenderName] = React.useState("");
+  const [nlSenderEmail, setNlSenderEmail] = React.useState("");
+  const [nlReplyTo, setNlReplyTo] = React.useState("");
+  const [nlEffectiveFrom, setNlEffectiveFrom] = React.useState("");
+  const [nlResendConfigured, setNlResendConfigured] = React.useState(false);
   const [nlSubject, setNlSubject] = React.useState("");
   const [nlDraft, setNlDraft] = React.useState("");
   const [nlMsg, setNlMsg] = React.useState("");
@@ -855,6 +858,11 @@ React.useEffect(() => {
       setNlEnabled(!!cfg.enabled);
       setNlListAddress(String(cfg.list_address || cfg.listAddress || ""));
       setNlBlurb(nextBlurb);
+      setNlSenderName(String(cfg.sender_name || ""));
+      setNlSenderEmail(String(cfg.sender_email || ""));
+      setNlReplyTo(String(cfg.reply_to || ""));
+      setNlEffectiveFrom(String(cfg.effective_from || ""));
+      setNlResendConfigured(!!cfg.resend_configured);
       setNlSubject((current) => current || `${orgName || "Organization"} update`);
       setNlDraft((current) => current || defaultNewsletterBody(nextBlurb, orgName || "Organization"));
     } catch (e) {
@@ -926,6 +934,9 @@ React.useEffect(() => {
           enabled: !!publicNewsletterEnabled,
           list_address: nlListAddress,
           blurb: nlBlurb,
+          sender_name: nlSenderName,
+          sender_email: nlSenderEmail,
+          reply_to: nlReplyTo,
         },
       });
       await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/public/save`, {
@@ -1018,7 +1029,7 @@ React.useEffect(() => {
     }
 
     const confirmed = window.confirm(
-      `Send this newsletter from newsletter@redharbor.org to ${recipientCount} subscriber${recipientCount === 1 ? "" : "s"}?`
+      `Send this newsletter from ${nlEffectiveFrom || nlSenderEmail || "the configured sender"} to ${recipientCount} subscriber${recipientCount === 1 ? "" : "s"}?`
     );
     if (!confirmed) return;
 
@@ -1959,14 +1970,15 @@ Outreach`} />
             <div>
               <h2 style={{ margin: 0 }}>Newsletter</h2>
               <p className="helper" style={{ margin: "6px 0 0", maxWidth: 760 }}>
-                {redHarborResend
-                  ? "Website signups stay in Bondfire as the source of truth. Resend handles delivery from newsletter@redharbor.org."
-                  : "Website signups are collected in Bondfire. Riseup remains the delivery list, so confirmed Riseup membership is the source of truth for who actually receives mail."}
+                Website signups stay in Bondfire as the source of truth. Resend handles confirmation emails and newsletter delivery for this organization.
               </p>
             </div>
             <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               <span className={publicNewsletterEnabled ? "bf-newsletter-status is-on" : "bf-newsletter-status"}>
                 {publicNewsletterEnabled ? "Signups on" : "Signups off"}
+              </span>
+              <span className={nlResendConfigured ? "bf-newsletter-status is-on" : "bf-newsletter-status"}>
+                {nlResendConfigured ? "Resend ready" : "Resend not configured"}
               </span>
               <span className="bf-newsletter-status">{subscribers.length} website signup{subscribers.length === 1 ? "" : "s"}</span>
             </div>
@@ -1994,7 +2006,7 @@ Outreach`} />
                   />
                   <span>
                     <strong>Accept newsletter signups</strong>
-                    <span className="helper">Visitors may submit their name and email through the public site.</span>
+                    <span className="helper">Visitors may submit their name and email through the public site and receive an automatic confirmation email.</span>
                   </span>
                 </label>
 
@@ -2017,74 +2029,73 @@ Outreach`} />
               <section className="card bf-newsletter-panel" style={{ padding: 14 }}>
                 <div className="bf-newsletter-panel-head">
                   <div>
-                    <h3>{redHarborResend ? "Delivery through Resend" : "Delivery through Riseup"}</h3>
-                    <p className="helper">
-                      {redHarborResend
-                        ? "Red Harbor newsletters send directly through the configured Resend account."
-                        : "This is the mailing-list address you send newsletters to."}
-                    </p>
+                    <h3>Delivery through Resend</h3>
+                    <p className="helper">Configure the sender identity used for this organization's confirmation emails and newsletters.</p>
                   </div>
                 </div>
 
-                {redHarborResend ? (
-                  <div className="bf-newsletter-note">
-                    <strong>From:</strong> newsletter@redharbor.org
-                    <br />
-                    Private-mode subscriber addresses remain encrypted at rest in Bondfire. This page decrypts them in your browser; pressing Send passes them to the server only for delivery through Resend, without storing a plaintext copy in D1.
-                  </div>
-                ) : (
-                <label className="grid" style={{ gap: 6 }}>
-                  <span className="helper">Riseup list address</span>
-                  <input
-                    className="input"
-                    type="email"
-                    value={nlListAddress}
-                    onChange={(event) => setNlListAddress(event.target.value)}
-                    placeholder="your-list@lists.riseup.net"
-                    autoComplete="off"
-                    spellCheck="false"
-                  />
-                </label>
-                )}
+                <div className="grid" style={{ gap: 10 }}>
+                  <label className="grid" style={{ gap: 6 }}>
+                    <span className="helper">Sender name</span>
+                    <input
+                      className="input"
+                      value={nlSenderName}
+                      onChange={(event) => setNlSenderName(event.target.value)}
+                      placeholder={orgName || "Organization"}
+                    />
+                  </label>
 
-                <label className="grid" style={{ gap: 6, marginTop: 10 }}>
-                  <span className="helper">Default opening blurb</span>
-                  <textarea
-                    className="textarea"
-                    rows={4}
-                    value={nlBlurb}
-                    onChange={(event) => setNlBlurb(event.target.value)}
-                    placeholder="A short paragraph you usually include near the top."
-                  />
-                </label>
+                  <label className="grid" style={{ gap: 6 }}>
+                    <span className="helper">Sender email</span>
+                    <input
+                      className="input"
+                      type="email"
+                      value={nlSenderEmail}
+                      onChange={(event) => setNlSenderEmail(event.target.value)}
+                      placeholder="newsletter@example.org"
+                      autoComplete="off"
+                      spellCheck="false"
+                    />
+                  </label>
+
+                  <label className="grid" style={{ gap: 6 }}>
+                    <span className="helper">Reply-to <span style={{ opacity: .7 }}>(optional)</span></span>
+                    <input
+                      className="input"
+                      type="email"
+                      value={nlReplyTo}
+                      onChange={(event) => setNlReplyTo(event.target.value)}
+                      placeholder="contact@example.org"
+                      autoComplete="off"
+                      spellCheck="false"
+                    />
+                  </label>
+                </div>
+
+                <div className="bf-newsletter-note" style={{ marginTop: 12 }}>
+                  <strong>Effective From:</strong> {nlEffectiveFrom || "Not configured yet"}
+                  <br />
+                  If Sender email is blank, Bondfire uses newsletter@ on the organization's verified custom domain when available, then falls back to the host's configured newsletter sender.
+                  <br />
+                  The sending domain must also be verified with the Resend account used by this Bondfire host.
+                </div>
+
+                <p className="helper" style={{ marginBottom: 0, marginTop: 10 }}>
+                  Private-mode subscriber addresses remain encrypted at rest. This page decrypts them in your browser; sending passes the addresses to the server only for delivery through Resend without creating a new plaintext subscriber copy in D1.
+                </p>
 
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
                   <button className="btn-red" type="button" onClick={saveNewsletter} disabled={nlBusy}>
                     {nlBusy ? "Saving…" : "Save newsletter settings"}
                   </button>
-                  {!redHarborResend && riseupInfoUrl ? (
-                    <a className="btn" href={riseupInfoUrl} target="_blank" rel="noopener noreferrer">
-                      Open Riseup list
-                    </a>
-                  ) : null}
                 </div>
-
-                <p className="helper" style={{ marginBottom: 0, marginTop: 10 }}>
-                  {redHarborResend
-                    ? "Unsubscribes are handled by a signed link in each message and recorded without storing the subscriber address in plaintext."
-                    : "Bondfire does not impersonate subscribers or silently add them to Riseup. Riseup handles list confirmation and delivery."}
-                </p>
               </section>
 
               <section className="card bf-newsletter-panel" style={{ padding: 14 }}>
                 <div className="bf-newsletter-panel-head">
                   <div>
                     <h3>Write and send</h3>
-                    <p className="helper">
-                      {redHarborResend
-                        ? "Draft here, then send directly to the current website subscriber list through Resend."
-                        : "Draft here, then open the message in your email app addressed to the Riseup list."}
-                    </p>
+                    <p className="helper">Draft here, then send directly to the current Bondfire subscriber list through Resend.</p>
                   </div>
                 </div>
 
@@ -2110,15 +2121,9 @@ Outreach`} />
                 </label>
 
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-                  {redHarborResend ? (
-                    <button className="btn-red" type="button" onClick={sendNewsletter} disabled={nlBusy || subscribers.length === 0}>
-                      {nlBusy ? "Sending…" : `Send to ${new Set(subscribers.map((subscriber) => String(subscriber?.email || "").trim().toLowerCase()).filter(Boolean)).size} subscriber${new Set(subscribers.map((subscriber) => String(subscriber?.email || "").trim().toLowerCase()).filter(Boolean)).size === 1 ? "" : "s"}`}
-                    </button>
-                  ) : (
-                    <button className="btn-red" type="button" onClick={openRiseupDraft} disabled={!String(nlListAddress || "").trim()}>
-                      Open in email app
-                    </button>
-                  )}
+                  <button className="btn-red" type="button" onClick={sendNewsletter} disabled={nlBusy || subscribers.length === 0 || !nlResendConfigured}>
+                    {nlBusy ? "Sending…" : `Send to ${new Set(subscribers.map((subscriber) => String(subscriber?.email || "").trim().toLowerCase()).filter(Boolean)).size} subscriber${new Set(subscribers.map((subscriber) => String(subscriber?.email || "").trim().toLowerCase()).filter(Boolean)).size === 1 ? "" : "s"}`}
+                  </button>
                   <button className="btn" type="button" onClick={copyNewsletterDraft}>
                     Copy draft
                   </button>
@@ -2141,9 +2146,7 @@ Outreach`} />
                 <div>
                   <h3>Website signups</h3>
                   <p className="helper">
-                    {redHarborResend
-                      ? "These are the current Red Harbor website newsletter signups. Resend receives their addresses only when an admin sends a newsletter."
-                      : "These are people who used the Bondfire signup form. They are not necessarily confirmed Riseup list members yet."}
+                    These are the current website newsletter signups for this organization. Resend receives their addresses only for confirmation and delivery.
                   </p>
                 </div>
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -2152,12 +2155,6 @@ Outreach`} />
                   <button className="btn" type="button" onClick={() => exportSubscribersCsv().catch(console.error)} disabled={nlBusy}>Export CSV</button>
                 </div>
               </div>
-
-              {!redHarborResend && riseupInfoUrl && subscribers.length > 0 ? (
-                <div className="bf-newsletter-note">
-                  To move website signups into Riseup, open the Riseup list, go to Members → Multiple add, and paste the copied addresses. Riseup sends the subscription notice instead of Bondfire silently enrolling people.
-                </div>
-              ) : null}
 
               {subscribers.length === 0 ? (
                 <div className="bf-newsletter-empty">
