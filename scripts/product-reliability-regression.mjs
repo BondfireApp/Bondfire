@@ -26,6 +26,8 @@ const checks = [
   ["FireChat uses device-scoped Rust crypto storage", "src/pages/BondfireChat.jsx", /initRustCrypto\(\{[\s\S]*cryptoDatabasePrefix: `bf_mx_crypto_\$\{uidSafe\}_\$\{deviceSafe\}`[\s\S]*useIndexedDB: true/],
   ["FireChat recognizes Matrix cross-signing truth", "src/pages/BondfireChat.jsx", /res\.crossSigningVerified === true/],
   ["settings remain directly reachable", "src/components/AppHeader.jsx", /Organization settings/],
+  ["settings resolves private mode from the organization", "src/pages/Settings.jsx", /setDetectedPrivateMode[\s\S]*\/privacy[\s\S]*state[\s\S]*!== "off"/],
+  ["private settings avoid legacy plaintext newsletter routes", "src/pages/Settings.jsx", /if \(!privateMode\)[\s\S]*\/newsletter/],
   ["encrypted member profiles are self-service", "src/pages/Settings.jsx", /encryptWithOrgKey[\s\S]*body: \{ userId: membersMeUserId, encrypted_blob: encryptedBlob \}/],
   ["member directory prefers profile names over raw account ids", "src/pages/Settings.jsx", /memberDisplayName[\s\S]*<th>Member<\/th>[\s\S]*<th>Contact<\/th>/],
   ["member profile stays reachable from global navigation", "src/components/AppHeader.jsx", /settings\?tab=profile[\s\S]*label="My profile"/],
