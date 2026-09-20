@@ -1,3 +1,5 @@
+import { normalizePublicPage } from "../../../shared/publicPageModel.js";
+
 const MAX_URL_LENGTH = 2000;
 const MAX_DATA_URL_LENGTH = 500000;
 
@@ -200,6 +202,7 @@ export function projectOrganizationPageConfig(input = {}) {
     get_involved_links: cleanLinks(input.get_involved_links, 6, { action: true }),
     section_order: cleanStrings(input.section_order, 30, 64),
     section_visibility: cleanSectionVisibility(input.section_visibility),
+    page: normalizePublicPage(input.page || input.published_page || {}),
     connected_publication: publicPublication,
     logoUrl: normalizeImageSource(logoUrl),
     logoDataUrl: logoDataUrl.startsWith("data:image/") ? logoDataUrl : "",
