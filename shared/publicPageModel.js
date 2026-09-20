@@ -36,11 +36,12 @@ function text(value, max = 4000) {
     .slice(0, max);
 }
 
-export function safePublicUrl(value, { allowActions = false } = {}) {
+export function safePublicUrl(value, { allowActions = false, allowDataImage = false } = {}) {
   const raw = text(value, 2000);
   if (!raw) return "";
   const lower = raw.toLowerCase();
   if (allowActions && (raw.startsWith("#") || lower === "newsletter" || lower.startsWith("modal:"))) return raw;
+  if (allowDataImage && raw.startsWith("data:image/") && raw.length <= 500000) return raw;
   if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
   if (/^(mailto:|tel:|sms:|signal:)/i.test(raw)) return raw;
   try {
@@ -99,7 +100,7 @@ function normalizeProps(type, value = {}) {
     props.eyebrow = text(input.eyebrow, 180);
     props.title = text(input.title || input.text, 500);
     props.text = text(input.text || input.body, 3000);
-    props.imageUrl = safePublicUrl(input.imageUrl || input.image_url);
+    props.imageUrl = safePublicUrl(input.imageUrl || input.image_url, { allowDataImage: true });
     props.buttons = Array.isArray(input.buttons) ? input.buttons.map(link).filter(Boolean).slice(0, 4) : [];
   }
   if (type === "list") props.items = Array.isArray(input.items) ? input.items.map((item) => text(item, 500)).filter(Boolean).slice(0, 24) : [];
@@ -108,7 +109,7 @@ function normalizeProps(type, value = {}) {
     props.url = safePublicUrl(input.url, { allowActions: true });
   }
   if (type === "image") {
-    props.url = safePublicUrl(input.url || input.imageUrl || input.image_url);
+    props.url = safePublicUrl(input.url || input.imageUrl || input.image_url, { allowDataImage: true });
     props.alt = text(input.alt, 300);
     props.caption = text(input.caption, 1000);
   }
