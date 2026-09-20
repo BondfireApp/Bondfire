@@ -51,6 +51,10 @@ export async function privateRequestGate({env,request}) {
   // metadata because it is exposed in outgoing email headers. Private newsletter
   // content, subscriber data, and private settings remain encrypted.
   if(route==='newsletter/delivery') return null;
+  // Sending is an explicit admin action. The send handler validates recipient
+  // IDs against stored subscriber records and does not persist the decrypted
+  // addresses it receives from the admin's browser.
+  if(route==='newsletter/send') return null;
   if(/^emergency(?:\/|$)/.test(route)) return null;
   if(route==='crypto' && request.method==='GET') return null;
   if(route==='crypto' && request.method==='POST') {
