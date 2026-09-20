@@ -27,7 +27,7 @@ function runtimeDiagnostics(env, request) {
     resend_api_key_binding_present: hasOwn("RESEND_API_KEY"),
     resend_api_key_nonempty: nonEmpty("RESEND_API_KEY"),
     jwt_secret_binding_present: hasOwn("JWT_SECRET"),
-    d1_binding_present: hasOwn("DB") || hasOwn("D1"),
+    d1_binding_present: hasOwn("DB") || hasOwn("BF_DB"),
     bf_public_binding_present: hasOwn("BF_PUBLIC"),
     cf_pages: nonEmpty("CF_PAGES") ? String(env.CF_PAGES) : "",
     cf_pages_branch: String(env?.CF_PAGES_BRANCH || ""),
