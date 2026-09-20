@@ -2,6 +2,7 @@ import {getDb,requireOrgRole} from './auth.js';
 import {bad,json} from './http.js';
 import {validPublicKey} from './wrappedKeyValidation.js';
 import {isCiphertext,contentContext} from '../../../shared/privateContent.js';
+import {makeNewsletterSignupReceipt} from './newsletterEmail.js';
 export async function ensureSubmissions(db) {
  await db.prepare('CREATE TABLE IF NOT EXISTS org_private_submissions(org_id TEXT NOT NULL,id TEXT NOT NULL,type TEXT NOT NULL,epoch INTEGER NOT NULL,sender_pub TEXT NOT NULL,salt TEXT NOT NULL,ciphertext TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(org_id,id))').run();
 }
@@ -38,5 +39,6 @@ export async function publicSubmission({env,request,orgId,tail,config}) {
  await ensureSubmissions(db);
  const result=await db.prepare('INSERT OR IGNORE INTO org_private_submissions SELECT ?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM org_private_key_state WHERE org_id=? AND epoch=? AND roster_revision=rotated_revision)').bind(orgId,b.id,type,b.epoch,JSON.stringify(b.sender_pub),b.salt,b.ciphertext,Date.now(),orgId,b.epoch).run();
  if(Number(result?.meta?.changes||0)!==1)return bad(409,'SUBMISSION_KEY_CHANGED_OR_DUPLICATE');
- return json({ok:true,id:b.id});
+ const confirmationReceipt=type==='newsletter'?await makeNewsletterSignupReceipt(env,{orgId,subscriberId:b.id}):'';
+ return json({ok:true,id:b.id,...(confirmationReceipt?{confirmationReceipt}:{})});
 }

@@ -2,6 +2,7 @@ import { getDB, json, bad, readJson, normalizeEmail } from "../../../_bf.js";
 import { enforceOrgWriteLockdown } from "../../../_lib/orgLockdown.js";
 import { getPublicCfg } from "../../../_lib/publicPageStore.js";
 import { rateLimit } from "../../../_lib/rateLimit.js";
+import { makeNewsletterSignupReceipt } from "../../../_lib/newsletterEmail.js";
 
 function validEmail(value) {
   const email = normalizeEmail(value);
@@ -106,7 +107,8 @@ export async function onRequest(context) {
       .bind(name, name, orgId, existing.id)
       .run();
 
-    return json({ ok: true, saved: true, existing: true });
+    const confirmationReceipt = await makeNewsletterSignupReceipt(env, { orgId, subscriberId: existing.id });
+    return json({ ok: true, saved: true, existing: true, id: existing.id, confirmationReceipt });
   }
 
   const now = Date.now();
@@ -119,5 +121,6 @@ export async function onRequest(context) {
     .bind(id, orgId, email, name, "public-site", now)
     .run();
 
-  return json({ ok: true, saved: true, id });
+  const confirmationReceipt = await makeNewsletterSignupReceipt(env, { orgId, subscriberId: id });
+  return json({ ok: true, saved: true, id, confirmationReceipt });
 }
