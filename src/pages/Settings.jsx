@@ -843,7 +843,7 @@ React.useEffect(() => {
 
       const delivery = deliveryResult?.delivery || {};
       const pub = publicResult?.public || {};
-      let nextBlurb = String(pub.newsletter_blurb || "");
+      let nextBlurb = String(pub.newsletter_blurb || delivery.public_blurb || "");
       let legacy = null;
 
       if (!privateMode) {
@@ -2123,7 +2123,7 @@ Outreach`} />
                 </label>
 
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-                  <button className="btn-red" type="button" onClick={sendNewsletter} disabled={nlBusy || subscribers.length === 0 || !nlResendConfigured}>
+                  <button className="btn-red" type="button" onClick={sendNewsletter} disabled={nlBusy || subscribers.length === 0 || !nlResendConfigured || !nlEffectiveFrom}>
                     {nlBusy ? "Sending…" : `Send to ${new Set(subscribers.map((subscriber) => String(subscriber?.email || "").trim().toLowerCase()).filter(Boolean)).size} subscriber${new Set(subscribers.map((subscriber) => String(subscriber?.email || "").trim().toLowerCase()).filter(Boolean)).size === 1 ? "" : "s"}`}
                   </button>
                   <button className="btn" type="button" onClick={copyNewsletterDraft}>
