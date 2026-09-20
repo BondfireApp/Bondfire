@@ -2,12 +2,6 @@ import { projectOrganizationPageConfig } from "../_lib/publicSurface.js";
 import { listPublicSiteDomains, publicDomainScope } from "../_lib/publicSiteDomains.js";
 import { getPrivateMode } from "../_lib/privateStore.js";
 
-function riseupSubscribeUrl(address) {
-  const value = String(address || "").trim().toLowerCase();
-  const match = value.match(/^([^@\s]+)@lists\.riseup\.net$/i);
-  return match ? `https://lists.riseup.net/www/subscribe/${encodeURIComponent(match[1])}` : "";
-}
-
 function publicationFromDomain(domain, fallback = null) {
   if (!domain?.hostname) return fallback;
   return {
@@ -46,14 +40,15 @@ export async function onRequestGet({ env, params }) {
     try {
       if (projected.newsletter_enabled) {
         const newsletterRow = await db.prepare(
-          "SELECT enabled, list_address, blurb FROM newsletter_settings WHERE org_id = ? LIMIT 1"
+          "SELECT enabled, blurb FROM newsletter_settings WHERE org_id = ? LIMIT 1"
         ).bind(orgId).first();
 
         if (newsletterRow) {
           newsletter = {
             enabled: newsletterRow.enabled !== 0,
             blurb: String(newsletterRow.blurb || "").trim(),
-            subscribe_url: riseupSubscribeUrl(newsletterRow.list_address),
+            delivery: "resend",
+            confirmation_email: true,
           };
         }
       }
