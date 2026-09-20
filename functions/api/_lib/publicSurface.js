@@ -135,6 +135,7 @@ export function projectOrganizationPageConfig(input = {}) {
   return {
     enabled: !!input.enabled,
     newsletter_enabled: !!input.newsletter_enabled,
+    newsletter_blurb: cleanText(input.newsletter_blurb, 3000),
     pledges_enabled: input.pledges_enabled !== false,
     show_action_strip: showActionStrip,
     show_needs: input.show_needs !== false,
