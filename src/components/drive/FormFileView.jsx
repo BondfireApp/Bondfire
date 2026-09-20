@@ -363,7 +363,7 @@ export default function FormFileView({ value, onChange, mode = "edit", fileId = 
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 16 }}>Public response link</div>
-              <div className="helper">Anyone with this link can submit without a Bondfire account. Public answers are encrypted in their browser before Bondfire receives them.</div>
+              <div className="helper">Anyone with this link can fill out and submit the form without a Bondfire account. They cannot view or edit the Drive document. Public answers are encrypted in their browser before Bondfire receives them.</div>
             </div>
             <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 700 }}>
               <input type="checkbox" checked={form.publicShare.enabled} onChange={(e) => { void togglePublicShare(e.target.checked); }} />
