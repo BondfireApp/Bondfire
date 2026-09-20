@@ -1,16 +1,14 @@
 import React from "react";
 import LivePublicPageEditor from "./LivePublicPageEditor.jsx";
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+import { api } from "../utils/api.js";
 
 async function checkEditorAccess(slug) {
-  const response = await fetch(API_BASE + "/api/public/" + encodeURIComponent(slug) + "/editor", {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) return null;
-  const data = await response.json().catch(() => ({}));
-  return data?.allowed ? data : null;
+  try {
+    const data = await api("/api/public/" + encodeURIComponent(slug) + "/editor", { method: "GET" });
+    return data?.allowed ? data : null;
+  } catch {
+    return null;
+  }
 }
 
 export default function PublicPageAdminBar({ slug, initialData, children, onPublished }) {
