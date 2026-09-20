@@ -159,10 +159,10 @@ function renderEmbed(url, title) {
   let src = parsed;
   try {
     const host = new URL(parsed).hostname.toLowerCase();
-    if (host.includes("youtube.com") || host === "youtu.be") {
+    if (host === "youtube.com" || host === "www.youtube.com" || host === "m.youtube.com" || host === "youtu.be") {
       const video = host === "youtu.be" ? new URL(parsed).pathname.slice(1) : new URL(parsed).searchParams.get("v");
       if (video) src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(video);
-    } else if (host.includes("vimeo.com")) {
+    } else if (host === "vimeo.com" || host === "www.vimeo.com" || host === "player.vimeo.com") {
       const id = new URL(parsed).pathname.split("/").filter(Boolean).pop();
       if (id) src = "https://player.vimeo.com/video/" + encodeURIComponent(id);
     } else {
@@ -174,7 +174,24 @@ function renderEmbed(url, title) {
   return <iframe className="pp-embed" src={src} title={title || "Embedded content"} loading="lazy" allowFullScreen />;
 }
 
-function StandardBlock({ block, slug, preview }) {
+
+function InlineEditable({ value, onChange, className = "", as = "div", style }) {
+  const Tag = as;
+  return (
+    <Tag
+      className={"pp-inline-editable " + className}
+      style={style}
+      contentEditable
+      suppressContentEditableWarning
+      onInput={(event) => onChange?.(event.currentTarget.textContent || "")}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {value || ""}
+    </Tag>
+  );
+}
+
+function StandardBlock({ block, slug, preview, editor = false, onChangeProps }) {
   const props = block.props || {};
   const style = blockStyle(block);
   switch (block.type) {
@@ -182,18 +199,22 @@ function StandardBlock({ block, slug, preview }) {
       return (
         <section className="pp-hero" style={style}>
           <div className="pp-hero-copy">
-            {props.eyebrow ? <p className="pp-eyebrow">{props.eyebrow}</p> : null}
-            <h1>{props.title || props.text || "Public page"}</h1>
-            {props.text ? <p className="pp-lede">{props.text}</p> : null}
+            {props.eyebrow || editor ? <InlineEditable value={props.eyebrow} onChange={(value) => onChangeProps?.({ eyebrow: value })} className="pp-eyebrow" as="p" /> : null}
+            <InlineEditable value={props.title || props.text || "Public page"} onChange={(value) => onChangeProps?.({ title: value })} as="h1" />
+            {props.text || editor ? <InlineEditable value={props.text} onChange={(value) => onChangeProps?.({ text: value })} className="pp-lede" as="p" /> : null}
             {Array.isArray(props.buttons) && props.buttons.length ? <div className="pp-actions">{props.buttons.map((item, index) => <ActionLink key={index} action={item}>{item.label}</ActionLink>)}</div> : null}
           </div>
           {props.imageUrl ? <img className="pp-hero-image" src={props.imageUrl} alt="" /> : null}
         </section>
       );
     case "heading":
-      return <h2 className="pp-heading" style={style}>{props.text || "Heading"}</h2>;
+      return editor
+        ? <InlineEditable value={props.text || "Heading"} onChange={(value) => onChangeProps?.({ text: value })} className="pp-heading" as="h2" style={style} />
+        : <h2 className="pp-heading" style={style}>{props.text || "Heading"}</h2>;
     case "text":
-      return <p className="pp-text" style={style}>{props.text || ""}</p>;
+      return editor
+        ? <InlineEditable value={props.text || ""} onChange={(value) => onChangeProps?.({ text: value })} className="pp-text" as="p" style={style} />
+        : <p className="pp-text" style={style}>{props.text || ""}</p>;
     case "list":
       return <ul className="pp-list" style={style}>{(props.items || []).map((item, index) => <li key={index}>{item}</li>)}</ul>;
     case "button":
@@ -201,7 +222,10 @@ function StandardBlock({ block, slug, preview }) {
     case "image":
       return props.url ? <figure className="pp-figure" style={style}><img src={props.url} alt={props.alt || ""} /><figcaption>{props.caption || ""}</figcaption></figure> : null;
     case "quote":
-      return <blockquote className="pp-quote" style={style}><p>{props.text || ""}</p>{props.attribution ? <cite>{props.attribution}</cite> : null}</blockquote>;
+      return <blockquote className="pp-quote" style={style}>
+        {editor ? <InlineEditable value={props.text || ""} onChange={(value) => onChangeProps?.({ text: value })} as="p" /> : <p>{props.text || ""}</p>}
+        {props.attribution || editor ? (editor ? <InlineEditable value={props.attribution} onChange={(value) => onChangeProps?.({ attribution: value })} as="cite" /> : <cite>{props.attribution}</cite>) : null}
+      </blockquote>;
     case "divider":
       return <hr className="pp-divider" style={style} />;
     case "spacer":
@@ -221,20 +245,77 @@ function StandardBlock({ block, slug, preview }) {
   }
 }
 
-export function PublicPageRenderer({ page, slug = "", preview = false, selectedId = "", onSelect }) {
+export function PublicPageRenderer({
+  page,
+  slug = "",
+  preview = false,
+  editor = false,
+  selectedId = "",
+  onSelect,
+  onChangeProps,
+  onToggleHidden,
+  onDuplicate,
+  onRemove,
+  onMove,
+}) {
   const normalized = page || { blocks: [] };
+  const [draggedId, setDraggedId] = React.useState("");
+
+  function frameFor(block) {
+    const visible = !block.hidden;
+    if (!editor) {
+      if (!visible) return null;
+      return (
+        <div key={block.id} className="pp-render-block">
+          <StandardBlock block={block} slug={slug} preview={preview} />
+        </div>
+      );
+    }
+    return (
+      <div
+        key={block.id}
+        className={"pp-render-block pp-live-block" + (selectedId === block.id ? " pp-selected" : "") + (block.hidden ? " pp-is-hidden" : "")}
+        draggable
+        tabIndex={0}
+        aria-label={(block.hidden ? "Hidden " : "") + (block.type || "page") + " block"}
+        onClick={(event) => { event.stopPropagation(); onSelect?.(block.id); }}
+        onDragStart={(event) => {
+          setDraggedId(block.id);
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", block.id);
+        }}
+        onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
+        onDrop={(event) => {
+          event.preventDefault();
+          const fromId = event.dataTransfer.getData("text/plain") || draggedId;
+          if (fromId) onMove?.(fromId, block.id);
+          setDraggedId("");
+        }}
+      >
+        <div className="pp-live-block-toolbar" onClick={(event) => event.stopPropagation()}>
+          <span className="pp-live-drag-handle" title="Drag to reorder" aria-hidden="true">⋮⋮</span>
+          <span className="pp-live-block-name">{block.type}</span>
+          <button type="button" onClick={() => onToggleHidden?.(block.id)}>{block.hidden ? "Show" : "Hide"}</button>
+          <button type="button" onClick={() => onDuplicate?.(block.id)}>Duplicate</button>
+          <button type="button" className="pp-live-danger" onClick={() => onRemove?.(block.id)}>Delete</button>
+        </div>
+        {block.hidden ? <div className="pp-live-hidden-label">Hidden on the public page</div> : null}
+        <StandardBlock
+          block={block}
+          slug={slug}
+          preview={preview || editor}
+          editor={editor}
+          onChangeProps={(patch) => onChangeProps?.(block.id, patch)}
+        />
+      </div>
+    );
+  }
+
   return (
-    <main className={"pp-page" + (preview ? " pp-preview" : "")} style={themeStyle(normalized)}>
+    <main className={"pp-page" + (preview ? " pp-preview" : "") + (editor ? " pp-editor-canvas" : "")} style={themeStyle(normalized)} onClick={() => editor && onSelect?.("")}>
       <div className="pp-page-inner">
-        {Array.isArray(normalized.blocks) && normalized.blocks.filter((block) => !block.hidden).map((block) => (
-          <div
-            key={block.id}
-            className={"pp-render-block" + (selectedId === block.id ? " pp-selected" : "")}
-            onClick={onSelect ? (event) => { event.stopPropagation(); onSelect(block.id); } : undefined}
-          >
-            <StandardBlock block={block} slug={slug} preview={preview} />
-          </div>
-        ))}
+        {Array.isArray(normalized.blocks) ? normalized.blocks.map(frameFor) : null}
+        {editor && !normalized.blocks.length ? <div className="pp-empty-page">Add a block from the left to start building this page.</div> : null}
       </div>
     </main>
   );

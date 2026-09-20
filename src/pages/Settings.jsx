@@ -1703,235 +1703,50 @@ React.useEffect(() => {
 
       {/* Public Page */}
       {tab === "public" && (
-        <div className="card" style={{ padding: 16 }}>
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <h2 style={{ marginTop: 0, marginBottom: 6 }}>Public Page</h2>
-              <p className="helper" style={{ margin: 0 }}>Set up the public-facing page visitors will see. Turn sections on or off, choose the theme, and decide what each button does.</p>
-            </div>
-            <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {enabled && slug ? (
-                <a className="btn" data-tour="settings-live-preview" href={`/#/p/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer">Open live preview</a>
-              ) : null}
-              <button className="btn-red" type="submit" form="public-page-settings-form">Save</button>
-            </div>
-          </div>
-
-          <form id="public-page-settings-form" onSubmit={savePublic} className="grid" style={{ gap: 12, marginTop: 12 }}>
-            <AdminPublicConfigCard ref={publicConfigRef} />
-            <PublicDomainCard slug={slug} />
-
-            <label className="row" style={{ gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-              <span>Enable public page</span>
-            </label>
-
-            <div className="bf-two">
-              <label className="grid" style={{ gap: 6 }}>
-                <span className="helper">Share URL (slug)</span>
-                <div className="row" style={{ gap: 8 }}>
-                  <input className="input" style={{ flex: 1 }} value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="e.g. chehalis-river-mutual-aid" />
-                  <button type="button" className="btn" onClick={genSlug}>Generate</button>
-                </div>
-                {slug ? <a className="helper" href={`/#/p/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer">{publicUrl}</a> : null}
-              </label>
-
-              <label className="grid" style={{ gap: 6 }}>
-                <span className="helper">Theme mode</span>
-                <select className="input" value={themeMode} onChange={(e) => setThemeMode(e.target.value)}>
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="bf-two">
-              <label className="grid" style={{ gap: 6 }}>
-                <span className="helper">Title</span>
-                <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Chehalis River Mutual Aid Network" />
-              </label>
-
-              <label className="grid" style={{ gap: 6 }}>
-                <span className="helper">Location line</span>
-                <input className="input" value={locationLine} onChange={(e) => setLocationLine(e.target.value)} placeholder="Aberdeen, WA" />
-              </label>
-            </div>
-
-            <label className="grid" style={{ gap: 6 }}>
-              <span className="helper">Tagline / subtitle</span>
-              <input className="input" value={about} onChange={(e) => setAbout(e.target.value)} placeholder="Mutual aid, community meals, outreach" />
-            </label>
-
-            <div className="card" style={{ padding: 12 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Basics</h3>
-              <p className="helper" style={{ marginTop: 0 }}>Start with the name, link, and color. This is the minimum needed to get the page live.</p>
-
-              <div className="bf-two">
-                <label className="grid" style={{ gap: 6 }}>
-                  <span className="helper">Accent color</span>
-                  <input className="input" type="color" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} />
-                </label>
-                <div className="card" style={{ padding: 12, background: "rgba(255,255,255,0.02)" }}>
-                  <strong style={{ display: "block", marginBottom: 6 }}>How this works</strong>
-                  <div className="helper">1. Turn the public page on.</div>
-                  <div className="helper">2. Choose which sections visitors should see.</div>
-                  <div className="helper">3. Save, then open the live preview.</div>
-                </div>
-              </div>
-
-              <div className="bf-two" style={{ marginTop: 12 }}>
-                <label className="grid" style={{ gap: 6 }}>
-                  <span className="helper">Website button label</span>
-                  <input className="input" value={websiteLabel} onChange={(e) => setWebsiteLabel(e.target.value)} placeholder="Website" />
-                </label>
-                <label className="grid" style={{ gap: 6 }}>
-                  <span className="helper">Website button URL</span>
-                  <input className="input" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.org" />
-                </label>
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: 12 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Sections</h3>
-              <p className="helper" style={{ marginTop: 0 }}>Choose which blocks appear on the public page. You can hide anything that does not apply to this org.</p>
-              <h4 style={{ marginTop: 0 }}>What should appear on the public page?</h4>
-              <div className="bf-two">
-                <label className="row" style={{ gap: 8, alignItems: "center" }}><input type="checkbox" checked={showWebsiteButton} onChange={(e) => setShowWebsiteButton(e.target.checked)} /><span>Show the Website button in the header</span></label>
-                <label className="row" style={{ gap: 8, alignItems: "center" }}><input type="checkbox" checked={showActionStrip} onChange={(e) => setShowActionStrip(e.target.checked)} /><span>Show the main action buttons row</span></label>
-                <label className="row" style={{ gap: 8, alignItems: "center" }}><input type="checkbox" checked={showNeeds} onChange={(e) => setShowNeeds(e.target.checked)} /><span>Show the Current Needs section</span></label>
-                <label className="row" style={{ gap: 8, alignItems: "center" }}><input type="checkbox" checked={showMeetings} onChange={(e) => setShowMeetings(e.target.checked)} /><span>Show the Public Meetings section</span></label>
-                <label className="row" style={{ gap: 8, alignItems: "center" }}><input type="checkbox" checked={showWhatWeDo} onChange={(e) => setShowWhatWeDo(e.target.checked)} /><span>Show the What We Do section</span></label>
-                <label className="row" style={{ gap: 8, alignItems: "center" }}><input type="checkbox" checked={showGetInvolved} onChange={(e) => setShowGetInvolved(e.target.checked)} /><span>Show the Get Involved buttons</span></label>
-              </div>
-
-              <div className="card" style={{ padding: 12, marginTop: 12, background: "rgba(255,255,255,0.02)" }}>
-                <strong>Stay Connected / Newsletter</strong>
-                <div className="grid" style={{ gap: 8, marginTop: 10 }}>
-                  <label className="row" style={{ gap: 8, alignItems: "center" }}>
-                    <input type="checkbox" checked={showNewsletterCard} onChange={(e) => setShowNewsletterCard(e.target.checked)} />
-                    <span>Show the Stay Connected card on the public page</span>
-                  </label>
-                  <label className="row" style={{ gap: 8, alignItems: "center", opacity: showNewsletterCard ? 1 : 0.65 }}>
-                    <input type="checkbox" checked={publicNewsletterEnabled} onChange={(e) => setPublicNewsletterEnabled(e.target.checked)} disabled={!showNewsletterCard} />
-                    <span>Let visitors submit the email signup form</span>
-                  </label>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 12 }}>
-                <label className="row" style={{ gap: 8, alignItems: "center" }}>
-                  <input type="checkbox" checked={publicPledgesEnabled} onChange={(e) => setPublicPledgesEnabled(e.target.checked)} />
-                  <span>Let visitors pledge support on public needs</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: 12 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 8 }}>What We Do</h3>
-              <p className="helper" style={{ marginTop: 0 }}>Add a short list of what the org does. Use one line per item.</p>
-              <label className="grid" style={{ gap: 6 }}>
-                <span className="helper">What we do (one item per line)</span>
-              <textarea className="textarea" rows={4} value={whatWeDo} onChange={(e) => setWhatWeDo(e.target.value)} placeholder={`Free Store
-Community Meals
-Outreach`} />
-              </label>
-            </div>
-
-            <div className="card" style={{ padding: 12 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Main action buttons</h3>
-              <p className="helper" style={{ marginTop: 0 }}>These are the big buttons near the top of the public page.</p>
-              <div className="grid" style={{ gap: 10 }}>
-                {primaryActionItems.map((item, index) => {
-                  const isEnabled = item.kind !== "none";
-                  return (
-                  <div key={`primary-action-${index}`} className="card" style={{ padding: 12, border: "1px solid #222" }}>
-                    <div className="grid" style={{ gap: 8 }}>
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <strong>Button {index + 1}</strong>
-                        <label className="row" style={{ gap: 8, alignItems: "center" }}>
-                          <input
-                            type="checkbox"
-                            checked={isEnabled}
-                            onChange={(e) => toggleActionItemEnabled(setPrimaryActionItems, primaryActionItems, primaryActionDefaults, index, e.target.checked)}
-                          />
-                          <span>Show this button</span>
-                        </label>
-                      </div>
-                      <label className="grid" style={{ gap: 6 }}>
-                        <span className="helper">Button label</span>
-                        <input className="input" value={item.label} onChange={(e) => updateActionItem(setPrimaryActionItems, index, { label: e.target.value })} placeholder={`Button ${index + 1}`} />
-                      </label>
-                      <label className="grid" style={{ gap: 6 }}>
-                        <span className="helper">When someone clicks it</span>
-                        <select className="input" value={item.kind} onChange={(e) => updateActionItem(setPrimaryActionItems, index, { kind: e.target.value, url: e.target.value === "external" ? item.url : "" })}>
-                          {actionTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </select>
-                      </label>
-                      {item.kind === "external" ? (
-                        <label className="grid" style={{ gap: 6 }}>
-                          <span className="helper">Link to open</span>
-                          <input className="input" value={item.url} onChange={(e) => updateActionItem(setPrimaryActionItems, index, { url: e.target.value })} placeholder="https://example.org/form" />
-                        </label>
-                      ) : null}
-                    </div>
-                  </div>
-                );})}
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: 12 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Get Involved buttons</h3>
-              <p className="helper" style={{ marginTop: 0 }}>These are the optional buttons lower on the page. You can hide any of them.</p>
-              <div className="grid" style={{ gap: 10 }}>
-                {getInvolvedActionItems.map((item, index) => {
-                  const isEnabled = item.kind !== "none";
-                  return (
-                  <div key={`involved-action-${index}`} className="card" style={{ padding: 12, border: "1px solid #222" }}>
-                    <div className="grid" style={{ gap: 8 }}>
-                      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <strong>Button {index + 1}</strong>
-                        <label className="row" style={{ gap: 8, alignItems: "center" }}>
-                          <input
-                            type="checkbox"
-                            checked={isEnabled}
-                            onChange={(e) => toggleActionItemEnabled(setGetInvolvedActionItems, getInvolvedActionItems, getInvolvedDefaults, index, e.target.checked)}
-                          />
-                          <span>Show this button</span>
-                        </label>
-                      </div>
-                      <label className="grid" style={{ gap: 6 }}>
-                        <span className="helper">Button label</span>
-                        <input className="input" value={item.label} onChange={(e) => updateActionItem(setGetInvolvedActionItems, index, { label: e.target.value })} placeholder={`Button ${index + 1}`} />
-                      </label>
-                      <label className="grid" style={{ gap: 6 }}>
-                        <span className="helper">When someone clicks it</span>
-                        <select className="input" value={item.kind} onChange={(e) => updateActionItem(setGetInvolvedActionItems, index, { kind: e.target.value, url: e.target.value === "external" ? item.url : "" })}>
-                          {actionTypeOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </select>
-                      </label>
-                      {item.kind === "external" ? (
-                        <label className="grid" style={{ gap: 6 }}>
-                          <span className="helper">Link to open</span>
-                          <input className="input" value={item.url} onChange={(e) => updateActionItem(setGetInvolvedActionItems, index, { url: e.target.value })} placeholder="https://example.org/form" />
-                        </label>
-                      ) : null}
-                    </div>
-                  </div>
-                );})}
-              </div>
-            </div>
-            <div className="row" style={{ gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+        <div className="grid" style={{ gap: 12 }}>
+          <section className="card" style={{ padding: 16 }}>
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div>
-                {msg && <span className={msg.includes("Saved") ? "success" : "error"}>{msg}</span>}
+                <h2 style={{ marginTop: 0, marginBottom: 6 }}>Public Page</h2>
+                <p className="helper" style={{ margin: 0 }}>
+                  The page is edited live, directly on the public canvas. There is no static HTML field to maintain.
+                </p>
               </div>
-              <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                {enabled && slug ? (
-                  <a className="btn" href={`/#/p/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer">Open live preview</a>
-                ) : null}
-                <button className="btn-red" type="submit">Save</button>
-              </div>
+              {enabled && slug ? (
+                <a className="btn-red" data-tour="settings-live-preview" href={`/#/p/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer">
+                  Open live page
+                </a>
+              ) : null}
             </div>
-          </form>
+
+            <form id="public-page-settings-form" onSubmit={savePublic} className="grid" style={{ gap: 12, marginTop: 16 }}>
+              <AdminPublicConfigCard ref={publicConfigRef} />
+              <PublicDomainCard slug={slug} />
+
+              <div className="card" style={{ padding: 14 }}>
+                <h3 style={{ marginTop: 0, marginBottom: 10 }}>Page availability</h3>
+                <div className="grid" style={{ gap: 10 }}>
+                  <label className="row" style={{ gap: 8, alignItems: "center" }}>
+                    <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
+                    <span>Enable public page</span>
+                  </label>
+                  <label className="grid" style={{ gap: 6 }}>
+                    <span className="helper">Share URL (slug)</span>
+                    <div className="row" style={{ gap: 8 }}>
+                      <input className="input" style={{ flex: 1 }} value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="e.g. red-harbor" />
+                      <button type="button" className="btn" onClick={genSlug}>Generate</button>
+                    </div>
+                    {slug ? <a className="helper" href={`/#/p/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer">{publicUrl}</a> : null}
+                  </label>
+                </div>
+              </div>
+
+              <div className="row" style={{ gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+                <span className={msg && !msg.includes("Saved") ? "error" : "success"}>{msg}</span>
+                <button className="btn-red" type="submit">Save page availability</button>
+              </div>
+            </form>
+          </section>
         </div>
       )}
 
