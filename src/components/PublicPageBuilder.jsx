@@ -40,6 +40,59 @@ function Field({ label, children }) {
   return <label className="ppb-sidebar-field"><span>{label}</span>{children}</label>;
 }
 
+function ImageUpload({ label, value, onChange }) {
+  const inputRef = React.useRef(null);
+  const [busy, setBusy] = React.useState(false);
+  async function choose(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    try {
+      const source = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Could not read that image."));
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.readAsDataURL(file);
+      });
+      if (source.length <= 500000) {
+        onChange(source);
+      } else {
+        const image = await new Promise((resolve, reject) => {
+          const element = new Image();
+          element.onerror = () => reject(new Error("That image could not be decoded."));
+          element.onload = () => resolve(element);
+          element.src = source;
+        });
+        const scale = Math.min(1, 1600 / Math.max(image.naturalWidth || 1, image.naturalHeight || 1));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL("image/webp", 0.78);
+        if (compressed.length > 500000) throw new Error("Choose a smaller image.");
+        onChange(compressed);
+      }
+    } catch (error) {
+      window.alert(error?.message || "Unable to prepare that image.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="ppb-sidebar-field">
+      <span>{label}</span>
+      <input value={value || ""} onChange={(event) => onChange(event.target.value)} placeholder="https://… or upload" />
+      <div className="ppb-row">
+        <button className="ppb-small-button" type="button" onClick={() => inputRef.current?.click()} disabled={busy}>{busy ? "Preparing…" : "Upload image"}</button>
+        {value ? <button className="ppb-small-button" type="button" onClick={() => onChange("")} disabled={busy}>Remove</button> : null}
+      </div>
+      <input ref={inputRef} hidden type="file" accept="image/*" onChange={choose} />
+    </div>
+  );
+}
+
+
 function editableStyle(block) {
   const style = block?.style || {};
   return {
@@ -134,7 +187,7 @@ function BlockInspector({ block, updateProps, updateStyle }) {
         <Field label="Eyebrow"><input value={props.eyebrow || ""} onChange={(event) => set("eyebrow", event.target.value)} /></Field>
         <Field label="Title"><input value={props.title || ""} onChange={(event) => set("title", event.target.value)} /></Field>
         <Field label="Intro"><textarea rows={4} value={props.text || ""} onChange={(event) => set("text", event.target.value)} /></Field>
-        <Field label="Hero image URL"><input value={props.imageUrl || ""} onChange={(event) => set("imageUrl", event.target.value)} /></Field>
+        <ImageUpload label="Hero image" value={props.imageUrl || ""} onChange={(value) => set("imageUrl", value)} />
       </> : null}
       {["heading", "text", "quote"].includes(block.type) ? <Field label="Text"><textarea rows={6} value={props.text || ""} onChange={(event) => set("text", event.target.value)} /></Field> : null}
       {block.type === "quote" ? <Field label="Attribution"><input value={props.attribution || ""} onChange={(event) => set("attribution", event.target.value)} /></Field> : null}
@@ -144,7 +197,7 @@ function BlockInspector({ block, updateProps, updateStyle }) {
         <Field label="URL"><input value={props.url || ""} onChange={(event) => set("url", event.target.value)} /></Field>
       </> : null}
       {block.type === "image" ? <>
-        <Field label="Image URL"><input value={props.url || ""} onChange={(event) => set("url", event.target.value)} /></Field>
+        <ImageUpload label="Image" value={props.url || ""} onChange={(value) => set("url", value)} />
         <Field label="Alt text"><input value={props.alt || ""} onChange={(event) => set("alt", event.target.value)} /></Field>
         <Field label="Caption"><textarea rows={3} value={props.caption || ""} onChange={(event) => set("caption", event.target.value)} /></Field>
       </> : null}
