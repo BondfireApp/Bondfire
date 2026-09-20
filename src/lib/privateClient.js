@@ -6,6 +6,11 @@ import {PUBLIC_FIELDS,selectPublicFields,wantsPublication} from '../../shared/pu
 import { resolveDriveShareKey } from './driveSharing.js';
 
 const DRIVE_SHARE_KINDS=new Set(['drive/folders','drive/notes','drive/files']);
+const PUBLIC_INBOX_SUBMISSION_TYPES=new Set(['intake','rsvp']);
+
+function isPublicInboxSubmission(row) {
+  return PUBLIC_INBOX_SUBMISSION_TYPES.has(String(row?.type||'').trim().toLowerCase());
+}
 
 function recArchiveId(record) {
   const direct=String(record?.rec_archive_id||'').trim();
@@ -200,9 +205,10 @@ export async function dispatchPrivate(path,opts,transport) {
           transport(`/api/orgs/${encodeURIComponent(orgId)}/intake/reviews`),
         ]);
         const reviews=await Promise.all((stored.items||[]).map(row=>reveal(key,orgId,'intake/reviews',row,transport)));
+        const inboxOriginals=originals.filter(isPublicInboxSubmission);
         const overlays=new Map(reviews.map(row=>[row.id,row]));
-        const items=originals.map(row=>({...row,...overlays.get(row.id),title:row.source_kind||row.type,contact:row.contact||row.email||row.pledger_email||'',name:row.name||row.pledger_name||'',details:row.details||row.note||row.status||'',id:row.id}));
-        for(const row of reviews)if(!originals.some(original=>original.id===row.id))items.push(row);
+        const items=inboxOriginals.map(row=>({...row,...overlays.get(row.id),title:row.source_kind||row.type,contact:row.contact||row.email||row.pledger_email||'',name:row.name||row.pledger_name||'',details:row.details||row.note||row.status||'',id:row.id}));
+        for(const row of reviews)if(!inboxOriginals.some(original=>original.id===row.id))items.push(row);
         return items;
       })():Promise.resolve([]),
     ]);
@@ -218,7 +224,7 @@ export async function dispatchPrivate(path,opts,transport) {
       let exists=false;try{await transport(target);exists=true;}catch(e){if(e.status!==404)throw e;}
       await dispatchPrivate(target,{method:exists?'PUT':'POST',body:JSON.stringify(body)},transport);
     }
-    const originals=await submissions();
+    const originals=(await submissions()).filter(isPublicInboxSubmission);
     const reviews=(await dispatchPrivate(`/api/orgs/${encodeURIComponent(orgId)}/intake/reviews`,{},transport)).data.items;
     const overlays=new Map(reviews.map(row=>[row.id,row]));
     const items=originals.map(row=>({...row,...overlays.get(row.id),title:row.source_kind||row.type,contact:row.contact||row.email||row.pledger_email||'',name:row.name||row.pledger_name||'',details:row.details||row.note||row.status||'',id:row.id}));
