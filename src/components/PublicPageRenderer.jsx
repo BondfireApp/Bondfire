@@ -175,11 +175,12 @@ function renderEmbed(url, title) {
 }
 
 
-function InlineEditable({ value, onChange, className = "", as = "div" }) {
+function InlineEditable({ value, onChange, className = "", as = "div", style }) {
   const Tag = as;
   return (
     <Tag
       className={"pp-inline-editable " + className}
+      style={style}
       contentEditable
       suppressContentEditableWarning
       onInput={(event) => onChange?.(event.currentTarget.textContent || "")}
@@ -208,11 +209,11 @@ function StandardBlock({ block, slug, preview, editor = false, onChangeProps }) 
       );
     case "heading":
       return editor
-        ? <InlineEditable value={props.text || "Heading"} onChange={(value) => onChangeProps?.({ text: value })} className="pp-heading" as="h2" />
+        ? <InlineEditable value={props.text || "Heading"} onChange={(value) => onChangeProps?.({ text: value })} className="pp-heading" as="h2" style={style} />
         : <h2 className="pp-heading" style={style}>{props.text || "Heading"}</h2>;
     case "text":
       return editor
-        ? <InlineEditable value={props.text || ""} onChange={(value) => onChangeProps?.({ text: value })} className="pp-text" as="p" />
+        ? <InlineEditable value={props.text || ""} onChange={(value) => onChangeProps?.({ text: value })} className="pp-text" as="p" style={style} />
         : <p className="pp-text" style={style}>{props.text || ""}</p>;
     case "list":
       return <ul className="pp-list" style={style}>{(props.items || []).map((item, index) => <li key={index}>{item}</li>)}</ul>;
