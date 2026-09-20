@@ -4,15 +4,12 @@ import PublicPageDefault from "./PublicPageDefault.jsx";
 import OrganizingPublicPage from "./OrganizingPublicPage.jsx";
 import BlockPublicPage from "./BlockPublicPage.jsx";
 import PublicPageAdminBar from "../components/PublicPageAdminBar.jsx";
+import { api } from "../utils/api.js";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 
 async function loadPublicPage(slug) {
-  const path = "/api/public/" + encodeURIComponent(slug);
-  const response = await fetch(API_BASE + path, { headers: { Accept: "application/json" } });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data?.ok === false) throw new Error(data?.error || data?.message || "HTTP " + response.status);
-  return data;
+  return api("/api/public/" + encodeURIComponent(slug), { method: "GET" });
 }
 
 export default function PublicPage() {
