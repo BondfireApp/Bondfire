@@ -5,6 +5,25 @@ import {
   writeNewsletterDeliverySettings,
 } from "../../../_lib/newsletterDelivery.js";
 import { newsletterIdentity } from "../../../_lib/newsletterEmail.js";
+import { getPublicCfg } from "../../../_lib/publicPageStore.js";
+import { getDB } from "../../../_bf.js";
+
+async function publicNewsletterBlurb(env, orgId) {
+  const cfg = await getPublicCfg(env, orgId).catch(() => ({}));
+  const current = String(cfg?.newsletter_blurb || "").trim();
+  if (current) return current;
+
+  const db = getDB(env);
+  if (!db?.prepare) return "";
+  try {
+    const row = await db.prepare(
+      "SELECT blurb FROM newsletter_settings WHERE org_id = ? LIMIT 1"
+    ).bind(orgId).first();
+    return String(row?.blurb || "").trim();
+  } catch {
+    return "";
+  }
+}
 
 export async function onRequestGet({ env, request, params }) {
   const orgId = String(params?.orgId || "").trim();
@@ -28,6 +47,7 @@ export async function onRequestGet({ env, request, params }) {
       resend_configured: !!String(env?.RESEND_API_KEY || "").trim(),
       effective_from: identity?.from || "",
       effective_sender_email: identity?.senderEmail || "",
+      public_blurb: await publicNewsletterBlurb(env, orgId),
     },
   });
 }
