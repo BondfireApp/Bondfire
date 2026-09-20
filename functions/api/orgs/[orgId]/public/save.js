@@ -3,7 +3,7 @@ import { normalizeConnectedPublication } from "../../../_lib/publicSurface.js";
 import { bad, ok } from "../../../_lib/http.js";
 import { requireOrgRole } from "../../../_lib/auth.js";
 import { enforceOrgWriteLockdown } from "../../../_lib/orgLockdown.js";
-import { normalizePublicPage } from "../../../../shared/publicPageModel.js";
+import { normalizePublicPage } from "../../../../../shared/publicPageModel.js";
 
 function cleanText(value, max = 4000) {
   return String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, max);
