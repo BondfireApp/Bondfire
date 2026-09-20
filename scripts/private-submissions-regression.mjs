@@ -20,7 +20,8 @@ const secret={name:'PRIVATE anonymous name',email:'PRIVATE@example.test',details
 for(const [type,path] of [['intake','intake'],['newsletter','newsletter/subscribe'],['pledges','pledges'],['rsvp','meetings/public-meeting/rsvp']]) {
  await anonymous(path,secret,400);
  const sealed=await sealSubmission(pub,type,secret);assert(!JSON.stringify(sealed).includes('PRIVATE'));
- await anonymous(path,sealed);
+ const accepted=await anonymous(path,sealed);
+ if(type==='newsletter') assert.match(String(accepted.confirmationReceipt||''),/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
  const row=sql.prepare('SELECT * FROM org_private_submissions WHERE org_id=? AND id=?').get(orgId,sealed.id);
  assert.deepEqual(await openSubmission(orgId,row,recipient.privateKey),secret);
  await assert.rejects(openSubmission(orgId,{...row,type:'wrong'},recipient.privateKey));
