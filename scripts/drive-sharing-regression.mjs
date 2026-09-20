@@ -58,13 +58,18 @@ assert.equal((await driveAccessForUser(db,"org-1","drive/notes","note-1","alice"
 assert.equal((await driveAccessForUser(db,"org-1","drive/notes","note-1","bob")).allowed,false,"ungranted members must not inherit restricted Drive access");
 assert.equal((await driveAccessForUser(db,"org-1","drive/notes","note-1","owner")).permission,"owner","share owner must retain access");
 
-assert.match(sidebar, /label: "Share"/, "Drive items must expose a Share action");
+assert.match(sidebar, /label: "Manage access"/, "Drive items must describe ACL changes as access management, not ordinary sharing");
 assert.match(sidebar, /Shared with me/, "Drive must expose a Shared with me surface");
 assert.match(sidebar, /sharePermission === "view"/, "Drive explorer must recognize view-only shared items");
 assert.match(modal, /Can view/, "Drive sharing must offer view permission");
 assert.match(modal, /Can edit/, "Drive sharing must offer edit permission");
 assert.match(modal, /disabled=\{String\(member\?\.role \|\| ""\) === "viewer"\}/, "Organization viewers must not be offered an effective edit grant");
-assert.match(modal, /Copying the link does not grant access by itself/, "Drive links must remain permission-bound");
+assert.match(modal, /Private Drive link/, "Permission-bound Drive links must be labeled as private");
+assert.match(modal, /Requires a Bondfire account with permission to this item/, "Private Drive links must explain sign-in and permission requirements");
+assert.match(modal, /Everyone in this organization with Drive access can already open this item/, "Organization-wide Drive access must be explicit before restriction");
+assert.match(modal, /Access inherited from Drive/, "Unrestricted member access must be described as inherited rather than selected");
+assert.match(modal, /Restrict access/, "Organization-wide items must present restriction as the action");
+assert.match(modal, /Copying this link does not grant access by itself/, "Drive links must remain permission-bound");
 assert.match(modal, /Needs to sign in on a device/, "Recipients without encryption keys must be explained instead of silently failing");
 
 assert.match(drive, /action: "prepare"/, "Drive sharing must stage key rotation before resealing content");
