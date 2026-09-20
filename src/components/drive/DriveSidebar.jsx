@@ -560,7 +560,7 @@ export default function DriveSidebar({
               { label: "Open", onClick: () => onSelectFolder?.(folder.id) },
               { label: isCollapsed ? "Expand" : "Collapse", onClick: () => setCollapsedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] })) },
               !readOnly ? { label: "Rename", onClick: () => onRenameFolder?.(folder.id) } : null,
-              { label: "Share", onClick: () => onShareItem?.({ kind: "drive/folders", id: folder.id, label: folder.name || "Folder" }) },
+              { label: "Manage access", onClick: () => onShareItem?.({ kind: "drive/folders", id: folder.id, label: folder.name || "Folder" }) },
               !readOnly ? { label: "Delete folder and contents", danger: true, onClick: () => onDeleteFolder?.(folder.id) } : null,
             ].filter(Boolean)}
           />,
@@ -583,7 +583,7 @@ export default function DriveSidebar({
               { label: "Open", onClick: () => onSelectNote?.(note.id) },
               !readOnly ? { label: "Rename", onClick: () => onRenameNote?.(note.id) } : null,
               !readOnly ? { label: "Move", onClick: () => onMoveNote?.(note.id) } : null,
-              { label: "Share", onClick: () => onShareItem?.({ kind: "drive/notes", id: note.id, label: note.title || "Untitled note" }) },
+              { label: "Manage access", onClick: () => onShareItem?.({ kind: "drive/notes", id: note.id, label: note.title || "Untitled note" }) },
               !readOnly ? { label: "Delete", danger: true, onClick: () => onDeleteNote?.(note.id) } : null,
             ].filter(Boolean)}
           />,
@@ -607,7 +607,7 @@ export default function DriveSidebar({
               { label: "Download", onClick: () => onDownloadFile?.(file) },
               !readOnly ? { label: "Rename", onClick: () => onRenameFile?.(file.id) } : null,
               !readOnly ? { label: "Move", onClick: () => onMoveFile?.(file.id) } : null,
-              { label: "Share", onClick: () => onShareItem?.({ kind: "drive/files", id: file.id, label: file.name || "File" }) },
+              { label: "Manage access", onClick: () => onShareItem?.({ kind: "drive/files", id: file.id, label: file.name || "File" }) },
               !readOnly ? { label: "Delete", danger: true, onClick: () => onDeleteFile?.(file.id) } : null,
             ].filter(Boolean)}
           />,
