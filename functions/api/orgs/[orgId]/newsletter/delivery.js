@@ -8,6 +8,34 @@ import { newsletterIdentity } from "../../../_lib/newsletterEmail.js";
 import { getPublicCfg } from "../../../_lib/publicPageStore.js";
 import { getDB } from "../../../_bf.js";
 
+function runtimeDiagnostics(env, request) {
+  let requestUrl = null;
+  try {
+    requestUrl = new URL(request.url);
+  } catch {
+    requestUrl = null;
+  }
+
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(env || {}, key);
+  const nonEmpty = (key) => !!String(env?.[key] || "").trim();
+
+  return {
+    request_hostname: requestUrl?.hostname || "",
+    request_origin: requestUrl?.origin || "",
+    cf_ray: String(request.headers.get("cf-ray") || ""),
+    cf_colo: String(request?.cf?.colo || ""),
+    resend_api_key_binding_present: hasOwn("RESEND_API_KEY"),
+    resend_api_key_nonempty: nonEmpty("RESEND_API_KEY"),
+    jwt_secret_binding_present: hasOwn("JWT_SECRET"),
+    d1_binding_present: hasOwn("DB") || hasOwn("BF_DB"),
+    bf_public_binding_present: hasOwn("BF_PUBLIC"),
+    cf_pages: nonEmpty("CF_PAGES") ? String(env.CF_PAGES) : "",
+    cf_pages_branch: String(env?.CF_PAGES_BRANCH || ""),
+    cf_pages_commit_sha: String(env?.CF_PAGES_COMMIT_SHA || ""),
+    cf_pages_url: String(env?.CF_PAGES_URL || ""),
+  };
+}
+
 async function publicNewsletterBlurb(env, orgId) {
   const cfg = await getPublicCfg(env, orgId).catch(() => ({}));
   const current = String(cfg?.newsletter_blurb || "").trim();
@@ -48,6 +76,7 @@ export async function onRequestGet({ env, request, params }) {
       effective_from: identity?.from || "",
       effective_sender_email: identity?.senderEmail || "",
       public_blurb: await publicNewsletterBlurb(env, orgId),
+      runtime: runtimeDiagnostics(env, request),
     },
   });
 }
@@ -84,6 +113,7 @@ export async function onRequestPut({ env, request, params }) {
       resend_configured: !!String(env?.RESEND_API_KEY || "").trim(),
       effective_from: identity?.from || "",
       effective_sender_email: identity?.senderEmail || "",
+      runtime: runtimeDiagnostics(env, request),
     },
   });
 }
