@@ -1,8 +1,7 @@
 import { getDB } from "../_bf.js";
 import { verifyNewsletterUnsubscribeToken } from "../_lib/newsletterEmail.js";
 import { ensureSubmissions } from "../_lib/privateSubmissions.js";
-
-const RED_HARBOR_ORG_ID = "73bdf68b-d67a-4d70-8ae8-7c3bf9c934b0";
+import { getPublicCfg } from "../_lib/publicPageStore.js";
 
 function escapeHtml(value) {
   return String(value || "")
@@ -85,10 +84,10 @@ async function unsubscribe({ env, request }) {
   `).run();
 
   const { orgId, subscriberId, emailHash } = decoded;
-  const isRedHarbor = orgId === RED_HARBOR_ORG_ID;
-  const homeUrl = isRedHarbor ? "https://redharbor.org/" : "/";
-  const homeLabel = isRedHarbor ? "Return to Red Harbor" : "Return to the site";
-  const orgName = isRedHarbor ? "Red Harbor" : "this organization";
+  const publicConfig = await getPublicCfg(env, orgId).catch(() => ({}));
+  const orgName = String(publicConfig?.title || publicConfig?.branch_label || "this organization").trim();
+  const homeUrl = "/";
+  const homeLabel = orgName === "this organization" ? "Return to the site" : `Return to ${orgName}`;
 
   try {
     await db.batch([

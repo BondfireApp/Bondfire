@@ -144,7 +144,7 @@ export async function onRequestPost({ env, request, params }) {
 
   let identity;
   try {
-    identity = newsletterIdentity(env, orgId, request.url);
+    identity = await newsletterIdentity(env, orgId, request.url);
   } catch (error) {
     return err(503, clean(error?.code || error?.message || "NEWSLETTER_FROM_NOT_CONFIGURED", 300));
   }
@@ -191,6 +191,7 @@ export async function onRequestPost({ env, request, params }) {
       const result = await sendNewsletterBatch(env, {
         from: identity.from,
         messages,
+        replyTo: identity.replyTo,
         idempotencyKey: `newsletter/${orgId}/${campaignId}/${batchIndex}`,
       });
       sent += chunk.length;
