@@ -32,6 +32,8 @@ const checks = [
   ["newsletter status still reports genuine missing Resend configuration", "src/pages/Settings.jsx", /Resend not configured/],
   ["newsletter subscriber loading fails closed for private storage", "src/pages/Settings.jsx", /const privateActive = String\(privacy\?\.state \|\| "off"\) !== "off"[\s\S]*setNewsletterPrivateMode\(true\)[\s\S]*newsletter\/subscribers/],
   ["private settings avoid legacy plaintext newsletter routes", "src/pages/Settings.jsx", /if \(!privateMode\)[\s\S]*\/newsletter/],
+  ["private client allows newsletter delivery operational route", "src/lib/privateClient.js", /newsletter\/delivery/],
+  ["private client allows newsletter send operational route", "src/lib/privateClient.js", /newsletter\/send/],
   ["encrypted member profiles are self-service", "src/pages/Settings.jsx", /encryptWithOrgKey[\s\S]*body: \{ userId: membersMeUserId, encrypted_blob: encryptedBlob \}/],
   ["member directory prefers profile names over raw account ids", "src/pages/Settings.jsx", /memberDisplayName[\s\S]*<th>Member<\/th>[\s\S]*<th>Contact<\/th>/],
   ["member profile stays reachable from global navigation", "src/components/AppHeader.jsx", /settings\?tab=profile[\s\S]*label="My profile"/],

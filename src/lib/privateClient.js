@@ -140,8 +140,18 @@ export async function dispatchPrivate(path,opts,transport) {
   if(status.state==='off') return null;
   if(status.state!=='enabled') throw new Error('Finish the encrypted-data conversion in Settings → Security before editing this organization.');
   // Organization Page configuration and domain/publication identity are intentionally public.
-  // Let their role-protected server endpoints remain authoritative even for private orgs.
-  if(['public/get','public/save','public/publication','public/domains'].includes(tail)) return null;
+  // Newsletter delivery identity/sending are operational routes: sender identity is
+  // exposed in outgoing mail headers and send is an explicit admin action. Their
+  // server handlers remain authoritative while subscriber/content storage stays encrypted.
+  // Let these role-protected server endpoints pass through for private orgs.
+  if([
+    'public/get',
+    'public/save',
+    'public/publication',
+    'public/domains',
+    'newsletter/delivery',
+    'newsletter/send',
+  ].includes(tail)) return null;
   const key=await loadPrivateKey(orgId,status,transport);
   const method=String(opts.method||'GET').toUpperCase();
   if(method!=='GET'&&key.rotationRequired)throw new Error('Membership or devices changed. An owner must rotate encryption keys in Security before saving.');
