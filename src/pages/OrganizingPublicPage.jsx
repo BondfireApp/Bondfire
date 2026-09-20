@@ -6,7 +6,6 @@ import "../styles/organizing-public.css";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const APP_ORIGIN = (import.meta.env.VITE_APP_ORIGIN || "https://bondfireapp.org").replace(/\/+$/, "");
-const RED_HARBOR_ORG_ID = "73bdf68b-d67a-4d70-8ae8-7c3bf9c934b0";
 
 function publicApiUrl(path) {
   if (path.startsWith("http")) return path;
@@ -233,34 +232,23 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
         website: newsletterWebsite,
       };
 
+      if (!orgId) throw new Error("NEWSLETTER_ORG_NOT_FOUND");
+
+      const orgApi = `/api/public/orgs/${encodeURIComponent(orgId)}`;
       let body = clearBody;
-      let sealed = false;
 
       if (state.data?.private_mode) {
-        const recipient = await fetchJson(`/api/public/${encodeURIComponent(publicSlug)}/submission-key`);
+        const recipient = await fetchJson(`${orgApi}/submission-key`);
         body = await sealSubmission(recipient, "newsletter", clearBody);
-        sealed = true;
       }
 
-      let signupResult;
-      try {
-        signupResult = await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, body);
-      } catch (submitError) {
-        const submitCode = String(submitError?.message || "");
-        if (!sealed && submitCode.includes("ENCRYPTED_SUBMISSION_REQUIRED")) {
-          const recipient = await fetchJson(`/api/public/${encodeURIComponent(publicSlug)}/submission-key`);
-          const encryptedBody = await sealSubmission(recipient, "newsletter", clearBody);
-          signupResult = await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, encryptedBody);
-        } else {
-          throw submitError;
-        }
-      }
+      const signupResult = await postJson(`${orgApi}/newsletter/subscribe`, body);
 
       let confirmationSent = false;
-      let confirmationFailed = false;
-      if (String(orgId || "") === RED_HARBOR_ORG_ID && signupResult?.confirmationReceipt) {
+      let confirmationFailed = "";
+      if (signupResult?.confirmationReceipt) {
         try {
-          await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/confirmation`, {
+          await postJson(`${orgApi}/newsletter/confirmation`, {
             name: clearBody.name,
             email: clearBody.email,
             confirmationReceipt: signupResult.confirmationReceipt,
@@ -280,9 +268,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
           ? "Thanks. You're subscribed. Check your inbox for a confirmation email."
           : confirmationFailed
             ? `Your signup was saved, but the confirmation email could not be sent. You are still subscribed. Error: ${confirmationFailed}`
-            : newsletterInfo?.subscribe_url
-              ? "Saved here. Finish the subscription with Riseup so they can confirm your address."
-              : "Thanks. Your signup was received."
+            : "Thanks. Your signup was received."
       );
     } catch (error) {
       const code = String(error?.message || "");
@@ -524,28 +510,15 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
             <strong>No tracking-pixel nonsense.</strong>
             <p>
               {state.data?.private_mode
-                ? "Bondfire encrypts the website signup for branch admins. Riseup handles mailing-list confirmation and delivery."
-                : "Bondfire stores the website signup. Riseup handles mailing-list confirmation and delivery."}
+                ? "Bondfire encrypts your signup for organization admins. A confirmation email is sent automatically, and every newsletter includes an unsubscribe link."
+                : "Bondfire stores your signup for this organization. A confirmation email is sent automatically, and every newsletter includes an unsubscribe link."}
             </p>
-            {newsletterInfo?.subscribe_url ? (
-              <a
-                className="bf-organizing-button"
-                href={newsletterInfo.subscribe_url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Subscribe directly with Riseup
-              </a>
-            ) : null}
           </div>
         </div>
 
         {newsletterMessage ? (
           <div className="bf-organizing-newsletter-message" role="status">
             <span>{newsletterMessage}</span>
-            {newsletterInfo?.subscribe_url && newsletterMessage.startsWith("Saved here") ? (
-              <a href={newsletterInfo.subscribe_url} target="_blank" rel="noopener noreferrer">Finish with Riseup</a>
-            ) : null}
           </div>
         ) : null}
       </section>
