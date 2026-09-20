@@ -31,6 +31,8 @@ const checks = [
   ["newsletter status distinguishes load failure from missing Resend config", "src/pages/Settings.jsx", /Resend status unavailable/],
   ["newsletter status still reports genuine missing Resend configuration", "src/pages/Settings.jsx", /Resend not configured/],
   ["newsletter subscriber loading fails closed for private storage", "src/pages/Settings.jsx", /const privateActive = String\(privacy\?\.state \|\| "off"\) !== "off"[\s\S]*setNewsletterPrivateMode\(true\)[\s\S]*newsletter\/subscribers/],
+  ["public inbox only accepts actionable intake and RSVP submission types", "src/lib/privateClient.js", /PUBLIC_INBOX_SUBMISSION_TYPES=new Set\(\['intake','rsvp'\]\)/],
+  ["public inbox filters encrypted submissions before rendering", "src/lib/privateClient.js", /originals\.filter\(isPublicInboxSubmission\)/],
   ["private settings avoid legacy plaintext newsletter routes", "src/pages/Settings.jsx", /if \(!privateMode\)[\s\S]*\/newsletter/],
   ["private client allows newsletter delivery operational route", "src/lib/privateClient.js", /newsletter\/delivery/],
   ["private client allows newsletter send operational route", "src/lib/privateClient.js", /newsletter\/send/],
