@@ -17,7 +17,7 @@ function blockStyle(block) {
   const s = block?.style || {};
   return {
     fontFamily: FONT_STACKS[s.fontFamily] || FONT_STACKS.system,
-    fontSize: s.fontSize ? \`\${s.fontSize}px\` : undefined,
+    fontSize: s.fontSize ? s.fontSize + "px" : undefined,
     fontWeight: s.fontWeight || undefined,
     fontStyle: s.fontStyle || undefined,
     color: s.color || undefined,
