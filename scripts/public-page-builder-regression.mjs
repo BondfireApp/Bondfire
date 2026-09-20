@@ -48,6 +48,7 @@ const editorAccess = fs.readFileSync(new URL("../functions/api/public/[slug]/edi
 
 assert.match(adminBar, /Edit page/);
 assert.match(adminBar, /api\(.*\/editor/);
+assert.match(editorAccess, /minRole:\s*"admin"/);
 assert.match(liveEditor, /onClick=\{\(\) => addBlock\(type\)\}/);
 assert.match(liveEditor, /onChangeProps=\{updateProps\}/);
 assert.match(liveEditor, /public\/publish/);
