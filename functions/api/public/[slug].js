@@ -46,7 +46,7 @@ export async function onRequestGet({ env, params }) {
         if (newsletterRow) {
           newsletter = {
             enabled: newsletterRow.enabled !== 0,
-            blurb: String(newsletterRow.blurb || "").trim(),
+            blurb: String(projected.newsletter_blurb || newsletterRow.blurb || "").trim(),
             delivery: "resend",
             confirmation_email: true,
           };
@@ -54,6 +54,15 @@ export async function onRequestGet({ env, params }) {
       }
     } catch (error) {
       console.warn("newsletter public metadata lookup failed", error);
+    }
+
+    if (projected.newsletter_enabled && !newsletter) {
+      newsletter = {
+        enabled: true,
+        blurb: String(projected.newsletter_blurb || "").trim(),
+        delivery: "resend",
+        confirmation_email: true,
+      };
     }
 
     try {
