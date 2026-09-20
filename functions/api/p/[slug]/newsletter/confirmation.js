@@ -139,3 +139,18 @@ export async function onRequestPost(context) {
     return bad(502, code);
   }
 }
+
+
+export async function onRequestGet(context) {
+  const slug = String(context?.params?.slug || "").trim();
+  const orgId = slug ? await getOrgIdBySlug(context.env, slug) : null;
+  const isRedHarbor = orgId === RED_HARBOR_ORG_ID;
+
+  return json({
+    ok: true,
+    delivery: isRedHarbor ? "resend" : "unknown",
+    configured: isRedHarbor ? !!String(context?.env?.RESEND_API_KEY || "").trim() : false,
+    sender: isRedHarbor ? "newsletter@redharbor.org" : "",
+    domain: isRedHarbor ? "redharbor.org" : "",
+  });
+}
