@@ -160,7 +160,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Share ${target.label || "Drive item"}`}
+      aria-label={`Manage access for ${target.label || "Drive item"}`}
       style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.72)", display: "grid", placeItems: "center", padding: 16 }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose?.();
@@ -170,8 +170,8 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 16px 12px", borderBottom: "1px solid rgba(255,255,255,.08)" }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, display: "grid", placeItems: "center", background: "rgba(255,255,255,.06)" }}><Share2 size={18} /></div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ margin: 0, fontSize: 19 }}>Share {target.label || "item"}</h2>
-            <div className="helper" style={{ marginTop: 3 }}>{detail?.inherited ? "Access is currently inherited from a shared folder." : detail?.restricted ? "Only selected members can open this item." : "This item currently uses organization-wide Drive access."}</div>
+            <h2 style={{ margin: 0, fontSize: 19 }}>Manage access for {target.label || "item"}</h2>
+            <div className="helper" style={{ marginTop: 3 }}>{detail?.inherited ? "Access is inherited from a restricted folder." : detail?.restricted ? "Only the selected organization members below can open this item." : "Everyone in this organization with Drive access can already open this item."}</div>
           </div>
           <button className="btn" type="button" aria-label="Close sharing" onClick={onClose} disabled={busy} style={{ padding: 7 }}><X size={16} /></button>
         </div>
@@ -180,12 +180,13 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: 12, border: "1px solid rgba(255,255,255,.09)", borderRadius: 12, background: "rgba(255,255,255,.025)" }}>
             <LockKeyhole size={17} style={{ marginTop: 2, flex: "0 0 auto" }} />
             <div className="helper" style={{ lineHeight: 1.5 }}>
-              Restricted sharing is end-to-end encrypted. Bondfire stores permission records and wrapped item keys, not a readable copy of the document. Copying the link does not grant access by itself.
+              {detail?.restricted || detail?.inherited ? "Restricted access is end-to-end encrypted. Bondfire stores permission records and wrapped item keys, not a readable copy of the document." : "Drive items are available to organization members by default. Use this panel only when you need to restrict this item to specific members."}
             </div>
           </div>
 
           <div>
-            <div style={{ fontWeight: 750, marginBottom: 8 }}>Link</div>
+            <div style={{ fontWeight: 750, marginBottom: 4 }}>Private Drive link</div>
+            <div className="helper" style={{ marginBottom: 8 }}>Requires a Bondfire account with permission to this item. Copying this link does not grant access by itself.</div>
             <div style={{ display: "flex", gap: 8 }}>
               <input className="input" value={link} readOnly style={{ flex: 1, minWidth: 0 }} />
               <button className="btn" type="button" onClick={copyLink} disabled={!link}><Copy size={15} /> {copied ? "Copied" : "Copy"}</button>
@@ -194,8 +195,8 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
 
           <div>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
-              <div style={{ fontWeight: 750 }}>People with access</div>
-              <div className="helper">{selectedCount} selected</div>
+              <div style={{ fontWeight: 750 }}>{detail?.restricted || detail?.inherited ? "People with access" : "Organization members"}</div>
+              <div className="helper">{detail?.restricted || detail?.inherited ? `${selectedCount} selected` : "Access inherited from Drive"}</div>
             </div>
 
             {loading ? <div className="helper" style={{ padding: "14px 0" }}>Loading organization members…</div> : (
@@ -234,7 +235,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
             <button className="btn" type="button" onClick={onClose} disabled={busy}>Cancel</button>
-            {canManage ? <button className="btn-red" type="button" onClick={save} disabled={busy || loading}>{busy ? (busyLabel || "Updating access…") : detail?.restricted ? "Update access" : "Restrict & share"}</button> : null}
+            {canManage ? <button className="btn-red" type="button" onClick={save} disabled={busy || loading}>{busy ? (busyLabel || "Updating access…") : detail?.restricted ? "Update access" : "Restrict access"}</button> : null}
           </div>
         </div>
       </div>
