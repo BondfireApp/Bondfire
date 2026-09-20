@@ -820,6 +820,7 @@ React.useEffect(() => {
   const [nlReplyTo, setNlReplyTo] = React.useState("");
   const [nlEffectiveFrom, setNlEffectiveFrom] = React.useState("");
   const [nlResendConfigured, setNlResendConfigured] = React.useState(false);
+  const [nlDeliveryStatus, setNlDeliveryStatus] = React.useState("loading");
   const [nlRuntime, setNlRuntime] = React.useState(null);
   const [nlSubject, setNlSubject] = React.useState("");
   const [nlDraft, setNlDraft] = React.useState("");
@@ -881,14 +882,37 @@ React.useEffect(() => {
     if (!orgId) return;
     setNlMsg("");
     setNlBusy(true);
+    setNlDeliveryStatus("loading");
+
     try {
-      const [deliveryResult, publicResult] = await Promise.all([
+      const [deliverySettled, publicSettled] = await Promise.allSettled([
         authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter/delivery`, { method: "GET" }),
         authFetch(`/api/orgs/${encodeURIComponent(orgId)}/public/get`, { method: "GET" }),
       ]);
 
-      const delivery = deliveryResult?.delivery || {};
-      const pub = publicResult?.public || {};
+      let delivery = {};
+      if (deliverySettled.status === "fulfilled") {
+        delivery = deliverySettled.value?.delivery || {};
+        const configured = !!delivery.resend_configured;
+        setNlResendConfigured(configured);
+        setNlDeliveryStatus(configured ? "ready" : "not-configured");
+        setNlSenderName(String(delivery.sender_name || ""));
+        setNlSenderEmail(String(delivery.sender_email || ""));
+        setNlReplyTo(String(delivery.reply_to || ""));
+        setNlEffectiveFrom(String(delivery.effective_from || ""));
+        setNlRuntime(delivery.runtime && typeof delivery.runtime === "object" ? delivery.runtime : null);
+      } else {
+        setNlResendConfigured(false);
+        setNlDeliveryStatus("error");
+        setNlRuntime(null);
+      }
+
+      let pub = {};
+      if (publicSettled.status === "fulfilled") {
+        pub = publicSettled.value?.public || {};
+        setNlEnabled(!!pub.newsletter_enabled);
+      }
+
       let nextBlurb = String(pub.newsletter_blurb || delivery.public_blurb || "");
       let legacy = null;
 
@@ -900,19 +924,19 @@ React.useEffect(() => {
         if (!nextBlurb) nextBlurb = String(legacy?.blurb || "");
       }
 
-      setNlEnabled(!!pub.newsletter_enabled);
       setNlListAddress(String(legacy?.list_address || legacy?.listAddress || ""));
       setNlBlurb(nextBlurb);
-      setNlSenderName(String(delivery.sender_name || ""));
-      setNlSenderEmail(String(delivery.sender_email || ""));
-      setNlReplyTo(String(delivery.reply_to || ""));
-      setNlEffectiveFrom(String(delivery.effective_from || ""));
-      setNlResendConfigured(!!delivery.resend_configured);
-      setNlRuntime(delivery.runtime && typeof delivery.runtime === "object" ? delivery.runtime : null);
       setNlSubject((current) => current || `${orgName || "Organization"} update`);
       setNlDraft((current) => current || defaultNewsletterBody(nextBlurb, orgName || "Organization"));
-    } catch (e) {
-      setNlMsg(e.message || "Failed to load newsletter settings");
+
+      const errors = [];
+      if (deliverySettled.status === "rejected") {
+        errors.push(`Delivery status unavailable: ${deliverySettled.reason?.message || "request failed"}`);
+      }
+      if (publicSettled.status === "rejected") {
+        errors.push(`Public signup settings unavailable: ${publicSettled.reason?.message || "request failed"}`);
+      }
+      if (errors.length) setNlMsg(errors.join(" "));
     } finally {
       setNlBusy(false);
     }
@@ -923,9 +947,21 @@ React.useEffect(() => {
     setNlMsg("");
     setNlBusy(true);
     try {
-      const privacy = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/privacy`, { method: "GET" }).catch(() => null);
+      // Never fall back to a plaintext subscriber endpoint when privacy status
+      // cannot be determined. Private mode is anything other than an explicit
+      // "off" state.
+      const privacy = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/privacy`, { method: "GET" });
+      const privateActive = String(privacy?.state || "off") !== "off";
 
-      if (privacy?.state === "enabled") {
+      if (privateActive) {
+        setNewsletterPrivateMode(true);
+
+        if (privacy?.state !== "enabled") {
+          setSubscribers([]);
+          setNlMsg("Encrypted organization setup is not complete yet. Newsletter subscribers will stay unavailable until private storage is ready.");
+          return;
+        }
+
         const scoped = await loadScopedKeys(orgId, authFetch);
         const adminScope = scoped?.key?.scopes?.admin;
         const inbox = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/privacy/submissions`, { method: "GET" });
@@ -949,21 +985,21 @@ React.useEffect(() => {
           }
         }
 
-        setNewsletterPrivateMode(true);
         setSubscribers(clear);
         return;
       }
 
+      setNewsletterPrivateMode(false);
       const r = await authFetch(
         `/api/orgs/${encodeURIComponent(orgId)}/newsletter/subscribers`,
         { method: "GET" }
       );
       const _subs = Array.isArray(r.subscribers) ? r.subscribers : [];
-      setNewsletterPrivateMode(false);
       setSubscribers(await tryDecryptList(orgId, _subs));
     } catch (e) {
       setSubscribers([]);
-      setNlMsg(e.message || "Failed to load subscribers");
+      setNewsletterPrivateMode(true);
+      setNlMsg(e.message || "Failed to determine newsletter subscriber storage mode.");
     } finally {
       setNlBusy(false);
     }
@@ -988,6 +1024,7 @@ React.useEffect(() => {
       const savedDelivery = deliverySave?.delivery || {};
       setNlEffectiveFrom(String(savedDelivery.effective_from || ""));
       setNlResendConfigured(!!savedDelivery.resend_configured);
+      setNlDeliveryStatus(savedDelivery.resend_configured ? "ready" : "not-configured");
       setNlRuntime(savedDelivery.runtime && typeof savedDelivery.runtime === "object" ? savedDelivery.runtime : null);
 
       if (!privateMode) {
@@ -2027,8 +2064,14 @@ Outreach`} />
               <span className={publicNewsletterEnabled ? "bf-newsletter-status is-on" : "bf-newsletter-status"}>
                 {publicNewsletterEnabled ? "Signups on" : "Signups off"}
               </span>
-              <span className={nlResendConfigured ? "bf-newsletter-status is-on" : "bf-newsletter-status"}>
-                {nlResendConfigured ? "Resend ready" : "Resend not configured"}
+              <span className={nlDeliveryStatus === "ready" ? "bf-newsletter-status is-on" : "bf-newsletter-status"}>
+                {nlDeliveryStatus === "loading"
+                  ? "Checking Resend…"
+                  : nlDeliveryStatus === "ready"
+                    ? "Resend ready"
+                    : nlDeliveryStatus === "not-configured"
+                      ? "Resend not configured"
+                      : "Resend status unavailable"}
               </span>
               <span className="bf-newsletter-status">{subscribers.length} website signup{subscribers.length === 1 ? "" : "s"}</span>
             </div>
@@ -2195,7 +2238,7 @@ Outreach`} />
                 </label>
 
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-                  <button className="btn-red" type="button" onClick={sendNewsletter} disabled={nlBusy || subscribers.length === 0 || !nlResendConfigured || !nlEffectiveFrom}>
+                  <button className="btn-red" type="button" onClick={sendNewsletter} disabled={nlBusy || subscribers.length === 0 || nlDeliveryStatus !== "ready" || !nlEffectiveFrom}>
                     {nlBusy ? "Sending…" : `Send to ${new Set(subscribers.map((subscriber) => String(subscriber?.email || "").trim().toLowerCase()).filter(Boolean)).size} subscriber${new Set(subscribers.map((subscriber) => String(subscriber?.email || "").trim().toLowerCase()).filter(Boolean)).size === 1 ? "" : "s"}`}
                   </button>
                   <button className="btn" type="button" onClick={copyNewsletterDraft}>
