@@ -148,7 +148,7 @@ export async function wrapForMember(orgKeyBytes, memberPublicJwk) {
 }
 
 export async function unwrapOrgKey(wrappedStr) {
-  const device = await ensureDeviceKeypair();
+  const device = await ensureDeviceKeypair({ register: false });
   const priv = await importPriv(device.privJwk);
 
   const wrapped = JSON.parse(wrappedStr);
