@@ -775,6 +775,7 @@ React.useEffect(() => {
   const [nlReplyTo, setNlReplyTo] = React.useState("");
   const [nlEffectiveFrom, setNlEffectiveFrom] = React.useState("");
   const [nlResendConfigured, setNlResendConfigured] = React.useState(false);
+  const [nlRuntime, setNlRuntime] = React.useState(null);
   const [nlSubject, setNlSubject] = React.useState("");
   const [nlDraft, setNlDraft] = React.useState("");
   const [nlMsg, setNlMsg] = React.useState("");
@@ -862,6 +863,7 @@ React.useEffect(() => {
       setNlReplyTo(String(delivery.reply_to || ""));
       setNlEffectiveFrom(String(delivery.effective_from || ""));
       setNlResendConfigured(!!delivery.resend_configured);
+      setNlRuntime(delivery.runtime && typeof delivery.runtime === "object" ? delivery.runtime : null);
       setNlSubject((current) => current || `${orgName || "Organization"} update`);
       setNlDraft((current) => current || defaultNewsletterBody(nextBlurb, orgName || "Organization"));
     } catch (e) {
@@ -941,6 +943,7 @@ React.useEffect(() => {
       const savedDelivery = deliverySave?.delivery || {};
       setNlEffectiveFrom(String(savedDelivery.effective_from || ""));
       setNlResendConfigured(!!savedDelivery.resend_configured);
+      setNlRuntime(savedDelivery.runtime && typeof savedDelivery.runtime === "object" ? savedDelivery.runtime : null);
 
       if (!privateMode) {
         await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter`, {
@@ -2085,6 +2088,30 @@ Outreach`} />
                 <p className="helper" style={{ marginBottom: 0, marginTop: 10 }}>
                   Private-mode subscriber addresses remain encrypted at rest. This page decrypts them in your browser; sending passes the addresses to the server only for delivery through Resend without creating a new plaintext subscriber copy in D1.
                 </p>
+
+                {nlRuntime ? (
+                  <details className="bf-newsletter-note" style={{ marginTop: 12 }}>
+                    <summary style={{ cursor: "pointer", fontWeight: 700 }}>Runtime diagnostics</summary>
+                    <div className="grid" style={{ gap: 4, marginTop: 8, fontFamily: "monospace", fontSize: 12, overflowWrap: "anywhere" }}>
+                      <div>Request hostname: {nlRuntime.request_hostname || "(unknown)"}</div>
+                      <div>Request origin: {nlRuntime.request_origin || "(unknown)"}</div>
+                      <div>RESEND_API_KEY binding present: {nlRuntime.resend_api_key_binding_present ? "yes" : "no"}</div>
+                      <div>RESEND_API_KEY non-empty: {nlRuntime.resend_api_key_nonempty ? "yes" : "no"}</div>
+                      <div>JWT_SECRET binding present: {nlRuntime.jwt_secret_binding_present ? "yes" : "no"}</div>
+                      <div>D1 binding present: {nlRuntime.d1_binding_present ? "yes" : "no"}</div>
+                      <div>BF_PUBLIC binding present: {nlRuntime.bf_public_binding_present ? "yes" : "no"}</div>
+                      <div>CF_PAGES: {nlRuntime.cf_pages || "(not exposed to Functions runtime)"}</div>
+                      <div>CF_PAGES_BRANCH: {nlRuntime.cf_pages_branch || "(not exposed to Functions runtime)"}</div>
+                      <div>CF_PAGES_COMMIT_SHA: {nlRuntime.cf_pages_commit_sha || "(not exposed to Functions runtime)"}</div>
+                      <div>CF_PAGES_URL: {nlRuntime.cf_pages_url || "(not exposed to Functions runtime)"}</div>
+                      <div>CF-Ray: {nlRuntime.cf_ray || "(unavailable)"}</div>
+                      <div>Cloudflare colo: {nlRuntime.cf_colo || "(unavailable)"}</div>
+                    </div>
+                    <p className="helper" style={{ marginBottom: 0, marginTop: 8 }}>
+                      This block exposes only deployment metadata and yes/no binding checks. Secret values are never returned.
+                    </p>
+                  </details>
+                ) : null}
 
                 <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
                   <button className="btn-red" type="button" onClick={saveNewsletter} disabled={nlBusy}>
