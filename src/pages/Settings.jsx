@@ -612,6 +612,7 @@ const loadPublic = React.useCallback(async () => {
     const pub = r.public || {};
     setEnabled(!!pub.enabled);
     setPublicNewsletterEnabled(!!pub.newsletter_enabled);
+    setNlBlurb(String(pub.newsletter_blurb || ""));
     setPublicPledgesEnabled(pub.pledges_enabled !== false);
     setShowActionStrip(pub.show_action_strip !== false);
     setShowNeeds(pub.show_needs !== false);
@@ -835,19 +836,32 @@ React.useEffect(() => {
     setNlMsg("");
     setNlBusy(true);
     try {
-      const r = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter`, {
-        method: "GET",
-      });
-      const cfg = r?.newsletter || r?.settings || r || {};
-      const nextBlurb = String(cfg.blurb || "");
-      setNlEnabled(!!cfg.enabled);
-      setNlListAddress(String(cfg.list_address || cfg.listAddress || ""));
+      const [deliveryResult, publicResult] = await Promise.all([
+        authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter/delivery`, { method: "GET" }),
+        authFetch(`/api/orgs/${encodeURIComponent(orgId)}/public/get`, { method: "GET" }),
+      ]);
+
+      const delivery = deliveryResult?.delivery || {};
+      const pub = publicResult?.public || {};
+      let nextBlurb = String(pub.newsletter_blurb || "");
+      let legacy = null;
+
+      if (!privateMode) {
+        const legacyResult = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter`, {
+          method: "GET",
+        }).catch(() => null);
+        legacy = legacyResult?.newsletter || legacyResult?.settings || null;
+        if (!nextBlurb) nextBlurb = String(legacy?.blurb || "");
+      }
+
+      setNlEnabled(!!pub.newsletter_enabled);
+      setNlListAddress(String(legacy?.list_address || legacy?.listAddress || ""));
       setNlBlurb(nextBlurb);
-      setNlSenderName(String(cfg.sender_name || ""));
-      setNlSenderEmail(String(cfg.sender_email || ""));
-      setNlReplyTo(String(cfg.reply_to || ""));
-      setNlEffectiveFrom(String(cfg.effective_from || ""));
-      setNlResendConfigured(!!cfg.resend_configured);
+      setNlSenderName(String(delivery.sender_name || ""));
+      setNlSenderEmail(String(delivery.sender_email || ""));
+      setNlReplyTo(String(delivery.reply_to || ""));
+      setNlEffectiveFrom(String(delivery.effective_from || ""));
+      setNlResendConfigured(!!delivery.resend_configured);
       setNlSubject((current) => current || `${orgName || "Organization"} update`);
       setNlDraft((current) => current || defaultNewsletterBody(nextBlurb, orgName || "Organization"));
     } catch (e) {
@@ -855,7 +869,7 @@ React.useEffect(() => {
     } finally {
       setNlBusy(false);
     }
-  }, [orgId, orgName]);
+  }, [orgId, orgName, privateMode]);
 
   const loadSubscribers = React.useCallback(async () => {
     if (!orgId) return;
@@ -913,24 +927,37 @@ React.useEffect(() => {
     setNlMsg("");
     setNlBusy(true);
     try {
-      const newsletterSave = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter`, {
-        method: "PUT",
-        body: {
-          enabled: !!publicNewsletterEnabled,
-          list_address: nlListAddress,
-          blurb: nlBlurb,
-          sender_name: nlSenderName,
-          sender_email: nlSenderEmail,
-          reply_to: nlReplyTo,
-        },
-      });
-      const savedNewsletter = newsletterSave?.newsletter || {};
-      setNlEffectiveFrom(String(savedNewsletter.effective_from || ""));
-      setNlResendConfigured(!!savedNewsletter.resend_configured);
+      const deliverySave = await authFetch(
+        `/api/orgs/${encodeURIComponent(orgId)}/newsletter/delivery`,
+        {
+          method: "PUT",
+          body: {
+            sender_name: nlSenderName,
+            sender_email: nlSenderEmail,
+            reply_to: nlReplyTo,
+          },
+        }
+      );
+      const savedDelivery = deliverySave?.delivery || {};
+      setNlEffectiveFrom(String(savedDelivery.effective_from || ""));
+      setNlResendConfigured(!!savedDelivery.resend_configured);
+
+      if (!privateMode) {
+        await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter`, {
+          method: "PUT",
+          body: {
+            enabled: !!publicNewsletterEnabled,
+            list_address: nlListAddress,
+            blurb: nlBlurb,
+          },
+        });
+      }
+
       await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/public/save`, {
         method: "POST",
         body: {
           newsletter_enabled: !!publicNewsletterEnabled,
+          newsletter_blurb: nlBlurb,
           show_newsletter_card: !!publicNewsletterEnabled && !!showNewsletterCard,
         },
       });
