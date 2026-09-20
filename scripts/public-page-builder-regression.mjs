@@ -47,7 +47,7 @@ const renderer = fs.readFileSync(new URL("../src/components/PublicPageRenderer.j
 const editorAccess = fs.readFileSync(new URL("../functions/api/public/[slug]/editor.js", import.meta.url), "utf8");
 
 assert.match(adminBar, /Edit page/);
-assert.match(adminBar, /credentials:\s*"include"/);
+assert.match(adminBar, /api\(.*\/editor/);
 assert.match(liveEditor, /onClick=\{\(\) => addBlock\(type\)\}/);
 assert.match(liveEditor, /onChangeProps=\{updateProps\}/);
 assert.match(liveEditor, /public\/publish/);
