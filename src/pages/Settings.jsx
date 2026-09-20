@@ -90,8 +90,53 @@ function memberContact(member) {
 }
 
 
-export default function Settings({ privateMode = false }) {
+export default function Settings({ privateMode: privateModeProp }) {
   const { orgId } = useParams();
+  const [detectedPrivateMode, setDetectedPrivateMode] = React.useState(null);
+
+  // Settings is mounted directly from the router, so no parent currently supplies
+  // a privateMode prop. Resolve the organization's real privacy state here.
+  // Until that check finishes, default to the safer private-mode behavior so
+  // Settings never probes plaintext-only endpoints for an encrypted org.
+  const privateMode =
+    typeof privateModeProp === "boolean"
+      ? privateModeProp
+      : detectedPrivateMode !== false;
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    if (!orgId) {
+      setDetectedPrivateMode(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (typeof privateModeProp === "boolean") {
+      setDetectedPrivateMode(privateModeProp);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setDetectedPrivateMode(null);
+    authFetch(`/api/orgs/${encodeURIComponent(orgId)}/privacy`, { method: "GET" })
+      .then((privacy) => {
+        if (cancelled) return;
+        setDetectedPrivateMode(!!privacy && String(privacy.state || "off") !== "off");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Fail closed. A temporary privacy-status error must not cause Settings
+        // to fall back to readable server-side routes.
+        setDetectedPrivateMode(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, privateModeProp]);
 
   /* ---------- Submenu tabs ---------- */
   const [searchParams, setSearchParams] = useSearchParams();
