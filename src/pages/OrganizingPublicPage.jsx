@@ -268,7 +268,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
           confirmationSent = true;
         } catch (confirmationError) {
           console.error("NEWSLETTER_CONFIRMATION_FAILED", confirmationError);
-          confirmationFailed = true;
+          confirmationFailed = String(confirmationError?.message || "CONFIRMATION_SEND_FAILED");
         }
       }
 
@@ -279,7 +279,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
         confirmationSent
           ? "Thanks. You're subscribed. Check your inbox for a confirmation email."
           : confirmationFailed
-            ? "Your signup was saved, but the confirmation email could not be sent. You are still subscribed."
+            ? `Your signup was saved, but the confirmation email could not be sent. You are still subscribed. Error: ${confirmationFailed}`
             : newsletterInfo?.subscribe_url
               ? "Saved here. Finish the subscription with Riseup so they can confirm your address."
               : "Thanks. Your signup was received."
