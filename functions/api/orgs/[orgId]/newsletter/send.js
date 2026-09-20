@@ -5,6 +5,7 @@ import { ensureSubmissions } from "../../../_lib/privateSubmissions.js";
 import {
   makeNewsletterUnsubscribeToken,
   newsletterIdentity,
+  newsletterRecipientHash,
   newsletterUnsubscribeUrl,
   renderNewsletterMessage,
   sendNewsletterBatch,
@@ -20,7 +21,7 @@ function validEmail(value) {
   return email;
 }
 
-async function ensureSubscriberTable(db) {
+async function ensureNewsletterTables(db) {
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS newsletter_subscribers (
       id TEXT PRIMARY KEY,
@@ -31,23 +32,34 @@ async function ensureSubscriberTable(db) {
       created_at INTEGER NOT NULL
     )
   `).run();
+  await ensureSubmissions(db);
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS newsletter_suppressions (
+      org_id TEXT NOT NULL,
+      email_hash TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (org_id, email_hash)
+    )
+  `).run();
 }
 
-async function validSubscriberIds(db, orgId) {
-  await ensureSubscriberTable(db);
-  await ensureSubmissions(db);
+async function subscriberRows(db, orgId) {
+  await ensureNewsletterTables(db);
 
   const legacy = await db.prepare(
-    "SELECT id FROM newsletter_subscribers WHERE org_id = ?"
+    "SELECT id, created_at FROM newsletter_subscribers WHERE org_id = ?"
   ).bind(orgId).all();
   const encrypted = await db.prepare(
-    "SELECT id FROM org_private_submissions WHERE org_id = ? AND type = 'newsletter'"
+    "SELECT id, created_at FROM org_private_submissions WHERE org_id = ? AND type = 'newsletter'"
   ).bind(orgId).all();
 
-  return new Set([
-    ...(legacy?.results || []).map((row) => String(row.id || "")),
-    ...(encrypted?.results || []).map((row) => String(row.id || "")),
-  ].filter(Boolean));
+  const rows = new Map();
+  for (const row of [...(legacy?.results || []), ...(encrypted?.results || [])]) {
+    const id = String(row?.id || "").trim();
+    if (!id) continue;
+    rows.set(id, { id, createdAt: Number(row?.created_at || 0) });
+  }
+  return rows;
 }
 
 export async function onRequestPost({ env, request, params }) {
@@ -75,28 +87,76 @@ export async function onRequestPost({ env, request, params }) {
   if (!requested.length) return err(400, "NO_NEWSLETTER_SUBSCRIBERS");
   if (requested.length > 5000) return err(400, "TOO_MANY_NEWSLETTER_RECIPIENTS");
 
-  const allowedIds = await validSubscriberIds(db, orgId);
-  const recipients = [];
-  const seenEmails = new Set();
+  const allowedRows = await subscriberRows(db, orgId);
+  const newestByEmail = new Map();
 
   for (const row of requested) {
     const id = clean(row?.id, 200);
     const email = validEmail(row?.email);
-    if (!id || !email || !allowedIds.has(id)) {
+    const stored = allowedRows.get(id);
+    if (!id || !email || !stored) {
       return err(400, "INVALID_NEWSLETTER_RECIPIENT");
     }
-    if (seenEmails.has(email)) continue;
-    seenEmails.add(email);
-    recipients.push({ id, email });
+
+    const current = newestByEmail.get(email);
+    if (!current || stored.createdAt > current.createdAt) {
+      newestByEmail.set(email, { id, email, createdAt: stored.createdAt });
+    }
   }
 
-  if (!recipients.length) return err(400, "NO_NEWSLETTER_SUBSCRIBERS");
+  const suppressionResult = await db.prepare(
+    "SELECT email_hash, created_at FROM newsletter_suppressions WHERE org_id = ?"
+  ).bind(orgId).all();
+  const suppressions = new Map(
+    (suppressionResult?.results || []).map((row) => [
+      String(row?.email_hash || ""),
+      Number(row?.created_at || 0),
+    ])
+  );
+
+  const recipients = [];
+  const clearSuppressions = [];
+  let suppressed = 0;
+
+  for (const candidate of newestByEmail.values()) {
+    const emailHash = await newsletterRecipientHash(env, {
+      orgId,
+      email: candidate.email,
+    });
+    const suppressedAt = Number(suppressions.get(emailHash) || 0);
+
+    if (suppressedAt && candidate.createdAt <= suppressedAt) {
+      suppressed += 1;
+      continue;
+    }
+
+    if (suppressedAt && candidate.createdAt > suppressedAt) {
+      clearSuppressions.push(
+        db.prepare("DELETE FROM newsletter_suppressions WHERE org_id = ? AND email_hash = ?")
+          .bind(orgId, emailHash)
+      );
+    }
+
+    recipients.push({ ...candidate, emailHash });
+  }
+
+  if (clearSuppressions.length) await db.batch(clearSuppressions);
 
   let identity;
   try {
     identity = newsletterIdentity(env, orgId, request.url);
   } catch (error) {
     return err(503, clean(error?.code || error?.message || "NEWSLETTER_FROM_NOT_CONFIGURED", 300));
+  }
+
+  if (!recipients.length) {
+    return ok({
+      sent: 0,
+      subscriberCount: newestByEmail.size,
+      suppressed,
+      campaignId,
+      providerIds: [],
+    });
   }
 
   let sent = 0;
@@ -110,6 +170,7 @@ export async function onRequestPost({ env, request, params }) {
       const token = await makeNewsletterUnsubscribeToken(env, {
         orgId,
         subscriberId: recipient.id,
+        emailHash: recipient.emailHash,
       });
       const unsubscribeUrl = newsletterUnsubscribeUrl(identity, token);
       const rendered = renderNewsletterMessage({
@@ -137,13 +198,18 @@ export async function onRequestPost({ env, request, params }) {
     } catch (error) {
       const code = clean(error?.code || error?.message || "NEWSLETTER_SEND_FAILED", 300);
       console.error("NEWSLETTER_SEND_FAILED", { orgId, sent, code });
-      return err(502, code, { sent, subscriberCount: recipients.length });
+      return err(502, code, {
+        sent,
+        subscriberCount: newestByEmail.size,
+        suppressed,
+      });
     }
   }
 
   return ok({
     sent,
-    subscriberCount: recipients.length,
+    subscriberCount: newestByEmail.size,
+    suppressed,
     campaignId,
     providerIds,
   });
