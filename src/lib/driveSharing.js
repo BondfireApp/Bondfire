@@ -34,7 +34,7 @@ export async function resolveDriveShareKey(orgId, kind, itemId, transport, {
   preferPending = false,
   parentId,
 } = {}) {
-  const device = await ensureDeviceKeypair();
+  const device = await ensureDeviceKeypair({ register: false });
   const deviceId = await deviceKeyId(device.pubJwk);
   const params = new URLSearchParams({ kind, itemId, deviceId });
   if (preferPending) params.set('pending', '1');
