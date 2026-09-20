@@ -302,7 +302,7 @@ export function renderNewsletterMessage({ identity, body, unsubscribeUrl }) {
   };
 }
 
-export async function sendNewsletterEmail(env, { from, to, subject, text, html, unsubscribeUrl, idempotencyKey }) {
+export async function sendNewsletterEmail(env, { from, to, subject, text, html, unsubscribeUrl, replyTo, idempotencyKey }) {
   const key = String(env?.RESEND_API_KEY || "").trim();
   if (!key) {
     const error = new Error("RESEND_NOT_CONFIGURED");
@@ -336,6 +336,7 @@ export async function sendNewsletterEmail(env, { from, to, subject, text, html, 
       subject: String(subject || "").trim(),
       text: String(text || ""),
       html: String(html || ""),
+      ...(validSenderEmail(replyTo) ? { reply_to: validSenderEmail(replyTo) } : {}),
       ...(unsubscribeUrl ? {
         headers: {
           "List-Unsubscribe": "<" + String(unsubscribeUrl) + ">",
@@ -362,7 +363,7 @@ export async function sendNewsletterEmail(env, { from, to, subject, text, html, 
   return { id: String(data?.id || data?.data?.id || "") };
 }
 
-export async function sendNewsletterBatch(env, { from, messages, idempotencyKey }) {
+export async function sendNewsletterBatch(env, { from, messages, replyTo, idempotencyKey }) {
   const key = String(env?.RESEND_API_KEY || "").trim();
   if (!key) {
     const error = new Error("RESEND_NOT_CONFIGURED");
@@ -398,6 +399,7 @@ export async function sendNewsletterBatch(env, { from, messages, idempotencyKey 
       subject: String(message?.subject || "").trim(),
       text: String(message?.text || ""),
       html: String(message?.html || ""),
+      ...(validSenderEmail(replyTo) ? { reply_to: validSenderEmail(replyTo) } : {}),
       ...(message?.unsubscribeUrl ? {
         headers: {
           "List-Unsubscribe": "<" + String(message.unsubscribeUrl) + ">",
