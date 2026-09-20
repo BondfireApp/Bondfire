@@ -1,8 +1,6 @@
 import * as React from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../utils/api.js";
-import { PublicSiteContentCard } from "./PublicSiteContentCard.jsx";
-import { PublicSiteProfileTransfer } from "./PublicSiteProfileTransfer.jsx";
 
 function normalizeHttpUrl(value) {
   let raw = String(value || "").trim();
@@ -25,7 +23,6 @@ function errorMessage(error, fallback) {
 
 export const AdminPublicConfigCard = React.forwardRef(function AdminPublicConfigCard(_, ref) {
   const { orgId } = useParams();
-  const contentRef = React.useRef(null);
   const [connection, setConnection] = React.useState({
     publication_id: "",
     publication_name: "",
@@ -41,10 +38,11 @@ export const AdminPublicConfigCard = React.forwardRef(function AdminPublicConfig
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState("");
   const [canManageConnection, setCanManageConnection] = React.useState(true);
-  const [profileRevision, setProfileRevision] = React.useState(0);
 
   React.useImperativeHandle(ref, () => ({
-    saveSiteContent: () => contentRef.current?.save?.(),
+    // The public page is edited on the live page now. Keep this handle for
+    // older settings submit flows without reintroducing a second editor.
+    saveSiteContent: async () => null,
   }), []);
 
   const relationPath = React.useMemo(
@@ -287,8 +285,19 @@ export const AdminPublicConfigCard = React.forwardRef(function AdminPublicConfig
         </div>
       </section>
 
-      <PublicSiteContentCard key={profileRevision} ref={contentRef} />
-      <PublicSiteProfileTransfer onImported={() => setProfileRevision((value) => value + 1)} />
+      <section className="card live-page-settings-launch" style={{ padding: 16 }}>
+        <h2 style={{ marginTop: 0, marginBottom: 6 }}>Live public page editor</h2>
+        <p className="helper" style={{ marginTop: 0 }}>
+          Edit the page where it lives. Open the public page while signed in as a publication administrator, then choose <strong>Edit page</strong> at the top.
+        </p>
+        {organizationPage?.available && organizationPage?.slug ? (
+          <a className="btn-red" href={`/#/p/${encodeURIComponent(organizationPage.slug)}`} target="_blank" rel="noreferrer">
+            Open live page
+          </a>
+        ) : (
+          <p className="helper" style={{ marginBottom: 0 }}>Enable and save the Organization Page above to open its live editor.</p>
+        )}
+      </section>
     </>
   );
 });
