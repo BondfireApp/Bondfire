@@ -108,6 +108,7 @@ export async function onRequestPost({ env, request, params }) {
     ...prev,
     enabled: boolField(body, prev, "enabled", false),
     newsletter_enabled: boolField(body, prev, "newsletter_enabled", false),
+    newsletter_blurb: textField(body, prev, "newsletter_blurb", 3000),
     pledges_enabled: body?.pledges_enabled === undefined ? prev?.pledges_enabled !== false : body.pledges_enabled !== false,
     show_action_strip: body?.show_action_strip === undefined ? prev?.show_action_strip !== false : body.show_action_strip !== false,
     show_needs: body?.show_needs === undefined ? prev?.show_needs !== false : body.show_needs !== false,
