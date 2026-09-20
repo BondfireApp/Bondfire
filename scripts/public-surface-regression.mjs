@@ -50,6 +50,8 @@ const organizing = projectOrganizationPageConfig({
   branch_label: "Harbor Workers Local",
   hero_headline: "Build worker power.",
   hero_text: "Organize together.",
+  newsletter_enabled: true,
+  newsletter_blurb: "Monthly organizing news.",
   membership_title: "Join the union",
   membership_url: "https://example.org/join",
   membership_dues_items: ["Low income", "Regular", "Sustainer"],
@@ -64,6 +66,8 @@ const organizing = projectOrganizationPageConfig({
 assert.equal(organizing.template, "organizing");
 assert.equal(organizing.branch_label, "Harbor Workers Local");
 assert.equal(organizing.hero_headline, "Build worker power.");
+assert.equal(organizing.newsletter_enabled, true);
+assert.equal(organizing.newsletter_blurb, "Monthly organizing news.");
 assert.equal(organizing.membership_url, "https://example.org/join");
 assert.deepEqual(organizing.membership_dues_items, ["Low income", "Regular", "Sustainer"]);
 assert.equal(organizing.archive_items[0].image_url, "https://example.org/strike.jpg");
