@@ -59,16 +59,18 @@ function editableStyle(block) {
   };
 }
 
-function EditableText({ value, onChange, className = "", as = "div" }) {
+function EditableText({ value, onChange, className = "", as = "div", style }) {
   const Tag = as;
   return (
     <Tag
       className={"ppb-editable " + className}
+      style={style}
       contentEditable
       suppressContentEditableWarning
       onInput={(event) => onChange(event.currentTarget.textContent || "")}
-      dangerouslySetInnerHTML={{ __html: String(value || "").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br />") }}
-    />
+    >
+      {value || ""}
+    </Tag>
   );
 }
 
