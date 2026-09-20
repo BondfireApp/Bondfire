@@ -913,7 +913,7 @@ React.useEffect(() => {
     setNlMsg("");
     setNlBusy(true);
     try {
-      await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter`, {
+      const newsletterSave = await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/newsletter`, {
         method: "PUT",
         body: {
           enabled: !!publicNewsletterEnabled,
@@ -924,6 +924,9 @@ React.useEffect(() => {
           reply_to: nlReplyTo,
         },
       });
+      const savedNewsletter = newsletterSave?.newsletter || {};
+      setNlEffectiveFrom(String(savedNewsletter.effective_from || ""));
+      setNlResendConfigured(!!savedNewsletter.resend_configured);
       await authFetch(`/api/orgs/${encodeURIComponent(orgId)}/public/save`, {
         method: "POST",
         body: {
