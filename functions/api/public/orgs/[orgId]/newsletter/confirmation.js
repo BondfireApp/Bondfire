@@ -80,10 +80,11 @@ export async function onRequestPost(context) {
     return bad(400, "CONFIRMATION_EMAIL_MISMATCH");
   }
 
+  const emailHash = await newsletterRecipientHash(env, { orgId, email });
   const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "";
   const rl = await rateLimit({
     env,
-    key: `newsletter-confirmation:${orgId}:${ip}:${email}`,
+    key: `newsletter-confirmation:${orgId}:${ip}:${emailHash}`,
     limit: 4,
     windowSec: 60 * 60,
   });
@@ -101,7 +102,6 @@ export async function onRequestPost(context) {
 
   try {
     const identity = await newsletterIdentity(env, orgId, request.url);
-    const emailHash = await newsletterRecipientHash(env, { orgId, email });
     const unsubscribeToken = await makeNewsletterUnsubscribeToken(env, {
       orgId,
       subscriberId: verified.subscriberId,
