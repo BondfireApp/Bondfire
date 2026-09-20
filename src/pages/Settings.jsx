@@ -1713,7 +1713,7 @@ React.useEffect(() => {
                 </p>
               </div>
               {enabled && slug ? (
-                <a className="btn-red" data-tour="settings-live-preview" href={\`/#/p/\${encodeURIComponent(slug)}\`} target="_blank" rel="noreferrer">
+                <a className="btn-red" data-tour="settings-live-preview" href={`/#/p/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer">
                   Open live page
                 </a>
               ) : null}
@@ -1736,7 +1736,7 @@ React.useEffect(() => {
                       <input className="input" style={{ flex: 1 }} value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="e.g. red-harbor" />
                       <button type="button" className="btn" onClick={genSlug}>Generate</button>
                     </div>
-                    {slug ? <a className="helper" href={\`/#/p/\${encodeURIComponent(slug)}\`} target="_blank" rel="noreferrer">{publicUrl}</a> : null}
+                    {slug ? <a className="helper" href={`/#/p/${encodeURIComponent(slug)}`} target="_blank" rel="noreferrer">{publicUrl}</a> : null}
                   </label>
                 </div>
               </div>
