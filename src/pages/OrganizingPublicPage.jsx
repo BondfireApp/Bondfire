@@ -6,6 +6,7 @@ import "../styles/organizing-public.css";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 const APP_ORIGIN = (import.meta.env.VITE_APP_ORIGIN || "https://bondfireapp.org").replace(/\/+$/, "");
+const RED_HARBOR_ORG_ID = "73bdf68b-d67a-4d70-8ae8-7c3bf9c934b0";
 
 function publicApiUrl(path) {
   if (path.startsWith("http")) return path;
@@ -241,25 +242,47 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
         sealed = true;
       }
 
+      let signupResult;
       try {
-        await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, body);
+        signupResult = await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, body);
       } catch (submitError) {
         const submitCode = String(submitError?.message || "");
         if (!sealed && submitCode.includes("ENCRYPTED_SUBMISSION_REQUIRED")) {
           const recipient = await fetchJson(`/api/public/${encodeURIComponent(publicSlug)}/submission-key`);
           const encryptedBody = await sealSubmission(recipient, "newsletter", clearBody);
-          await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, encryptedBody);
+          signupResult = await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/subscribe`, encryptedBody);
         } else {
           throw submitError;
         }
       }
+
+      let confirmationSent = false;
+      let confirmationFailed = false;
+      if (String(orgId || "") === RED_HARBOR_ORG_ID && signupResult?.confirmationReceipt) {
+        try {
+          await postJson(`/api/p/${encodeURIComponent(publicSlug)}/newsletter/confirmation`, {
+            name: clearBody.name,
+            email: clearBody.email,
+            confirmationReceipt: signupResult.confirmationReceipt,
+          });
+          confirmationSent = true;
+        } catch (confirmationError) {
+          console.error("NEWSLETTER_CONFIRMATION_FAILED", confirmationError);
+          confirmationFailed = true;
+        }
+      }
+
       setNewsletterName("");
       setNewsletterEmail("");
       setNewsletterWebsite("");
       setNewsletterMessage(
-        newsletterInfo?.subscribe_url
-          ? "Saved here. Finish the subscription with Riseup so they can confirm your address."
-          : "Thanks. Your signup was received."
+        confirmationSent
+          ? "Thanks. You're subscribed. Check your inbox for a confirmation email."
+          : confirmationFailed
+            ? "Your signup was saved, but the confirmation email could not be sent. You are still subscribed."
+            : newsletterInfo?.subscribe_url
+              ? "Saved here. Finish the subscription with Riseup so they can confirm your address."
+              : "Thanks. Your signup was received."
       );
     } catch (error) {
       const code = String(error?.message || "");
