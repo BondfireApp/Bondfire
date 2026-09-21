@@ -276,11 +276,20 @@ export default function AppHeader({ onLogout, showLogout }) {
 
   const base = orgId ? `/org/${encodeURIComponent(orgId)}` : null;
   const path = location.pathname || "";
+  const settingsParams = new URLSearchParams(location.search || "");
+  const settingsTab = String(settingsParams.get("tab") || "").toLowerCase();
+  const settingsSection = String(settingsParams.get("section") || "").toLowerCase();
   const organizationItems = base
     ? [
         { label: "Dashboard", to: `${base}/overview`, tourId: "nav-overview", active: path === base || path === `${base}/` || path === `${base}/overview` },
         { label: "Build", to: `${base}/build`, tourId: "nav-build" },
         { label: "People", to: `${base}/people`, tourId: "nav-people" },
+        {
+          label: "Newsletter",
+          to: `${base}/settings?section=newsletter&tab=newsletter`,
+          tourId: "nav-newsletter",
+          active: path === `${base}/settings` && settingsTab === "newsletter",
+        },
       ]
     : [];
   const moduleItems = base
@@ -393,11 +402,24 @@ export default function AppHeader({ onLogout, showLogout }) {
 
             <DrawerSection title="ACCOUNT">
               {base ? (
-                <DrawerLink
-                  to={`${base}/settings?tab=profile`}
-                  label="My profile"
-                  onNavigate={() => closeMenu(false)}
-                />
+                <>
+                  <DrawerLink
+                    to={`${base}/settings?section=security&tab=profile`}
+                    label="My profile"
+                    isActiveOverride={path === `${base}/settings` && settingsTab === "profile"}
+                    onNavigate={() => closeMenu(false)}
+                  />
+                  <DrawerLink
+                    to={`${base}/settings?section=security&tab=security`}
+                    label="Security"
+                    isActiveOverride={
+                      path === `${base}/settings` &&
+                      settingsTab !== "profile" &&
+                      (settingsSection === "security" || ["invites", "members", "security"].includes(settingsTab))
+                    }
+                    onNavigate={() => closeMenu(false)}
+                  />
+                </>
               ) : null}
               <DrawerLink
                 to={supportTo}
