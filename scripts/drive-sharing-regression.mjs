@@ -105,6 +105,8 @@ assert.match(shareStore, /drive_share_keys/, "Drive sharing must persist wrapped
 assert.doesNotMatch(shareStore, /plaintext|text_content|body TEXT/i, "Drive share metadata must not introduce readable document storage");
 
 assert.match(shares, /PRIVATE_MODE_REQUIRED/, "Encrypted sharing must require private mode");
+assert.match(shares, /resolvingNewItem = !item && url\.searchParams\.has\(['"]parentId['"]\)/, "New encrypted Drive items must resolve inherited access before their record exists");
+assert.match(shares, /!item && !resolvingNewItem/, "Drive share lookup must still reject unknown existing-item requests");
 assert.match(shares, /DRIVE_SHARE_RECIPIENT_KEY_REQUIRED/, "Every selected recipient must have a wrapped item key");
 assert.match(shares, /grant\.permission === ['"]edit['"] && memberRoles\.get\(grant\.userId\) === ['"]viewer['"]/, "Drive edit grants must not exceed the recipient organization role");
 assert.match(shares, /detail\.restricted && !detail\.permission/, "Restricted Drive shares must not grant implicit administrator access");

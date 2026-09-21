@@ -95,7 +95,8 @@ export async function onRequest({ env, request, params }) {
     const parentId = url.searchParams.has('parentId') ? (String(url.searchParams.get('parentId') || '').trim() || null) : undefined;
     if (!itemId) return bad(400, 'MISSING_ITEM_ID');
     const item = await record(db, orgId, kind, itemId);
-    if (!item) return bad(404, 'NOT_FOUND');
+    const resolvingNewItem = !item && url.searchParams.has('parentId');
+    if (!item && !resolvingNewItem) return bad(404, 'NOT_FOUND');
 
     const detail = await getShareDetail(db, orgId, kind, itemId, gate.user.sub, deviceId, {
       preferPending: url.searchParams.get('pending') === '1',
@@ -103,10 +104,10 @@ export async function onRequest({ env, request, params }) {
     });
     if (detail.restricted && !detail.permission) return bad(403, 'DRIVE_SHARE_ACCESS_DENIED');
 
-    const creatorUserId = String(item.created_by || '').trim();
+    const creatorUserId = String(item?.created_by || '').trim();
     const role = String(gate.role || '');
     const canWrite = role !== 'viewer';
-    const legacyManager = !creatorUserId && ['admin', 'owner'].includes(role);
+    const legacyManager = !!item && !creatorUserId && ['admin', 'owner'].includes(role);
     const canManage = canWrite && (detail.canManage || (!detail.restricted && (
       creatorUserId === String(gate.user.sub) || legacyManager
     )));
