@@ -279,6 +279,10 @@ export default function AppHeader({ onLogout, showLogout }) {
   const settingsParams = new URLSearchParams(location.search || "");
   const settingsTab = String(settingsParams.get("tab") || "").toLowerCase();
   const settingsSection = String(settingsParams.get("section") || "").toLowerCase();
+  const securitySettingsActive =
+    settingsSection === "security" || ["invites", "members", "profile", "security"].includes(settingsTab);
+  const newsletterSettingsActive =
+    settingsSection === "newsletter" || settingsTab === "newsletter";
   const organizationItems = base
     ? [
         { label: "Dashboard", to: `${base}/overview`, tourId: "nav-overview", active: path === base || path === `${base}/` || path === `${base}/overview` },
@@ -320,7 +324,7 @@ export default function AppHeader({ onLogout, showLogout }) {
           {base ? (
             <Link
               to={`${base}/settings`}
-              className={`bf-globalIconButton${path === `${base}/settings` ? " is-active" : ""}`}
+              className={`bf-globalIconButton${path === `${base}/settings` && !securitySettingsActive && !newsletterSettingsActive ? " is-active" : ""}`}
               aria-label="Organization settings"
               title="Settings"
               onClick={() => closeMenu(false)}
@@ -415,7 +419,7 @@ export default function AppHeader({ onLogout, showLogout }) {
                     isActiveOverride={
                       path === `${base}/settings` &&
                       settingsTab !== "profile" &&
-                      (settingsSection === "security" || ["invites", "members", "security"].includes(settingsTab))
+                      securitySettingsActive
                     }
                     onNavigate={() => closeMenu(false)}
                   />
