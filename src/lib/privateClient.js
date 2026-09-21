@@ -109,7 +109,7 @@ async function reveal(key,orgId,kind,row,transport,hydrate=false) {
       const bytes=await decryptPrivate(contentKey,payload.ciphertext,orgId,'drive/blob',result.payloadId,true);
       const blob=new Blob([bytes],{type:result.mime||'application/octet-stream'});
       result.dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob);});
-      if(String(result.mime||'').startsWith('text/')||/\.(bfform|bfsheet|json|md|csv)$/i.test(result.name||'')) result.textContent=new TextDecoder().decode(bytes);
+      if(String(result.mime||'').startsWith('text/')||String(result.mime||'')==='application/vnd.jgraph.mxfile'||String(result.mime||'').includes('diagrams.net')||/\.(bfform|bfsheet|drawio|json|md|markdown|txt|csv)$/i.test(result.name||'')) result.textContent=new TextDecoder().decode(bytes);
     }
   }
   return result;

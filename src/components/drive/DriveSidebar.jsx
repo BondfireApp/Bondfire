@@ -1,8 +1,48 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronRight, File, FileSpreadsheet, FileText, Folder, LayoutTemplate, MoreHorizontal, Share2 } from "lucide-react";
+import { ChevronDown, ChevronRight, File, FileText, Folder, FolderOpen, LayoutTemplate, ListChecks, MoreHorizontal, Share2, StickyNote } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { api } from "../../utils/api.js";
+
+function getDriveFileType(file) {
+  const name = String(file?.name || "").toLowerCase();
+  const mime = String(file?.mime || "").toLowerCase();
+  if (mime.includes("bondfire.sheet") || name.endsWith(".bfsheet")) return "sheet";
+  if (mime === "text/markdown" || name.endsWith(".md") || name.endsWith(".markdown")) return "markdown";
+  if (mime.includes("bondfire.form") || name.endsWith(".bfform")) return "form";
+  if (name.endsWith(".drawio") || mime === "application/vnd.jgraph.mxfile" || mime.includes("diagrams.net")) return "diagram";
+  return "file";
+}
+
+function SheetGridIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <rect x="2" y="2" width="16" height="16" rx="2" />
+      <path d="M2 7h16M2 12h16M7 2v16M12 2v16" />
+    </svg>
+  );
+}
+
+function MarkdownFileIcon() {
+  return (
+    <span style={{ position: "relative", display: "inline-flex", width: 18, height: 18, alignItems: "center", justifyContent: "center" }} aria-hidden="true">
+      <FileText size={17} strokeWidth={2.2} />
+      <span style={{ position: "absolute", right: -3, bottom: -3, padding: "1px 2px", borderRadius: 3, background: "#131418", border: "1px solid rgba(255,255,255,0.14)", fontSize: 8, lineHeight: 1, fontWeight: 800 }}>M</span>
+    </span>
+  );
+}
+
+function DriveItemIcon({ type, open = false, fileType = "" }) {
+  const props = { size: 16, strokeWidth: 2.15, "aria-hidden": true };
+  if (type === "folder") return open ? <FolderOpen {...props} /> : <Folder {...props} />;
+  if (type === "note") return <StickyNote {...props} />;
+  if (type === "template") return <LayoutTemplate {...props} />;
+  if (fileType === "sheet") return <SheetGridIcon />;
+  if (fileType === "markdown") return <MarkdownFileIcon />;
+  if (fileType === "form") return <ListChecks {...props} />;
+  if (fileType === "diagram") return <span aria-hidden="true" style={{ fontWeight: 800, fontSize: 15 }}>◇</span>;
+  return <File {...props} />;
+}
 
 function MenuButton({ label, onClick, danger = false }) {
   return (
@@ -217,38 +257,56 @@ function TreeRow({
   onToggle,
   dragPayload,
   onDropItem,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  dropActive = false,
+  onContextMenu,
 }) {
-  const draggable = !!dragPayload;
-  const canDrop = typeof onDropItem === "function";
+  const draggable = !!dragPayload || typeof onDragStart === "function";
+  const canDrop = typeof onDrop === "function" || typeof onDropItem === "function";
   const [contextPoint, setContextPoint] = useState(null);
+
+  const defaultDragStart = (event) => {
+    if (!dragPayload) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-bondfire-drive-item", JSON.stringify(dragPayload));
+    event.dataTransfer.setData("text/plain", JSON.stringify(dragPayload));
+  };
 
   return (
     <div
-      className={`bf-drive-treeRow${active ? " is-active" : ""}${onToggle ? " has-toggle" : ""}`}
-      style={{ "--bf-drive-depth": depth }}
+      className={`bf-drive-treeRow${active ? " is-active" : ""}${onToggle ? " has-toggle" : ""}${dropActive ? " is-drop-target" : ""}`}
+      style={{ "--bf-drive-depth": depth, outline: dropActive ? "2px solid rgba(125,188,255,0.55)" : undefined, outlineOffset: -2 }}
       data-drive-tree-row="true"
       draggable={draggable}
-      onDragStart={draggable ? (event) => {
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("application/x-bondfire-drive-item", JSON.stringify(dragPayload));
-        event.dataTransfer.setData("text/plain", JSON.stringify(dragPayload));
-      } : undefined}
+      onDragStart={draggable ? (onDragStart || defaultDragStart) : undefined}
+      onDragEnd={onDragEnd}
       onDragOver={canDrop ? (event) => {
         event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
+        event.dataTransfer.dropEffect = Array.from(event.dataTransfer?.types || []).includes("Files") ? "copy" : "move";
+        onDragOver?.(event);
       } : undefined}
+      onDragLeave={onDragLeave}
       onDrop={canDrop ? (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (onDrop) {
+          onDrop(event);
+          return;
+        }
         const raw = event.dataTransfer.getData("application/x-bondfire-drive-item") || event.dataTransfer.getData("text/plain");
         try {
           const item = JSON.parse(raw || "{}");
           if (item?.id && item?.kind) onDropItem(item);
         } catch {}
       } : undefined}
-      onContextMenu={menuItems?.length ? (event) => {
+      onContextMenu={(menuItems?.length || onContextMenu) ? (event) => {
         event.preventDefault();
         event.stopPropagation();
+        onContextMenu?.(event);
         setContextPoint({ x: event.clientX, y: event.clientY });
       } : undefined}
     >
@@ -304,18 +362,27 @@ export default function DriveSidebar({
   onOpenCreatePicker,
   onUploadFile,
   onUploadFolder,
+  onDropFilesOnFolder,
   onRenameFolder,
   onMoveFolder,
+  onMoveFolderToFolder,
   onDeleteFolder,
   onRenameNote,
   onMoveNote,
   onDeleteNote,
   onRenameFile,
   onMoveFile,
+  onMoveFileToFolder,
+  onMoveFilesToFolder,
   onDeleteFile,
+  onDeleteFiles,
+  onMoveFiles,
+  onDownloadFiles,
   onDownloadFile,
   onOpenFileInBrowser,
   onShareItem,
+  repairCandidateCount = 0,
+  onRepairExplodedFolders,
   sharedItems = [],
   templates = [],
   onApplyTemplate,
@@ -325,15 +392,19 @@ export default function DriveSidebar({
 }) {
   const { orgId = "" } = useParams();
   const [activePane, setActivePane] = useState("explorer");
-  const collapseStorageKey = `bf_drive_collapsed_v1_${orgId}`;
-  const [collapsedFolders, setCollapsedFolders] = useState(() => {
+  const expandStorageKey = `bf_drive_expanded_v2_${orgId}`;
+  const [expandedFolders, setExpandedFolders] = useState(() => {
     try {
-      const raw = JSON.parse(localStorage.getItem(collapseStorageKey) || "{}");
+      const raw = JSON.parse(localStorage.getItem(expandStorageKey) || "{}");
       return raw && typeof raw === "object" ? raw : {};
     } catch {
       return {};
     }
   });
+  const [expandedStateReadyKey, setExpandedStateReadyKey] = useState("");
+  const [selectedFileIds, setSelectedFileIds] = useState([]);
+  const [lastSelectedFileId, setLastSelectedFileId] = useState("");
+  const [dropTargetFolder, setDropTargetFolder] = useState(null);
   const [templateItems, setTemplateItems] = useState(templates);
   const templateImportRef = useRef(null);
   const [templateBusy, setTemplateBusy] = useState(false);
@@ -347,30 +418,168 @@ export default function DriveSidebar({
 
   useEffect(() => {
     try {
-      localStorage.setItem(collapseStorageKey, JSON.stringify(collapsedFolders));
-    } catch {}
-  }, [collapseStorageKey, collapsedFolders]);
+      const raw = JSON.parse(localStorage.getItem(expandStorageKey) || "{}");
+      setExpandedFolders(raw && typeof raw === "object" ? raw : {});
+    } catch {
+      setExpandedFolders({});
+    }
+    setExpandedStateReadyKey(expandStorageKey);
+    setSelectedFileIds([]);
+    setLastSelectedFileId("");
+  }, [expandStorageKey]);
 
-  function moveDroppedItem(item, targetFolderId) {
+  useEffect(() => {
+    const present = new Set(files.map((file) => String(file.id)));
+    setSelectedFileIds((previous) => previous.filter((id) => present.has(String(id))));
+  }, [files]);
+
+  useEffect(() => {
+    if (expandedStateReadyKey !== expandStorageKey) return;
+    try {
+      localStorage.setItem(expandStorageKey, JSON.stringify(expandedFolders));
+    } catch {}
+  }, [expandStorageKey, expandedFolders, expandedStateReadyKey]);
+
+  async function moveDroppedItem(item, targetFolderId) {
     if (!item?.id || !item?.kind) return;
     if (item.kind === "folder") {
-      onMoveFolder?.(item.id, targetFolderId);
-      return;
+      return (onMoveFolderToFolder || onMoveFolder)?.(item.id, targetFolderId);
     }
     if (item.kind === "note") {
-      onMoveNote?.(item.id, targetFolderId);
-      return;
+      return onMoveNote?.(item.id, targetFolderId);
     }
-    if (item.kind === "file") onMoveFile?.(item.id, targetFolderId);
+    if (item.kind === "file") return (onMoveFileToFolder || onMoveFile)?.(item.id, targetFolderId);
   }
 
-  function handleRootDrop(event) {
+  function isExternalFiles(event) {
+    return Array.from(event.dataTransfer?.types || []).includes("Files");
+  }
+
+  function isInsideDragTarget(event) {
+    return event.currentTarget.contains(event.relatedTarget);
+  }
+
+  function handleFolderDragOver(event, folderId) {
     event.preventDefault();
-    let raw = event.dataTransfer.getData("application/x-bondfire-drive-item") || event.dataTransfer.getData("text/plain");
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = isExternalFiles(event) ? "copy" : "move";
+    setDropTargetFolder(folderId || "__root__");
+  }
+
+  function handleFolderDragLeave(event) {
+    if (isInsideDragTarget(event)) return;
+    setDropTargetFolder(null);
+  }
+
+  async function handleFolderDrop(event, targetFolderId) {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropTargetFolder(null);
+    const nextParentId = targetFolderId || null;
+    const transfer = event.dataTransfer;
+    const folderId = String(transfer?.getData("application/x-bondfire-drive-folder") || "");
+    const fileIdsRaw = transfer?.getData("application/x-bondfire-drive-files") || "";
+    const singleFileId = String(transfer?.getData("application/x-bondfire-drive-file") || "");
+    const genericRaw = transfer?.getData("application/x-bondfire-drive-item") || "";
+    const droppedFiles = Array.from(transfer?.files || []);
+
     try {
-      const item = JSON.parse(raw || "{}");
-      if (item?.id && item?.kind) moveDroppedItem(item, null);
-    } catch {}
+      if (folderId) {
+        if (folderId !== String(nextParentId || "")) await (onMoveFolderToFolder || onMoveFolder)?.(folderId, nextParentId);
+        return;
+      }
+      if (fileIdsRaw) {
+        let ids = [];
+        try { ids = JSON.parse(fileIdsRaw); } catch {}
+        if (Array.isArray(ids) && ids.length) {
+          await (onMoveFilesToFolder || onMoveFiles)?.(ids, nextParentId);
+          return;
+        }
+      }
+      if (singleFileId) {
+        await (onMoveFileToFolder || onMoveFile)?.(singleFileId, nextParentId);
+        return;
+      }
+      if (genericRaw) {
+        try {
+          const item = JSON.parse(genericRaw);
+          if (item?.id && item?.kind) {
+            await moveDroppedItem(item, nextParentId);
+            return;
+          }
+        } catch {}
+      }
+      if (droppedFiles.length) await onDropFilesOnFolder?.(droppedFiles, nextParentId);
+    } catch (error) {
+      console.error("Drive drop failed", error);
+    }
+  }
+
+  function handleFolderDragStart(event, folder) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-bondfire-drive-folder", String(folder.id));
+    event.dataTransfer.setData("application/x-bondfire-drive-item", JSON.stringify({ kind: "folder", id: folder.id }));
+    event.dataTransfer.setData("text/plain", String(folder.name || folder.id));
+  }
+
+  function handleFileDragStart(event, file) {
+    const fileId = String(file.id);
+    const ids = selectedFileIds.includes(fileId) ? selectedFileIds : [fileId];
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-bondfire-drive-files", JSON.stringify(ids));
+    event.dataTransfer.setData("application/x-bondfire-drive-file", fileId);
+    event.dataTransfer.setData("application/x-bondfire-drive-item", JSON.stringify({ kind: "file", id: fileId }));
+    event.dataTransfer.setData("text/plain", String(file.name || file.id));
+  }
+
+  const fileOrder = useMemo(() => {
+    const q = String(search || "").trim().toLowerCase();
+    const fileMatches = (file) => !q || String(file.name || "").toLowerCase().includes(q);
+    const folderMatches = (folder) => !q || String(folder.name || "").toLowerCase().includes(q);
+    const walk = (parentId = null) => {
+      const foldersHere = folders
+        .filter((folder) => (folder.parentId || null) === parentId)
+        .filter(folderMatches)
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+      const filesHere = files
+        .filter((file) => (file.parentId || null) === parentId)
+        .filter(fileMatches)
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+      const ordered = [];
+      foldersHere.forEach((folder) => {
+        if (expandedFolders[folder.id] || q) ordered.push(...walk(folder.id));
+      });
+      ordered.push(...filesHere.map((file) => String(file.id)));
+      return ordered;
+    };
+    return walk();
+  }, [folders, files, search, expandedFolders]);
+
+  function handleFileClick(file, event) {
+    const id = String(file.id);
+    const additive = !!(event?.metaKey || event?.ctrlKey);
+    const range = !!event?.shiftKey;
+    if (range && lastSelectedFileId && fileOrder.includes(lastSelectedFileId)) {
+      const start = fileOrder.indexOf(lastSelectedFileId);
+      const end = fileOrder.indexOf(id);
+      const [from, to] = [start, end].sort((a, b) => a - b);
+      setSelectedFileIds(fileOrder.slice(from, to + 1));
+    } else if (additive) {
+      setSelectedFileIds((previous) => previous.includes(id) ? previous.filter((item) => item !== id) : [...previous, id]);
+    } else {
+      setSelectedFileIds([id]);
+      onSelectFile?.(file);
+    }
+    setLastSelectedFileId(id);
+  }
+
+  function targetFileSelection(file) {
+    const id = String(file?.id || "");
+    if (!id) return [];
+    if (selectedFileIds.includes(id)) return selectedFileIds;
+    setSelectedFileIds([id]);
+    setLastSelectedFileId(id);
+    return [id];
   }
 
   function openTemplateEditor(template) {
@@ -538,34 +747,37 @@ export default function DriveSidebar({
       const rows = [];
 
       folderChildren.forEach((folder) => {
-        const isCollapsed = !!collapsedFolders[folder.id];
+        const isExpanded = !!expandedFolders[folder.id];
         const readOnly = folder.sharePermission === "view";
         rows.push(
           <TreeRow
             key={folder.id}
             depth={depth}
             active={currentFolder === folder.id}
-            icon={<Folder size={15} />}
+            icon={<DriveItemIcon type="folder" open={isExpanded} />}
             label={folder.name}
-            expanded={!isCollapsed}
-            onToggle={() => setCollapsedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] }))}
+            expanded={isExpanded}
+            onToggle={() => setExpandedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] }))}
             onClick={() => onSelectFolder?.(folder.id)}
-            dragPayload={readOnly ? null : { kind: "folder", id: folder.id }}
-            onDropItem={readOnly ? undefined : (item) => {
-              if (item.kind === "folder" && item.id === folder.id) return;
-              setCollapsedFolders((prev) => ({ ...prev, [folder.id]: false }));
-              moveDroppedItem(item, folder.id);
+            onDragStart={readOnly ? undefined : (event) => handleFolderDragStart(event, folder)}
+            onDragEnd={() => setDropTargetFolder(null)}
+            onDragOver={readOnly ? undefined : (event) => handleFolderDragOver(event, folder.id)}
+            onDragLeave={readOnly ? undefined : handleFolderDragLeave}
+            onDrop={readOnly ? undefined : async (event) => {
+              setExpandedFolders((prev) => ({ ...prev, [folder.id]: true }));
+              await handleFolderDrop(event, folder.id);
             }}
+            dropActive={dropTargetFolder === folder.id}
             menuItems={[
               { label: "Open", onClick: () => onSelectFolder?.(folder.id) },
-              { label: isCollapsed ? "Expand" : "Collapse", onClick: () => setCollapsedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] })) },
+              { label: isExpanded ? "Collapse" : "Expand", onClick: () => setExpandedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] })) },
               !readOnly ? { label: "Rename", onClick: () => onRenameFolder?.(folder.id) } : null,
               { label: "Manage access", onClick: () => onShareItem?.({ kind: "drive/folders", id: folder.id, label: folder.name || "Folder" }) },
               !readOnly ? { label: "Delete folder and contents", danger: true, onClick: () => onDeleteFolder?.(folder.id) } : null,
             ].filter(Boolean)}
           />,
         );
-        if (!isCollapsed) rows.push(...renderBranch(folder.id, depth + 1));
+        if (isExpanded || q) rows.push(...renderBranch(folder.id, depth + 1));
       });
 
       noteChildren.forEach((note) => {
@@ -575,7 +787,7 @@ export default function DriveSidebar({
             key={note.id}
             depth={depth}
             active={selectedKind === "note" && selectedId === note.id}
-            icon={<FileText size={15} />}
+            icon={<DriveItemIcon type="note" />}
             label={note.title || "untitled"}
             dragPayload={readOnly ? null : { kind: "note", id: note.id }}
             onClick={() => onSelectNote?.(note.id)}
@@ -592,23 +804,29 @@ export default function DriveSidebar({
 
       fileChildren.forEach((file) => {
         const readOnly = file.sharePermission === "view";
+        const fileType = getDriveFileType(file);
+        const fileId = String(file.id);
+        const batchIds = selectedFileIds.includes(fileId) ? selectedFileIds : [fileId];
         rows.push(
           <TreeRow
             key={file.id}
             depth={depth}
-            active={selectedKind === "file" && selectedId === file.id}
-            icon={String(file.mime || "").includes("bondfire.sheet") || /\.bfsheet$/i.test(String(file.name || "")) ? <FileSpreadsheet size={15} /> : <File size={15} />}
+            active={(selectedKind === "file" && selectedId === file.id) || selectedFileIds.includes(fileId)}
+            icon={<DriveItemIcon type="file" fileType={fileType} />}
             label={file.name}
-            dragPayload={readOnly ? null : { kind: "file", id: file.id }}
-            onClick={() => onSelectFile?.(file)}
+            onClick={(event) => handleFileClick(file, event)}
+            onContextMenu={() => { targetFileSelection(file); }}
+            onDragStart={readOnly ? undefined : (event) => handleFileDragStart(event, file)}
+            onDragEnd={() => setDropTargetFolder(null)}
             menuItems={[
               { label: "Open", onClick: () => onSelectFile?.(file) },
               { label: "Open in browser", onClick: () => onOpenFileInBrowser?.(file) },
-              { label: "Download", onClick: () => onDownloadFile?.(file) },
-              !readOnly ? { label: "Rename", onClick: () => onRenameFile?.(file.id) } : null,
-              !readOnly ? { label: "Move", onClick: () => onMoveFile?.(file.id) } : null,
+              { label: batchIds.length > 1 ? `Download ${batchIds.length} selected files` : "Download", onClick: () => batchIds.length > 1 ? onDownloadFiles?.(batchIds) : onDownloadFile?.(file) },
+              !readOnly && batchIds.length === 1 ? { label: "Rename", onClick: () => onRenameFile?.(file.id) } : null,
+              !readOnly ? { label: batchIds.length > 1 ? `Move ${batchIds.length} selected files` : "Move", onClick: () => batchIds.length > 1 ? onMoveFiles?.(batchIds) : onMoveFile?.(file.id) } : null,
               { label: "Manage access", onClick: () => onShareItem?.({ kind: "drive/files", id: file.id, label: file.name || "File" }) },
-              !readOnly ? { label: "Delete", danger: true, onClick: () => onDeleteFile?.(file.id) } : null,
+              !readOnly ? { label: batchIds.length > 1 ? `Delete ${batchIds.length} selected files` : "Delete", danger: true, onClick: () => batchIds.length > 1 ? onDeleteFiles?.(batchIds) : onDeleteFile?.(file.id) } : null,
+              batchIds.length > 1 ? { label: "Clear selection", onClick: () => setSelectedFileIds([]) } : null,
             ].filter(Boolean)}
           />,
         );
@@ -618,7 +836,7 @@ export default function DriveSidebar({
     }
 
     return renderBranch();
-  }, [folders, notes, files, currentFolder, selectedId, selectedKind, search, collapsedFolders, onSelectFolder, onSelectNote, onSelectFile, onRenameFolder, onMoveFolder, onDeleteFolder, onRenameNote, onMoveNote, onDeleteNote, onRenameFile, onMoveFile, onDeleteFile, onDownloadFile, onOpenFileInBrowser, onShareItem]);
+  }, [folders, notes, files, currentFolder, selectedId, selectedKind, search, expandedFolders, selectedFileIds, dropTargetFolder, onSelectFolder, onSelectNote, onSelectFile, onRenameFolder, onMoveFolder, onMoveFolderToFolder, onDeleteFolder, onRenameNote, onMoveNote, onDeleteNote, onRenameFile, onMoveFile, onMoveFileToFolder, onMoveFilesToFolder, onDeleteFile, onDeleteFiles, onMoveFiles, onDownloadFiles, onDownloadFile, onOpenFileInBrowser, onShareItem, onDropFilesOnFolder]);
 
   const sharedRows = useMemo(() => {
     const q = String(search || "").trim().toLowerCase();
@@ -660,7 +878,7 @@ export default function DriveSidebar({
           onContextMenu={(event) => {
             if (event.target.closest?.("[data-drive-tree-row]")) return;
             event.preventDefault();
-            setBlankContextPoint({ x: event.clientX, y: event.clientY });
+            setBlankContextPoint({ x: event.clientX, y: event.clientY, scope: "background" });
           }}
         >
           <div className="bf-drive-sidebarSearch">
@@ -682,18 +900,34 @@ export default function DriveSidebar({
 
           {activePane === "explorer" ? (
             <>
+              {selectedFileIds.length ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 8, padding: "7px 8px", border: "1px solid rgba(125,188,255,0.35)", borderRadius: 10, background: "rgba(125,188,255,0.09)" }}>
+                  <span className="helper" style={{ marginRight: "auto" }}>{selectedFileIds.length} file{selectedFileIds.length === 1 ? "" : "s"} selected</span>
+                  <button className="btn" type="button" onClick={() => onDownloadFiles?.(selectedFileIds)} style={{ padding: "5px 8px" }}>Download</button>
+                  <button className="btn" type="button" onClick={() => onMoveFiles?.(selectedFileIds)} style={{ padding: "5px 8px" }}>Move</button>
+                  <button className="btn" type="button" onClick={async () => { const completed = await onDeleteFiles?.(selectedFileIds); if (completed !== false) setSelectedFileIds([]); }} style={{ padding: "5px 8px", color: "#ff9b9b" }}>Delete</button>
+                  <button className="btn" type="button" onClick={() => setSelectedFileIds([])} style={{ padding: "5px 8px" }}>Clear</button>
+                </div>
+              ) : null}
               <div className="bf-drive-sectionHead">
                 <div className="bf-drive-sectionLabel">Explorer</div>
-                <button
-                  className="bf-drive-rootButton"
-                  type="button"
-                  onClick={() => onSelectFolder?.(null)}
-                  onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
-                  onDrop={handleRootDrop}
-                  title="Open root or drop an item here to move it to root"
-                >
-                  Root
-                </button>
+                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                  {repairCandidateCount >= 2 ? <button className="btn" type="button" onClick={() => onRepairExplodedFolders?.()} title="Move files out of likely accidental single-file folders without deleting files" style={{ padding: "5px 8px", color: "#ffd27a", borderColor: "rgba(255,210,122,0.42)" }}>Repair {repairCandidateCount}</button> : null}
+                  <button
+                    className="bf-drive-rootButton"
+                    type="button"
+                    onClick={() => onSelectFolder?.(null)}
+                    onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setBlankContextPoint({ x: event.clientX, y: event.clientY, scope: "root" }); }}
+                    onDragEnter={(event) => handleFolderDragOver(event, null)}
+                    onDragOver={(event) => handleFolderDragOver(event, null)}
+                    onDragLeave={handleFolderDragLeave}
+                    onDrop={(event) => handleFolderDrop(event, null)}
+                    title="Open root or drop files and folders here"
+                    style={{ outline: dropTargetFolder === "__root__" ? "2px solid rgba(125,188,255,0.55)" : undefined }}
+                  >
+                    <Folder size={14} aria-hidden="true" /> Root
+                  </button>
+                </div>
               </div>
               <div className="bf-drive-tree">
                 {rootItems.length ? rootItems : <div className="helper" style={{ padding: "8px 4px" }}>Nothing here.</div>}
@@ -777,6 +1011,12 @@ export default function DriveSidebar({
                 ]
               : activePane === "shared"
                 ? []
+                : blankContextPoint?.scope === "root"
+                  ? [
+                      { label: "Open root", onClick: () => onSelectFolder?.(null) },
+                      { label: "Upload files", onClick: onUploadFile },
+                      { label: "Upload folder", onClick: onUploadFolder },
+                    ]
                 : [
                   { label: "New note", onClick: onNewNote },
                   { label: "New folder", onClick: onNewFolder },

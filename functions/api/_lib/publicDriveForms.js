@@ -2,31 +2,80 @@ import { validPublicKey } from './wrappedKeyValidation.js';
 import { contentContext, isCiphertext } from '../../../shared/privateContent.js';
 
 const FIELD_TYPES = new Set(['text', 'paragraph', 'choice', 'checkbox', 'date']);
+const CONDITION_OPERATORS = new Set(['equals', 'not_equals', 'contains', 'not_empty']);
 
 function cleanText(value, max) {
   return String(value || '').slice(0, max);
 }
 
 function normalizeField(field, index) {
-  const type = FIELD_TYPES.has(String(field?.type || '')) ? String(field.type) : 'text';
+  const type = FIELD_TYPES.has(String(field?.fieldType || field?.type || ''))
+    ? String(field.fieldType || field.type)
+    : 'text';
   return {
     id: cleanText(field?.id || `field_${index + 1}`, 160) || `field_${index + 1}`,
-    type,
+    type: 'question',
+    fieldType: type,
     label: cleanText(field?.label || `Question ${index + 1}`, 500),
     required: !!field?.required,
     options: Array.isArray(field?.options)
       ? field.options.slice(0, 100).map((value) => cleanText(value, 500)).filter(Boolean)
       : [],
+    conditions: normalizeConditions(field?.conditions),
+    conditionLogic: field?.conditionLogic === 'any' ? 'any' : 'all',
   };
 }
 
+function normalizeConditions(value) {
+  return Array.isArray(value)
+    ? value.slice(0, 20).map((condition) => {
+      const sourceId = cleanText(condition?.sourceId, 160);
+      if (!sourceId) return null;
+      return {
+        sourceId,
+        operator: CONDITION_OPERATORS.has(String(condition?.operator || '')) ? String(condition.operator) : 'equals',
+        value: cleanText(condition?.value, 500),
+      };
+    }).filter(Boolean)
+    : [];
+}
+
+function normalizeBlock(block, index) {
+  if (block?.type === 'display' || block?.type === 'text') {
+    return {
+      id: cleanText(block?.id || `display_${index + 1}`, 160) || `display_${index + 1}`,
+      type: 'display',
+      text: cleanText(block?.text ?? block?.content ?? '', 10000),
+    };
+  }
+  if (block?.type === 'page-break' || block?.type === 'pageBreak') {
+    return {
+      id: cleanText(block?.id || `page_${index + 1}`, 160) || `page_${index + 1}`,
+      type: 'page-break',
+      label: cleanText(block?.label || 'Page break', 500),
+    };
+  }
+  return normalizeField(block, index);
+}
+
 export function normalizePublicDriveForm(form) {
-  const fields = Array.isArray(form?.fields) ? form.fields.slice(0, 100).map(normalizeField) : [];
+  const rawBlocks = Array.isArray(form?.blocks) && form.blocks.length
+    ? form.blocks.slice(0, 200)
+    : (Array.isArray(form?.fields) ? form.fields.slice(0, 100) : []);
+  const usedIds = new Set();
+  const blocks = rawBlocks.map(normalizeBlock).map((block, index) => {
+    let id = block.id;
+    while (usedIds.has(id)) id = `${block.type === 'question' ? 'field' : block.type}_${index + 1}_${usedIds.size}`;
+    usedIds.add(id);
+    return { ...block, id };
+  });
+  const fields = blocks.filter((block) => block.type === 'question');
   return {
     type: 'bondfire-form',
-    version: 2,
+    version: 3,
     title: cleanText(form?.title || 'Untitled form', 500),
     description: cleanText(form?.description || '', 10000),
+    blocks,
     fields,
   };
 }

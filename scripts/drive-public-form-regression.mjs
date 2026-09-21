@@ -11,6 +11,7 @@ import {
   unpublishPublicDriveForm,
   deletePublicDriveFormData,
 } from '../functions/api/_lib/publicDriveForms.js';
+import { onRequestGet as publicFormGet } from '../functions/api/public/forms/[id].js';
 
 const sql = new DatabaseSync(':memory:');
 const db = {
@@ -45,12 +46,14 @@ const token = 'public-form-token-that-is-not-stored-raw';
 const recipient = await makeSubmissionRecipient();
 const form = {
   type: 'bondfire-form',
-  version: 2,
+  version: 3,
   title: 'Public encrypted form',
   description: 'Visible by design',
-  fields: [
-    { id: 'name', type: 'text', label: 'Name', required: true, options: [] },
-    { id: 'notes', type: 'paragraph', label: 'Notes', required: false, options: [] },
+  blocks: [
+    { id: 'intro', type: 'display', text: 'Welcome **friend**' },
+    { id: 'name', type: 'question', fieldType: 'text', label: 'Name', required: true, options: [] },
+    { id: 'notes', type: 'question', fieldType: 'paragraph', label: 'Notes', required: false, options: [], conditions: [{ sourceId: 'name', operator: 'not_empty', value: '' }], conditionLogic: 'all' },
+    { id: 'break', type: 'page-break', label: 'More' },
   ],
   responses: [{ id: 'must-not-project', answers: { name: 'SECRET' } }],
   publicShare: { enabled: true, token: 'MUST_NOT_PROJECT' },
@@ -76,7 +79,22 @@ assert.equal(wrong?.forbidden, true);
 const published = await readPublicDriveForm(db, fileId, token);
 assert.equal(published.form.title, form.title);
 assert.equal(published.form.fields.length, 2);
+assert.equal(published.form.blocks.length, 4);
+assert.equal(published.form.fields[1].conditions[0].sourceId, 'name');
 assert.deepEqual(published.recipient.publicKey, recipient.publicKey);
+
+const publicPage = await publicFormGet({
+  env: { BF_DB: db },
+  request: new Request(`https://example.test/api/public/forms/${fileId}?token=${encodeURIComponent(token)}`),
+  params: { id: fileId },
+});
+assert.equal(publicPage.status, 200);
+const publicHtml = await publicPage.text();
+assert.match(publicHtml, /data-block-id="intro"/, 'public form must render display blocks');
+assert.match(publicHtml, /data-block-id="notes"/, 'public form must render conditional question blocks');
+assert.match(publicHtml, /refreshVisibility\(\);/, 'public form must initialize conditional visibility');
+const embeddedScript = publicHtml.match(/<script nonce="[^"]+">([\s\S]*)<\/script>/)?.[1] || '';
+assert.doesNotThrow(() => new Function(embeddedScript), 'generated public-form script must parse in a browser');
 
 const secret = {
   fileId,
@@ -123,14 +141,20 @@ assert.match(drive, /verifyPublicFormProjection/, "Opening a public form must ve
 assert.match(drive, /Public form check/, "Public form verification must have a bounded wait");
 assert.match(formView, /Preparing encrypted public form/, "Public form popup must show progress instead of a blank page");
 assert.match(formView, /The public form could not be prepared/, "Public form popup must show a useful failure state");
-assert.match(formView, /markdownToHtml\(form\.description\)/, "Form preview descriptions must render Markdown rather than literal markers");
+assert.match(formView, /function MarkdownContent[\s\S]*markdownToHtml\(value\)/, "Form preview descriptions must render Markdown rather than literal markers");
+assert.match(formView, /isBlockVisible/, "Internal form submissions must respect conditional visibility");
+assert.match(formView, /Download CSV/, "Editors must export response tables as CSV");
 assert.match(publicHandler, /renderMarkdownText\(form\.description\)/, "Public form descriptions must use the same Markdown semantics");
 assert.match(publicHandler, /heading = trimmed\.match/, "Public forms must parse Markdown headings");
 assert.ok(publicHandler.includes('html += `<h${level}>${applyInline(heading[2])}</h${level}>`'), "Public forms must emit heading elements instead of raw Markdown markers");
 assert.match(publicHandler, /bf-public-form-markdown h1/, "Public form Markdown headings must be styled");
+assert.match(publicHandler, /refreshVisibility\(\)/, "Public form blocks must refresh conditional visibility before submission");
+assert.match(publicHandler, /collectAnswers\(\)/, "Public form submissions must omit hidden answers");
+assert.match(publicHandler, /safeHref/, "Public form Markdown links must reject unsafe schemes");
 assert.match(privateGate, /if\(form\) return null/);
 assert.match(privateGate, /route==='drive\/shares'\|\|route==='drive\/forms-public'/);
 assert.match(privateClient, /tail==='drive\/forms-public'/);
+assert.match(privateClient, /bfform\|bfsheet\|drawio/, "Private Drive hydration must treat Drawio XML as editable encrypted content");
 assert.match(publicHandler, /storePublicDriveFormResponse/);
 assert.match(publicHandler, /submission\/drive-form/);
 assert.match(publicHandler, /script nonce/);

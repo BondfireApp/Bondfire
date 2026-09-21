@@ -9,7 +9,7 @@ export async function onRequestGet({ env, request, params }) {
   const auth = await requireOrgRole({ env, request, orgId, minRole: "viewer" });
   if (!auth.ok) return auth.resp;
   const existingMeta = await getFileRecord(env, orgId, fileId, { includeData: false });
-  const shouldIncludeData = !!(existingMeta && (String(existingMeta.mime || "").startsWith("text/") || String(existingMeta.mime || "") === "application/vnd.bondfire.sheet+json" || String(existingMeta.mime || "") === "application/vnd.bondfire.form+json" || String(existingMeta.mime || "") === "application/vnd.bondfire.zk-file" || String(existingMeta.mime || "") === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || /\.(md|markdown|txt|json|js|jsx|ts|tsx|css|html|xml|yaml|yml|csv|bfsheet|bfform|docx)$/i.test(String(existingMeta.name || ""))));
+  const shouldIncludeData = !!(existingMeta && (String(existingMeta.mime || "").startsWith("text/") || String(existingMeta.mime || "") === "application/vnd.bondfire.sheet+json" || String(existingMeta.mime || "") === "application/vnd.bondfire.form+json" || String(existingMeta.mime || "") === "application/vnd.jgraph.mxfile" || String(existingMeta.mime || "") === "application/vnd.bondfire.zk-file" || String(existingMeta.mime || "") === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || /\.(md|markdown|txt|json|js|jsx|ts|tsx|css|html|xml|yaml|yml|csv|bfsheet|bfform|drawio|docx)$/i.test(String(existingMeta.name || ""))));
   const file = existingMeta ? await getFileRecord(env, orgId, fileId, { includeData: shouldIncludeData }) : null;
   if (!file) return bad(404, "NOT_FOUND");
   return json({ ok: true, file });
@@ -48,7 +48,7 @@ export async function onRequestPatch({ env, request, params }) {
       textContent: body.textContent === undefined ? (await getFileRecord(env, orgId, fileId, { includeData: true }))?.textContent || "" : String(body.textContent || ""),
     });
   }
-  const shouldIncludeData = !!(String(nextMime || "").startsWith("text/") || String(nextMime || "") === "application/vnd.bondfire.sheet+json" || String(nextMime || "") === "application/vnd.bondfire.form+json" || String(nextMime || "") === "application/vnd.bondfire.zk-file" || String(nextMime || "") === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || /\.(md|markdown|txt|json|js|jsx|ts|tsx|css|html|xml|yaml|yml|csv|bfsheet|bfform|docx)$/i.test(String(nextName || "")));
+  const shouldIncludeData = !!(String(nextMime || "").startsWith("text/") || String(nextMime || "") === "application/vnd.bondfire.sheet+json" || String(nextMime || "") === "application/vnd.bondfire.form+json" || String(nextMime || "") === "application/vnd.jgraph.mxfile" || String(nextMime || "") === "application/vnd.bondfire.zk-file" || String(nextMime || "") === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || /\.(md|markdown|txt|json|js|jsx|ts|tsx|css|html|xml|yaml|yml|csv|bfsheet|bfform|drawio|docx)$/i.test(String(nextName || "")));
   const file = await getFileRecord(env, orgId, fileId, { includeData: shouldIncludeData });
   return json({ ok: true, file });
 }
