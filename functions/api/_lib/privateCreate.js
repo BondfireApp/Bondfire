@@ -6,7 +6,7 @@ import { requireCookieCsrf } from './csrf.js';
 import { ensurePrivateSchema } from './privateStore.js';
 import { ensureZkSchema } from './zk.js';
 import { isCiphertext, contentContext } from '../../../shared/privateContent.js';
-import { ensureModulesTable, parseEnabledModules } from '../orgs/[orgId]/modules.js';
+import { MODULE_CONFIG_SCHEMA_VERSION, ensureModulesTable, parseEnabledModules } from '../orgs/[orgId]/modules.js';
 import { validRecoveryPayload, validWrappedKey } from './wrappedKeyValidation.js';
 
 export async function createPrivateOrg({db,request,userId,body}) {
@@ -26,7 +26,7 @@ export async function createPrivateOrg({db,request,userId,body}) {
   const recoveryStatement=caps.has('recovery_payload')
     ? db.prepare('INSERT INTO org_key_recovery(org_id,user_id,recovery_payload,updated_at) VALUES(?,?,?,?)').bind(id,userId,JSON.stringify(recovery),t)
     : db.prepare('INSERT INTO org_key_recovery(org_id,user_id,wrapped_key,salt,kdf,updated_at) VALUES(?,?,?,?,?,?)').bind(id,userId,JSON.stringify(recovery),recovery.salt,'PBKDF2-SHA256:210000',t);
-  const modules=enabled_modules===undefined?[]:[db.prepare('INSERT INTO org_module_configs(org_id,enabled_modules_json,version,updated_at,updated_by) VALUES(?,?,1,?,?)').bind(id,JSON.stringify(parseEnabledModules(enabled_modules)),t,userId)];
+  const modules=enabled_modules===undefined?[]:[db.prepare('INSERT INTO org_module_configs(org_id,enabled_modules_json,version,module_schema_version,updated_at,updated_by) VALUES(?,?,1,?,?,?)').bind(id,JSON.stringify(parseEnabledModules(enabled_modules)),MODULE_CONFIG_SCHEMA_VERSION,t,userId)];
   const wraps=device_id?[db.prepare('INSERT INTO org_private_device_wraps(org_id,user_id,device_id,wrapped_key) VALUES(?,?,?,?)').bind(id,userId,device_id,wrappedKey)]:[];
   if(scopeKeys&&!device_id)return bad(400,'REGISTER_DEVICE_FIRST');
   const scoped=scopeKeys?await initialScopedKeyStatements(db,id,userId,device_id,scopeKeys,submissionPublicKey):[];

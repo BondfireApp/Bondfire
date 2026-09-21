@@ -1,10 +1,15 @@
 import { bad, json, now } from "../../_lib/http.js";
 import { getDb, requireOrgRole } from "../../_lib/auth.js";
 
-const CORE_MODULE_IDS = Object.freeze(["people", "public-site"]);
+export const MODULE_CONFIG_SCHEMA_VERSION = 2;
+
+const CORE_MODULE_IDS = Object.freeze(["public-site"]);
+const LEGACY_OPTIONAL_MODULE_IDS = Object.freeze(["people", "newsletter"]);
 
 const DEFAULT_ENABLED_MODULES = Object.freeze([
   ...CORE_MODULE_IDS,
+  "people",
+  "newsletter",
   "needs",
   "pledges",
   "inventory",
@@ -31,24 +36,39 @@ export async function ensureModulesTable(db) {
       org_id TEXT PRIMARY KEY,
       enabled_modules_json TEXT NOT NULL DEFAULT '[]',
       version INTEGER NOT NULL DEFAULT 1,
+      module_schema_version INTEGER NOT NULL DEFAULT ${MODULE_CONFIG_SCHEMA_VERSION},
       updated_at INTEGER NOT NULL,
       updated_by TEXT
     )`
   ).run();
+  try {
+    await db.prepare(
+      "ALTER TABLE org_module_configs ADD COLUMN module_schema_version INTEGER NOT NULL DEFAULT 1"
+    ).run();
+  } catch {}
 }
 
-export function parseEnabledModules(value) {
+export function parseEnabledModules(value, options = {}) {
+  const includeLegacyOptionalModules = options?.includeLegacyOptionalModules === true;
   let parsed = value;
   if (typeof value === "string") {
     try { parsed = JSON.parse(value); } catch { parsed = []; }
   }
   const requested = Array.isArray(parsed) ? parsed : [];
   const wanted = new Set(
-    [...CORE_MODULE_IDS, ...requested]
+    [
+      ...CORE_MODULE_IDS,
+      ...(includeLegacyOptionalModules ? LEGACY_OPTIONAL_MODULE_IDS : []),
+      ...requested,
+    ]
       .map((id) => String(id || "").trim())
       .filter(Boolean)
   );
   return MODULE_ORDER.filter((id) => wanted.has(id));
+}
+
+function isLegacyModuleConfig(row) {
+  return Number(row?.module_schema_version || 1) < MODULE_CONFIG_SCHEMA_VERSION;
 }
 
 function currentUserId(auth) {
@@ -78,9 +98,13 @@ export async function onRequestGet({ env, request, params }) {
   await ensureModulesTable(db);
 
   const row = await db.prepare(
-    "SELECT org_id, enabled_modules_json, version, updated_at FROM org_module_configs WHERE org_id = ?"
+    "SELECT org_id, enabled_modules_json, version, module_schema_version, updated_at FROM org_module_configs WHERE org_id = ?"
   ).bind(orgId).first();
-  const enabledModules = row ? parseEnabledModules(row.enabled_modules_json) : [...DEFAULT_ENABLED_MODULES];
+  const enabledModules = row
+    ? parseEnabledModules(row.enabled_modules_json, {
+        includeLegacyOptionalModules: isLegacyModuleConfig(row),
+      })
+    : [...DEFAULT_ENABLED_MODULES];
   return json(responsePayload(orgId, enabledModules, row, auth.role));
 }
 
@@ -108,14 +132,22 @@ export async function onRequestPut({ env, request, params }) {
   const updatedBy = currentUserId(auth);
 
   await db.prepare(
-    `INSERT INTO org_module_configs (org_id, enabled_modules_json, version, updated_at, updated_by)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO org_module_configs (org_id, enabled_modules_json, version, module_schema_version, updated_at, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(org_id) DO UPDATE SET
        enabled_modules_json = excluded.enabled_modules_json,
        version = excluded.version,
+       module_schema_version = excluded.module_schema_version,
        updated_at = excluded.updated_at,
        updated_by = excluded.updated_by`
-  ).bind(orgId, JSON.stringify(enabledModules), version, timestamp, updatedBy).run();
+  ).bind(
+    orgId,
+    JSON.stringify(enabledModules),
+    version,
+    MODULE_CONFIG_SCHEMA_VERSION,
+    timestamp,
+    updatedBy
+  ).run();
 
   return json(responsePayload(orgId, enabledModules, { version, updated_at: timestamp }, auth.role));
 }

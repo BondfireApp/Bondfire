@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS org_module_configs (
   org_id TEXT PRIMARY KEY,
   enabled_modules_json TEXT NOT NULL DEFAULT '[]',
   version INTEGER NOT NULL DEFAULT 1,
+  module_schema_version INTEGER NOT NULL DEFAULT 2,
   updated_at INTEGER NOT NULL,
   updated_by TEXT
 );

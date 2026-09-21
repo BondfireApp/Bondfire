@@ -79,7 +79,7 @@ for(const variant of ['wrapped_key','recovery_payload']) {
     assert.equal(sql.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column}=?`).get(nextId).n,0,'failed backup must roll back '+table);
   }
   await call('/api/orgs/create',{body});
-  assert.deepEqual(JSON.parse(sql.prepare('SELECT enabled_modules_json FROM org_module_configs WHERE org_id=?').get(nextId).enabled_modules_json),['people','public-site','needs','studio']);
+  assert.deepEqual(JSON.parse(sql.prepare('SELECT enabled_modules_json FROM org_module_configs WHERE org_id=?').get(nextId).enabled_modules_json),['public-site','needs','studio']);
   assert(sql.prepare('SELECT * FROM org_key_recovery WHERE org_id=?').get(nextId));
   if(variant==='recovery_payload') sql.exec('DROP TABLE org_key_recovery; ALTER TABLE recovery_saved RENAME TO org_key_recovery');
 }
