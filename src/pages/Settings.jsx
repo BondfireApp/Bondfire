@@ -138,9 +138,14 @@ export default function Settings({ privateMode: privateModeProp }) {
     };
   }, [orgId, privateModeProp]);
 
-  /* ---------- Submenu tabs ---------- */
+  /* ---------- Section + submenu tabs ---------- */
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = String(searchParams.get("tab") || "org").toLowerCase();
+  const requestedSection = String(searchParams.get("section") || "").toLowerCase();
+  const securityTabKeys = ["invites", "members", "profile", "security"];
+  const activeSection =
+    requestedSection ||
+    (securityTabKeys.includes(tab) ? "security" : tab === "newsletter" ? "newsletter" : "settings");
 
   const setTab = (next) => {
     const n = String(next || "org").toLowerCase();
@@ -148,27 +153,35 @@ export default function Settings({ privateMode: privateModeProp }) {
       (prev) => {
         const p = new URLSearchParams(prev);
         p.set("tab", n);
+        if (securityTabKeys.includes(n)) p.set("section", "security");
+        else if (n === "newsletter") p.set("section", "newsletter");
+        else p.set("section", "settings");
         return p;
       },
       { replace: true }
     );
   };
 
-  const tabs = React.useMemo(
-    () => [
+  const tabs = React.useMemo(() => {
+    if (activeSection === "newsletter") return [];
+
+    if (activeSection === "security") {
+      return [
+        ["invites", "Invites"],
+        ["members", "Members"],
+        ["profile", "Member profile"],
+        ["security", "Security"],
+      ];
+    }
+
+    return [
       ["org", "Organization"],
       ["build", "Build"],
-      ["invites", "Invites"],
-      ["members", "Members"],
-      ["profile", "My profile"],
       ["public", "Public page"],
       ["public-inbox", "Public inbox"],
-      ["newsletter", "Newsletter"],
       ["pledges", "Pledges"],
-      ["security", "Security"],
-    ].filter(([key]) => !privateMode || ["security","members","profile","invites","pledges","public","public-inbox","newsletter"].includes(key)),
-    [privateMode]
-  );
+    ].filter(([key]) => !privateMode || ["pledges", "public", "public-inbox"].includes(key));
+  }, [activeSection, privateMode]);
 
   /* ========== INVITES (backend) ========== */
   const [invites, setInvites] = React.useState([]);
@@ -1355,25 +1368,27 @@ React.useEffect(() => {
 
   return (
     <div className="grid" style={{ gap: 16, padding: 16 }}>
-      {/* Submenu */}
-      <div className="card" style={{ padding: 12 }}>
-        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-          {tabs.map(([key, label]) => {
-            const active = tab === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                className={active ? "btn-red" : "btn"}
-                onClick={() => setTab(key)}
-                style={{ padding: "8px 12px" }}
-              >
-                {label}
-              </button>
-            );
-          })}
+      {/* Section submenu. Newsletter is intentionally standalone in the global drawer. */}
+      {tabs.length > 0 ? (
+        <div className="card" style={{ padding: 12 }}>
+          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+            {tabs.map(([key, label]) => {
+              const active = tab === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={active ? "btn-red" : "btn"}
+                  onClick={() => setTab(key)}
+                  style={{ padding: "8px 12px" }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Build */}
       {tab === "build" && <BuildModules />}
