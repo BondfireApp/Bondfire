@@ -393,7 +393,7 @@ export default function BondfireChat() {
     } catch {
       setDeviceVerified(true);
     }
-  }, [saved?.userId, saved?.deviceId, userId, deviceId]);
+  }, [orgId, saved?.userId, saved?.deviceId, userId, deviceId]);
 
   const refreshRooms = React.useCallback(() => {
     const client = clientRef.current;
@@ -459,7 +459,7 @@ export default function BondfireChat() {
     } else if (truth === false) {
       setDeviceVerified(false);
     }
-  }, []);
+  }, [orgId]);
 
   function cacheMember(roomId, mxid, info) {
     setMemberCache((prev) => {
@@ -521,7 +521,7 @@ export default function BondfireChat() {
       });
       if (next.deviceId) setDeviceId(next.deviceId);
     } catch {}
-  }, [saved?.hsUrl, saved?.userId, saved?.accessToken, saved?.deviceId, userId, accessToken, deviceId]);
+  }, [orgId, saved?.hsUrl, saved?.userId, saved?.accessToken, saved?.deviceId, userId, accessToken, deviceId]);
 
   useEffect(() => {
     if (!saved?.hsUrl || !saved?.userId || !saved?.accessToken) return;
