@@ -309,6 +309,9 @@ export default function People() {
 						{busyZk ? "Encrypting" : "Encrypt Existing"}
 					</button>
 				</div>
+				<p className="helper" style={{ margin: "8px 0 0" }}>
+					This is the organization’s broader people roster. Bondfire Members, accounts, roles, and access live separately in Settings → Members.
+				</p>
 
 				{zkMsg ? <div className="helper" style={{ marginTop: 10 }}>{zkMsg}</div> : null}
 
