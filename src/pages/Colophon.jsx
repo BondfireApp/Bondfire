@@ -126,7 +126,25 @@ function NativeColophonBoundary({ children }) {
   return <LocationContext.Provider value={embeddedLocationContext}>{children}</LocationContext.Provider>;
 }
 
+const SABOT_MEDIA_ORG_ID = "397ffb25-cf4a-4fa2-b364-e506764a20c4";
+
 export default function Colophon() {
+  const { orgId } = useParams();
+  const opensSabotColophon = String(orgId || "") === SABOT_MEDIA_ORG_ID;
+
+  React.useEffect(() => {
+    if (!opensSabotColophon) return;
+    window.location.assign("/api/integrations/sabot/start");
+  }, [opensSabotColophon]);
+
+  if (opensSabotColophon) {
+    return (
+      <main className="page">
+        <p className="helper">Opening the connected Sabot Colophon workspace…</p>
+      </main>
+    );
+  }
+
   return (
     <div className="bondfire-colophon-page">
       <NativeColophonBoundary>
