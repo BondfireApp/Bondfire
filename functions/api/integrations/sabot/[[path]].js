@@ -108,40 +108,64 @@ async function consume({ env, request }) {
   }
 
   let user = null
-  const linked = await db.prepare('SELECT bondfire_user_id FROM bondfire_sabot_identity_links WHERE sabot_user_id = ? LIMIT 1')
-    .bind(String(handoff.subject)).first()
-  if (linked?.bondfire_user_id) {
-    user = await db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1').bind(String(linked.bondfire_user_id)).first()
-  }
+  let membership = null
 
-  // First-time pairing binds the Bondfire account that is already signed in
-  // on this browser. Sabot and Bondfire do not need to use the same email.
-  if (!user) {
-    const current = await requireUser({ env, request })
-    if (current.ok && current.user?.sub) {
-      user = await db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1').bind(String(current.user.sub)).first()
+  // The browser's current Bondfire session is authoritative for an interactive
+  // handoff. If that account belongs to Sabot Media, prefer it and repair any
+  // stale saved identity mapping left by an earlier pairing attempt.
+  const current = await requireUser({ env, request })
+  if (current.ok && current.user?.sub) {
+    const currentUser = await db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1')
+      .bind(String(current.user.sub)).first()
+    if (currentUser?.id) {
+      const currentMembership = await db.prepare('SELECT role FROM org_memberships WHERE org_id = ? AND user_id = ? LIMIT 1')
+        .bind(SABOT_ORG_ID, String(currentUser.id)).first()
+      if (currentMembership?.role) {
+        user = currentUser
+        membership = currentMembership
+      }
     }
   }
 
-  // Email matching is only a fallback when there is no current Bondfire
-  // session to establish the explicit account pairing.
-  if (!user && handoff.email) {
-    user = await db.prepare('SELECT id, email, name FROM users WHERE lower(email) = ? LIMIT 1')
-      .bind(String(handoff.email).toLowerCase()).first()
+  // If there is no usable current session, try the previously paired identity.
+  if (!user) {
+    const linked = await db.prepare('SELECT bondfire_user_id FROM bondfire_sabot_identity_links WHERE sabot_user_id = ? LIMIT 1')
+      .bind(String(handoff.subject)).first()
+    if (linked?.bondfire_user_id) {
+      const linkedUser = await db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1')
+        .bind(String(linked.bondfire_user_id)).first()
+      if (linkedUser?.id) {
+        const linkedMembership = await db.prepare('SELECT role FROM org_memberships WHERE org_id = ? AND user_id = ? LIMIT 1')
+          .bind(SABOT_ORG_ID, String(linkedUser.id)).first()
+        if (linkedMembership?.role) {
+          user = linkedUser
+          membership = linkedMembership
+        }
+      }
+    }
   }
 
-  if (!user?.id) {
+  // Email matching remains a last-resort bootstrap only. Different email
+  // addresses across Sabot and Bondfire are fully supported.
+  if (!user && handoff.email) {
+    const emailUser = await db.prepare('SELECT id, email, name FROM users WHERE lower(email) = ? LIMIT 1')
+      .bind(String(handoff.email).toLowerCase()).first()
+    if (emailUser?.id) {
+      const emailMembership = await db.prepare('SELECT role FROM org_memberships WHERE org_id = ? AND user_id = ? LIMIT 1')
+        .bind(SABOT_ORG_ID, String(emailUser.id)).first()
+      if (emailMembership?.role) {
+        user = emailUser
+        membership = emailMembership
+      }
+    }
+  }
+
+  if (!user?.id || !membership?.role) {
     return errorPage(
       'Bondfire account not linked',
-      'Sign in to Bondfire once with the account that belongs to the Sabot Media organization, then open Bondfire from Sabot again.',
+      'Sign in to Bondfire with the account that belongs to the Sabot Media organization, then open Bondfire from Sabot again.',
       403,
     )
-  }
-
-  const membership = await db.prepare('SELECT role FROM org_memberships WHERE org_id = ? AND user_id = ? LIMIT 1')
-    .bind(SABOT_ORG_ID, String(user.id)).first()
-  if (!membership?.role) {
-    return errorPage('Bondfire access denied', 'This Bondfire account is not a member of the Sabot Media organization.', 403)
   }
 
   await db.prepare(`
