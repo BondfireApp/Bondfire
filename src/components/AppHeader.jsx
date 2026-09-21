@@ -6,6 +6,8 @@ import { loadOrgIdentity } from "../lib/orgIdentity.js";
 
 const homeHref = "/orgs";
 const NAV_MODULE_LOGOS = Object.freeze({
+  people: "/logos/people.svg",
+  newsletter: "/logos/newsletter.svg",
   needs: "/logos/needs.png",
   pledges: "/logos/pledges.png",
   inventory: "/logos/inventory.png",
@@ -287,17 +289,18 @@ export default function AppHeader({ onLogout, showLogout }) {
     ? [
         { label: "Dashboard", to: `${base}/overview`, tourId: "nav-overview", active: path === base || path === `${base}/` || path === `${base}/overview` },
         { label: "Build", to: `${base}/build`, tourId: "nav-build" },
-        { label: "People", to: `${base}/people`, tourId: "nav-people" },
-        {
-          label: "Newsletter",
-          to: `${base}/settings?section=newsletter&tab=newsletter`,
-          tourId: "nav-newsletter",
-          active: path === `${base}/settings` && settingsTab === "newsletter",
-        },
       ]
     : [];
   const moduleItems = base
     ? [
+        { label: "People", to: `${base}/people`, tourId: "nav-people", moduleId: "people" },
+        {
+          label: "Newsletter",
+          to: `${base}/settings?section=newsletter&tab=newsletter`,
+          tourId: "nav-newsletter",
+          moduleId: "newsletter",
+          active: path === `${base}/settings` && settingsTab === "newsletter",
+        },
         { label: "Needs", to: `${base}/needs`, tourId: "nav-needs", moduleId: "needs" },
         { label: "Pledges", to: `${base}/pledges`, tourId: "nav-pledges", moduleId: "pledges" },
         { label: "Inventory", to: `${base}/inventory`, tourId: "nav-inventory", moduleId: "inventory" },
