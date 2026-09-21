@@ -289,7 +289,7 @@ async function getDeviceVerifiedTruth(client) {
   }
 }
 
-export default function BondfireChat() {
+export default function BondfireChat({ floating = false }) {
   const params = useParams();
   const orgId = params.orgId || parseOrgIdFromHash();
 
@@ -327,6 +327,12 @@ export default function BondfireChat() {
   const [activeRoomId, setActiveRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [msg, setMsg] = useState("");
+  const [dockOpen, setDockOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationPermission, setNotificationPermission] = useState(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+    return window.Notification.permission;
+  });
 
   const [memberCache, setMemberCache] = useState({});
   const [hideUndecryptable, setHideUndecryptable] = useState(
@@ -341,6 +347,7 @@ export default function BondfireChat() {
   const recoveryKeyRef = useRef(null);
   const activeRoomIdRef = useRef(null);
   const stoppedRef = useRef(false);
+  const dockOpenRef = useRef(false);
 
   const log = (...a) => setStatus(`[${ts()}] ${a.join(" ")}`);
 
@@ -355,6 +362,11 @@ export default function BondfireChat() {
   useEffect(() => {
     activeRoomIdRef.current = activeRoomId;
   }, [activeRoomId]);
+
+  useEffect(() => {
+    dockOpenRef.current = dockOpen;
+    if (dockOpen) setUnreadCount(0);
+  }, [dockOpen]);
 
   useEffect(() => {
     if (!rooms.length) {
@@ -606,14 +618,48 @@ export default function BondfireChat() {
       if (toStartOfTimeline) return;
       if (ev?.getType?.() !== "m.room.message") return;
 
-      const current = activeRoomIdRef.current;
-      if (!current || room?.roomId !== current) return;
+      const orgMeta = getStoredOrgMeta(orgId);
+      const roomSummary = {
+        id: room?.roomId || "",
+        name: room?.name || room?.getCanonicalAlias?.() || room?.roomId || "",
+        canonicalAlias: room?.getCanonicalAlias?.() || "",
+        altAliases: typeof room?.getAltAliases === "function" ? room.getAltAliases() || [] : [],
+      };
+      if (!roomMatchesOrg(roomSummary, orgMeta)) return;
 
+      const current = activeRoomIdRef.current;
       const m = eventToMsg(ev, room);
-      setMessages((prev) => {
-        if (prev.some((x) => x.id === m.id)) return prev;
-        return [...prev, m];
-      });
+
+      if (current && room?.roomId === current) {
+        setMessages((prev) => {
+          if (prev.some((x) => x.id === m.id)) return prev;
+          return [...prev, m];
+        });
+      }
+
+      const sender = normalizeMxid(ev?.getSender?.() || "");
+      const me = normalizeMxid(client?.getUserId?.() || uid || "");
+      const fromSelf = !!sender && !!me && sender === me;
+      const shouldNotify =
+        floating &&
+        !fromSelf &&
+        (!dockOpenRef.current ||
+          document.visibilityState !== "visible" ||
+          (current && room?.roomId !== current));
+
+      if (!shouldNotify) return;
+
+      setUnreadCount((count) => count + 1);
+
+      try {
+        if ("Notification" in window && window.Notification.permission === "granted") {
+          new window.Notification("New FireChat message", {
+            body: "Open Bondfire to read it.",
+            icon: "/logos/firechat.png",
+            tag: `bf-firechat-${orgId}`,
+          });
+        }
+      } catch {}
     }
 
     function onVerificationReq(req) {
@@ -933,6 +979,19 @@ export default function BondfireChat() {
 
   const loggedIn = !!(saved?.hsUrl && saved?.userId && saved?.accessToken);
 
+  const enableNotifications = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      return;
+    }
+    try {
+      const permission = await window.Notification.requestPermission();
+      setNotificationPermission(permission);
+    } catch {
+      setNotificationPermission(window.Notification.permission || "default");
+    }
+  };
+
   const login = async (e) => {
     e.preventDefault();
     try {
@@ -1114,8 +1173,114 @@ export default function BondfireChat() {
 
   const deviceLock = !cryptoReady ? "🟡" : deviceVerified ? "🔒" : "🔓";
 
+  if (floating && !loggedIn) return null;
+
+  if (floating && !dockOpen) {
+    return (
+      <button
+        type="button"
+        className="btn"
+        onClick={() => setDockOpen(true)}
+        aria-label={unreadCount ? `Open FireChat, ${unreadCount} unread messages` : "Open FireChat"}
+        title="Open FireChat"
+        style={{
+          position: "fixed",
+          right: 18,
+          bottom: 18,
+          zIndex: 1200,
+          minWidth: 58,
+          height: 54,
+          borderRadius: 999,
+          padding: "0 16px",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          boxShadow: "0 14px 42px rgba(0,0,0,.45)",
+        }}
+      >
+        <img src="/logos/firechat.png" alt="" aria-hidden="true" style={{ width: 28, height: 28, objectFit: "contain" }} />
+        <span style={{ fontWeight: 900 }}>FireChat</span>
+        {unreadCount ? (
+          <span
+            aria-hidden="true"
+            style={{
+              minWidth: 22,
+              height: 22,
+              padding: "0 6px",
+              borderRadius: 999,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "#ef4444",
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 900,
+            }}
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        ) : null}
+      </button>
+    );
+  }
+
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
+    <div
+      style={
+        floating
+          ? {
+              position: "fixed",
+              right: 18,
+              bottom: 18,
+              zIndex: 1200,
+              width: "min(520px, calc(100vw - 24px))",
+              height: "min(760px, calc(100dvh - 92px))",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              border: "1px solid rgba(255,255,255,.16)",
+              borderRadius: 16,
+              background: "var(--bg, #0b0f0d)",
+              boxShadow: "0 20px 70px rgba(0,0,0,.55)",
+            }
+          : { maxWidth: 1100, margin: "0 auto", padding: 16 }
+      }
+    >
+      {floating ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 12px",
+            borderBottom: "1px solid rgba(255,255,255,.12)",
+            background: "rgba(255,255,255,.035)",
+          }}
+        >
+          <img src="/logos/firechat.png" alt="" aria-hidden="true" style={{ width: 28, height: 28, objectFit: "contain" }} />
+          <strong style={{ flex: 1 }}>FireChat</strong>
+          {notificationPermission === "default" ? (
+            <button className="btn" type="button" onClick={enableNotifications} style={{ padding: "6px 9px" }}>
+              Enable alerts
+            </button>
+          ) : null}
+          {notificationPermission === "denied" ? (
+            <span className="helper" title="Browser notifications are blocked for this site">Alerts blocked</span>
+          ) : null}
+          <button
+            className="btn"
+            type="button"
+            onClick={() => setDockOpen(false)}
+            aria-label="Minimize FireChat"
+            title="Minimize FireChat"
+            style={{ padding: "6px 10px" }}
+          >
+            −
+          </button>
+        </div>
+      ) : null}
+      <div style={floating ? { flex: 1, minHeight: 0, overflow: "auto", padding: 12 } : {}}>
       <header
         style={{
           display: "flex",
@@ -1144,7 +1309,7 @@ export default function BondfireChat() {
         </div>
       )}
 
-      {loggedIn && (
+      {loggedIn && (!floating || !deviceVerified || verificationReq) && (
         <div className="card" style={{ padding: 12, marginTop: 12 }}>
           <h3 className="section-title" style={{ marginTop: 0 }}>
             Verify this session
@@ -1275,14 +1440,22 @@ export default function BondfireChat() {
           style={{
             display: "grid",
             gridTemplateColumns:
-              window.matchMedia && window.matchMedia("(max-width: 820px)").matches
+              floating || (window.matchMedia && window.matchMedia("(max-width: 820px)").matches)
                 ? "1fr"
                 : "280px 1fr",
             gap: 12,
             marginTop: 12,
           }}
         >
-          <aside className="card" style={{ padding: 12, minHeight: 0 }}>
+          <aside
+            className="card"
+            style={{
+              padding: 12,
+              minHeight: 0,
+              maxHeight: floating ? 190 : undefined,
+              overflow: floating ? "auto" : undefined,
+            }}
+          >
             <h3 className="section-title" style={{ marginTop: 0 }}>
               Rooms
             </h3>
@@ -1330,9 +1503,10 @@ export default function BondfireChat() {
             className="card"
             style={{
               padding: 12,
-              minHeight: 420,
-              height:
-                window.matchMedia && window.matchMedia("(max-width: 820px)").matches
+              minHeight: floating ? 320 : 420,
+              height: floating
+                ? 360
+                : window.matchMedia && window.matchMedia("(max-width: 820px)").matches
                   ? "calc(100dvh - 220px)"
                   : "auto",
               display: "flex",
@@ -1428,6 +1602,7 @@ export default function BondfireChat() {
           </main>
         </div>
       )}
+      </div>
     </div>
   );
 }
