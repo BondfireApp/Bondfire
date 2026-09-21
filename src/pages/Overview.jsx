@@ -533,9 +533,6 @@ export default function Overview() {
   }
 
   const go = (tab) => nav(`/org/${encodeURIComponent(orgId)}/${tab}`);
-  const moduleEnabled = (moduleId) =>
-    !moduleId || (!!enabledModules && enabledModules.has(moduleId));
-
   const countsNormalized = useMemo(() => {
     const c = counts || {};
     return {
@@ -884,12 +881,12 @@ export default function Overview() {
   );
 
   const visiblePanels = [
-    moduleEnabled("intake") ? { key: "inbox", panel: inboxPanel } : null,
-    moduleEnabled("meetings") ? { key: "meetings", panel: meetingsPanel } : null,
-    moduleEnabled("inventory") ? { key: "inventory", panel: inventoryPanel } : null,
-    moduleEnabled("needs") ? { key: "needs", panel: needsPanel } : null,
-    moduleEnabled("pledges") ? { key: "pledges", panel: pledgesPanel } : null,
-  ].filter(Boolean);
+    { key: "inbox", panel: inboxPanel },
+    { key: "meetings", panel: meetingsPanel },
+    { key: "inventory", panel: inventoryPanel },
+    { key: "needs", panel: needsPanel },
+    { key: "pledges", panel: pledgesPanel },
+  ];
 
   return (
     <div style={{ padding: 16 }}>
