@@ -57,7 +57,7 @@ export default function InnerSanctum() {
   return (
     <PrivateOrgBoundary>
       <Outlet />
-      {fireChatEnabled && !onFullChatRoute ? <BondfireChat floating /> : null}
+      {fireChatEnabled && !onFullChatRoute ? <BondfireChat key={orgId} floating /> : null}
     </PrivateOrgBoundary>
   );
 }
