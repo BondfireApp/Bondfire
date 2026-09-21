@@ -8,51 +8,6 @@ import { decryptWithOrgKey, getCachedOrgKey } from "../lib/zk.js";
 import OrgKeyBackupNudge from "../components/OrgKeyBackupNudge.jsx";
 import "./Overview.css";
 
-const DASH_LAUNCH_MODULES = Object.freeze([
-  {
-    moduleId: "drive",
-    title: "Drive",
-    logo: "/logos/drive.png",
-    to: "drive",
-    description: "Files, forms, and shared documents",
-  },
-  {
-    moduleId: "publishing-colophon",
-    title: "Colophon",
-    logo: "/logos/colophon.png",
-    to: "colophon",
-    description: "Publication workspace",
-  },
-  {
-    moduleId: "bondfire-chat",
-    title: "FireChat",
-    logo: "/logos/firechat.png",
-    to: "chat",
-    description: "Encrypted organization chat",
-  },
-  {
-    moduleId: "events",
-    title: "Events",
-    logo: "/logos/events.png",
-    to: "events",
-    description: "Events and scheduling",
-  },
-  {
-    moduleId: "witness-archive",
-    title: "REC",
-    logo: "/logos/rec.png",
-    to: "witness",
-    description: "Witness archive",
-  },
-  {
-    moduleId: "studio",
-    title: "Studio",
-    logo: "/logos/studio.svg",
-    to: "studio",
-    description: "Media workspace",
-  },
-]);
-
 function readOrgInfo(orgId) {
   try {
     const s = JSON.parse(localStorage.getItem(`bf_org_settings_${orgId}`) || "{}");
@@ -581,11 +536,6 @@ export default function Overview() {
   const moduleEnabled = (moduleId) =>
     !moduleId || (!!enabledModules && enabledModules.has(moduleId));
 
-  const launchCards = useMemo(() => {
-    if (!enabledModules) return [];
-    return DASH_LAUNCH_MODULES.filter((item) => enabledModules.has(item.moduleId));
-  }, [enabledModules]);
-
   const countsNormalized = useMemo(() => {
     const c = counts || {};
     return {
@@ -952,28 +902,6 @@ export default function Overview() {
 
       <OrgKeyBackupNudge orgId={orgId} />
 
-      {launchCards.length ? (
-        <section style={{ marginBottom: 16 }}>
-          <div className="helper" style={{ fontWeight: 900, letterSpacing: ".08em", marginBottom: 8 }}>
-            ENABLED WORKSPACE
-          </div>
-          <div className="bfTopMetricsRow">
-            {launchCards.map((item) => (
-              <button key={item.moduleId} type="button" style={cardBtnStyle} onClick={() => go(item.to)}>
-                <div className="card bfDashCard" style={{ padding: 14, minHeight: 118 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 54 }}>
-                    <ModuleLogo src={item.logo} label={item.title} />
-                    <div style={{ fontWeight: 900, fontSize: 15 }}>{item.title}</div>
-                  </div>
-                  <div className="helper" style={{ marginTop: 10 }}>{item.description}</div>
-                  <div style={{ marginTop: 10, fontWeight: 900 }}>Open →</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       <div className="bfTopMetricsRow">
         {!hasLoadedOnce && loading ? (
           <>
@@ -1003,11 +931,7 @@ export default function Overview() {
             <SectionCardSkeleton key={item.key} rows={item.key === "inbox" ? 2 : 3} />
           ))}
         </div>
-      ) : visiblePanels.length === 0 ? (
-        <div className="helper" style={{ padding: "8px 2px 2px" }}>
-          This organization has no dashboard data modules enabled. Use the workspace cards above or Build to add modules.
-        </div>
-      ) : isNarrow ? (
+      ) : visiblePanels.length === 0 ? null : isNarrow ? (
         <div className="bfDashMobileStack">
           {visiblePanels.map((item) => (
             <React.Fragment key={item.key}>{item.panel}</React.Fragment>
