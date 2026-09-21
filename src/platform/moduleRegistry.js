@@ -7,21 +7,9 @@
  * in a build until they have a real surface behind them.
  */
 
-const CORE_MODULE_IDS = Object.freeze(["people", "public-site"]);
+const CORE_MODULE_IDS = Object.freeze(["public-site"]);
 
 const CORE_MODULES = [
-  {
-    id: "people",
-    label: "People",
-    name: "People + roles",
-    mark: "PE",
-    description: "Keep the human map close: members, roles, skills, and the people who make the work possible.",
-    routeBase: "people",
-    tier: "core",
-    available: true,
-    builderVisible: false,
-    defaultEnabled: true,
-  },
   {
     id: "public-site",
     label: "Public site",
@@ -37,6 +25,28 @@ const CORE_MODULES = [
 ];
 
 const LIVE_MODULES = [
+  {
+    id: "people",
+    label: "People",
+    name: "People directory",
+    mark: "PE",
+    description: "Keep the organization’s real-world roster close. People can be listed here without creating a Bondfire account.",
+    routeBase: "people",
+    tier: "live",
+    available: true,
+    defaultEnabled: true,
+  },
+  {
+    id: "newsletter",
+    label: "Newsletter",
+    name: "Newsletter",
+    mark: "NL",
+    description: "Manage website signups, sender details, and newsletter delivery for this organization.",
+    routeBase: "settings?tab=newsletter",
+    tier: "live",
+    available: true,
+    defaultEnabled: true,
+  },
   {
     id: "needs",
     label: "Needs",
