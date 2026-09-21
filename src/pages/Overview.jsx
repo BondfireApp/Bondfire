@@ -8,6 +8,51 @@ import { decryptWithOrgKey, getCachedOrgKey } from "../lib/zk.js";
 import OrgKeyBackupNudge from "../components/OrgKeyBackupNudge.jsx";
 import "./Overview.css";
 
+const DASH_LAUNCH_MODULES = Object.freeze([
+  {
+    moduleId: "drive",
+    title: "Drive",
+    logo: "/logos/drive.png",
+    to: "drive",
+    description: "Files, forms, and shared documents",
+  },
+  {
+    moduleId: "publishing-colophon",
+    title: "Colophon",
+    logo: "/logos/colophon.png",
+    to: "colophon",
+    description: "Publication workspace",
+  },
+  {
+    moduleId: "bondfire-chat",
+    title: "FireChat",
+    logo: "/logos/firechat.png",
+    to: "chat",
+    description: "Encrypted organization chat",
+  },
+  {
+    moduleId: "events",
+    title: "Events",
+    logo: "/logos/events.png",
+    to: "events",
+    description: "Events and scheduling",
+  },
+  {
+    moduleId: "witness-archive",
+    title: "REC",
+    logo: "/logos/rec.png",
+    to: "witness",
+    description: "Witness archive",
+  },
+  {
+    moduleId: "studio",
+    title: "Studio",
+    logo: "/logos/studio.svg",
+    to: "studio",
+    description: "Media workspace",
+  },
+]);
+
 function readOrgInfo(orgId) {
   try {
     const s = JSON.parse(localStorage.getItem(`bf_org_settings_${orgId}`) || "{}");
@@ -324,6 +369,7 @@ export default function Overview() {
   const [tickerDeltas, setTickerDeltas] = useState(() => ({}));
   const [dashLayouts, setDashLayouts] = useState(() => readLayouts(orgId));
   const [gridWidth, setGridWidth] = useState(0);
+  const [enabledModules, setEnabledModules] = useState(null);
 
   useEffect(() => {
     setOrgInfo(readOrgInfo(orgId));
@@ -333,6 +379,47 @@ export default function Overview() {
     };
     window.addEventListener("bf:org_settings_changed", onChange);
     return () => window.removeEventListener("bf:org_settings_changed", onChange);
+  }, [orgId]);
+
+  useEffect(() => {
+    let alive = true;
+    setEnabledModules(null);
+
+    const loadModules = async () => {
+      if (!orgId) {
+        if (alive) setEnabledModules(new Set());
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/orgs/${encodeURIComponent(orgId)}/modules`, {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!alive) return;
+        if (!response.ok || !Array.isArray(payload?.enabled_modules)) {
+          setEnabledModules(new Set());
+          return;
+        }
+        setEnabledModules(new Set(payload.enabled_modules.map((id) => String(id))));
+      } catch {
+        if (alive) setEnabledModules(new Set());
+      }
+    };
+
+    const onModulesChanged = (event) => {
+      const changedOrgId = event?.detail?.orgId;
+      if (changedOrgId && String(changedOrgId) !== String(orgId)) return;
+      loadModules();
+    };
+
+    loadModules();
+    window.addEventListener("bf:modules_changed", onModulesChanged);
+    return () => {
+      alive = false;
+      window.removeEventListener("bf:modules_changed", onModulesChanged);
+    };
   }, [orgId]);
 
   useEffect(() => {
@@ -491,6 +578,13 @@ export default function Overview() {
   }
 
   const go = (tab) => nav(`/org/${encodeURIComponent(orgId)}/${tab}`);
+  const moduleEnabled = (moduleId) =>
+    !moduleId || (!!enabledModules && enabledModules.has(moduleId));
+
+  const launchCards = useMemo(() => {
+    if (!enabledModules) return [];
+    return DASH_LAUNCH_MODULES.filter((item) => enabledModules.has(item.moduleId));
+  }, [enabledModules]);
 
   const countsNormalized = useMemo(() => {
     const c = counts || {};
@@ -645,7 +739,7 @@ export default function Overview() {
   );
 
   const topCards = useMemo(() => {
-    const mk = (key, title, logo, value, sub, to) => {
+    const mk = (key, title, logo, value, sub, to, moduleId = null) => {
       const db = deltaBadge(deltas[key]);
       return {
         key,
@@ -654,6 +748,7 @@ export default function Overview() {
         value,
         sub,
         to,
+        moduleId,
         badge: db,
         extra: (
           <div className="bf-dashboard-sparkline" style={{ marginTop: 8, borderRadius: 8, padding: "4px 6px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden", width: "100%", boxSizing: "border-box" }} title={`${title.toLowerCase()} trend`}>
@@ -664,16 +759,17 @@ export default function Overview() {
         ),
       };
     };
+
     return [
       mk("people", "People", "/logos/people.svg", countsNormalized.people, "members", "people"),
-      mk("inventory", "Inventory", "/logos/inventory.png", countsNormalized.inventory, "items", "inventory"),
-      mk("needsOpen", "Needs", "/logos/needs.png", countsNormalized.needsOpen, "open", "needs"),
-      mk("meetingsUpcoming", "Meetings", "/logos/meetings.png", countsNormalized.meetingsUpcoming, "upcoming", "meetings"),
-      mk("pledgesActive", "Pledges", "/logos/pledges.png", countsNormalized.pledgesActive, "active", "settings?tab=pledges"),
+      mk("inventory", "Inventory", "/logos/inventory.png", countsNormalized.inventory, "items", "inventory", "inventory"),
+      mk("needsOpen", "Needs", "/logos/needs.png", countsNormalized.needsOpen, "open", "needs", "needs"),
+      mk("meetingsUpcoming", "Meetings", "/logos/meetings.png", countsNormalized.meetingsUpcoming, "upcoming", "meetings", "meetings"),
+      mk("pledgesActive", "Pledges", "/logos/pledges.png", countsNormalized.pledgesActive, "active", "settings?tab=pledges", "pledges"),
       mk("subsTotal", "New Subs", "/logos/newsletter.svg", countsNormalized.subsTotal, "total", "settings?tab=newsletter"),
-      mk("publicInbox", "Inbox", "/logos/intake.png", countsNormalized.publicInbox, "open items", "settings?tab=public-inbox"),
-    ];
-  }, [countsNormalized, deltas, historySeries]);
+      mk("publicInbox", "Inbox", "/logos/intake.png", countsNormalized.publicInbox, "open items", "settings?tab=public-inbox", "intake"),
+    ].filter((card) => !card.moduleId || enabledModules?.has(card.moduleId));
+  }, [countsNormalized, deltas, historySeries, enabledModules]);
 
   const inboxPanel = panelWrap(
     "Inbox",
@@ -837,6 +933,14 @@ export default function Overview() {
     )
   );
 
+  const visiblePanels = [
+    moduleEnabled("intake") ? { key: "inbox", panel: inboxPanel } : null,
+    moduleEnabled("meetings") ? { key: "meetings", panel: meetingsPanel } : null,
+    moduleEnabled("inventory") ? { key: "inventory", panel: inventoryPanel } : null,
+    moduleEnabled("needs") ? { key: "needs", panel: needsPanel } : null,
+    moduleEnabled("pledges") ? { key: "pledges", panel: pledgesPanel } : null,
+  ].filter(Boolean);
+
   return (
     <div style={{ padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
@@ -848,10 +952,32 @@ export default function Overview() {
 
       <OrgKeyBackupNudge orgId={orgId} />
 
+      {launchCards.length ? (
+        <section style={{ marginBottom: 16 }}>
+          <div className="helper" style={{ fontWeight: 900, letterSpacing: ".08em", marginBottom: 8 }}>
+            ENABLED WORKSPACE
+          </div>
+          <div className="bfTopMetricsRow">
+            {launchCards.map((item) => (
+              <button key={item.moduleId} type="button" style={cardBtnStyle} onClick={() => go(item.to)}>
+                <div className="card bfDashCard" style={{ padding: 14, minHeight: 118 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 54 }}>
+                    <ModuleLogo src={item.logo} label={item.title} />
+                    <div style={{ fontWeight: 900, fontSize: 15 }}>{item.title}</div>
+                  </div>
+                  <div className="helper" style={{ marginTop: 10 }}>{item.description}</div>
+                  <div style={{ marginTop: 10, fontWeight: 900 }}>Open →</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <div className="bfTopMetricsRow">
         {!hasLoadedOnce && loading ? (
           <>
-            {Array.from({ length: 7 }).map((_, i) => <div key={i}><MetricCardSkeleton /></div>)}
+            {Array.from({ length: Math.max(2, topCards.length) }).map((_, i) => <div key={i}><MetricCardSkeleton /></div>)}
           </>
         ) : (
           topCards.map((c) => (
@@ -871,21 +997,21 @@ export default function Overview() {
         )}
       </div>
 
-      {loading && !hasLoadedOnce ? (
+      {loading && !hasLoadedOnce && visiblePanels.length ? (
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, alignItems: "start" }}>
-          <SectionCardSkeleton rows={2} />
-          <SectionCardSkeleton rows={3} />
-          <SectionCardSkeleton rows={3} />
-          <SectionCardSkeleton rows={3} />
-          <SectionCardSkeleton rows={3} />
+          {visiblePanels.map((item) => (
+            <SectionCardSkeleton key={item.key} rows={item.key === "inbox" ? 2 : 3} />
+          ))}
+        </div>
+      ) : visiblePanels.length === 0 ? (
+        <div className="helper" style={{ padding: "8px 2px 2px" }}>
+          This organization has no dashboard data modules enabled. Use the workspace cards above or Build to add modules.
         </div>
       ) : isNarrow ? (
         <div className="bfDashMobileStack">
-          {inboxPanel}
-          {meetingsPanel}
-          {inventoryPanel}
-          {needsPanel}
-          {pledgesPanel}
+          {visiblePanels.map((item) => (
+            <React.Fragment key={item.key}>{item.panel}</React.Fragment>
+          ))}
         </div>
       ) : (
         <div ref={gridWrapRef} className="bfDashGridWrap">
@@ -908,11 +1034,9 @@ export default function Overview() {
               measureBeforeMount={false}
               useCSSTransforms={true}
             >
-              <div key="inbox">{inboxPanel}</div>
-              <div key="meetings">{meetingsPanel}</div>
-              <div key="inventory">{inventoryPanel}</div>
-              <div key="needs">{needsPanel}</div>
-              <div key="pledges">{pledgesPanel}</div>
+              {visiblePanels.map((item) => (
+                <div key={item.key}>{item.panel}</div>
+              ))}
             </Responsive>
           ) : null}
         </div>
