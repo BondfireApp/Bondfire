@@ -114,16 +114,20 @@ async function consume({ env, request }) {
     user = await db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1').bind(String(linked.bondfire_user_id)).first()
   }
 
-  if (!user && handoff.email) {
-    user = await db.prepare('SELECT id, email, name FROM users WHERE lower(email) = ? LIMIT 1')
-      .bind(String(handoff.email).toLowerCase()).first()
-  }
-
+  // First-time pairing binds the Bondfire account that is already signed in
+  // on this browser. Sabot and Bondfire do not need to use the same email.
   if (!user) {
     const current = await requireUser({ env, request })
     if (current.ok && current.user?.sub) {
       user = await db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1').bind(String(current.user.sub)).first()
     }
+  }
+
+  // Email matching is only a fallback when there is no current Bondfire
+  // session to establish the explicit account pairing.
+  if (!user && handoff.email) {
+    user = await db.prepare('SELECT id, email, name FROM users WHERE lower(email) = ? LIMIT 1')
+      .bind(String(handoff.email).toLowerCase()).first()
   }
 
   if (!user?.id) {
