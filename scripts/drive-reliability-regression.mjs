@@ -52,4 +52,7 @@ const formView = fs.readFileSync(new URL("../src/components/drive/FormFileView.j
 assert.match(formView, /await ensurePublicFormSaved\(\)/, "Public form links must wait for Drive persistence before opening or copying");
 assert.match(formView, /Preparing encrypted public link/, "Public form UI must expose key initialization instead of a premature URL");
 
+assert.match(drive, /deleteFolder[\s\S]*await api\(.*drive\/folders.*method: "DELETE"/, "Drive folder deletion must use the authenticated encrypted-aware API client");
+assert.match(drive, /deleteFile[\s\S]*await api\(.*drive\/files.*method: "DELETE"/, "Drive file deletion must use the authenticated encrypted-aware API client");
+
 console.log("PASS: Drive tree, sheet workspace, folder import, recursive deletion, and preview regressions");

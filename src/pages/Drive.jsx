@@ -429,7 +429,7 @@ export default function Drive() {
     if (!window.confirm(`Delete "${folder.name}" and everything inside it? This cannot be undone.`)) return;
     setDriveNotice("");
     try {
-      await request(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/folders/${encodeURIComponent(id)}`, { method: "DELETE" });
       const descendants = new Set([id]);
       let changed = true;
       while (changed) {
@@ -652,7 +652,7 @@ export default function Drive() {
     }
   }
   async function deleteFile(id) {
-    await request(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(id)}`, { method: "DELETE" });
     setFiles((prev) => prev.filter((f) => f.id !== id));
     if (selectedId === id && selectedKind === "file") {
       setSelectedId(null);
