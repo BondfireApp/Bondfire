@@ -6,6 +6,8 @@ import "react-resizable/css/styles.css";
 import { api } from "../utils/api.js";
 import { decryptWithOrgKey, getCachedOrgKey } from "../lib/zk.js";
 import OrgKeyBackupNudge from "../components/OrgKeyBackupNudge.jsx";
+import { isDemoMode } from "../demo/demoMode.js";
+import { getDefaultEnabledModuleIds } from "../platform/moduleRegistry.js";
 import "./Overview.css";
 
 function readOrgInfo(orgId) {
@@ -343,6 +345,11 @@ export default function Overview() {
     const loadModules = async () => {
       if (!orgId) {
         if (alive) setEnabledModules(new Set());
+        return;
+      }
+
+      if (isDemoMode()) {
+        if (alive) setEnabledModules(new Set(getDefaultEnabledModuleIds()));
         return;
       }
 
@@ -708,12 +715,12 @@ export default function Overview() {
     };
 
     return [
-      mk("people", "People", "/logos/people.svg", countsNormalized.people, "members", "people"),
+      mk("people", "People", "/logos/people.svg", countsNormalized.people, "in roster", "people", "people"),
       mk("inventory", "Inventory", "/logos/inventory.png", countsNormalized.inventory, "items", "inventory", "inventory"),
       mk("needsOpen", "Needs", "/logos/needs.png", countsNormalized.needsOpen, "open", "needs", "needs"),
       mk("meetingsUpcoming", "Meetings", "/logos/meetings.png", countsNormalized.meetingsUpcoming, "upcoming", "meetings", "meetings"),
       mk("pledgesActive", "Pledges", "/logos/pledges.png", countsNormalized.pledgesActive, "active", "settings?tab=pledges", "pledges"),
-      mk("subsTotal", "New Subs", "/logos/newsletter.svg", countsNormalized.subsTotal, "total", "settings?tab=newsletter"),
+      mk("subsTotal", "New Subs", "/logos/newsletter.svg", countsNormalized.subsTotal, "total", "settings?tab=newsletter", "newsletter"),
       mk("publicInbox", "Inbox", "/logos/intake.png", countsNormalized.publicInbox, "open items", "settings?tab=public-inbox", "intake"),
     ].filter((card) => !card.moduleId || enabledModules?.has(card.moduleId));
   }, [countsNormalized, deltas, historySeries, enabledModules]);
@@ -881,12 +888,12 @@ export default function Overview() {
   );
 
   const visiblePanels = [
-    { key: "inbox", panel: inboxPanel },
-    { key: "meetings", panel: meetingsPanel },
-    { key: "inventory", panel: inventoryPanel },
-    { key: "needs", panel: needsPanel },
-    { key: "pledges", panel: pledgesPanel },
-  ];
+    { key: "inbox", moduleId: "intake", panel: inboxPanel },
+    { key: "meetings", moduleId: "meetings", panel: meetingsPanel },
+    { key: "inventory", moduleId: "inventory", panel: inventoryPanel },
+    { key: "needs", moduleId: "needs", panel: needsPanel },
+    { key: "pledges", moduleId: "pledges", panel: pledgesPanel },
+  ].filter((item) => enabledModules?.has(item.moduleId));
 
   return (
     <div style={{ padding: 16 }}>
