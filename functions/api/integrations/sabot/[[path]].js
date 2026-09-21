@@ -113,17 +113,13 @@ async function consume({ env, request }) {
   // The browser's current Bondfire session is authoritative for an interactive
   // handoff. If that account belongs to Sabot Media, prefer it and repair any
   // stale saved identity mapping left by an earlier pairing attempt.
-  const current = await requireUser({ env, request })
-  if (current.ok && current.user?.sub) {
-    const currentUser = await db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1')
-      .bind(String(current.user.sub)).first()
-    if (currentUser?.id) {
-      const currentMembership = await db.prepare('SELECT role FROM org_memberships WHERE org_id = ? AND user_id = ? LIMIT 1')
-        .bind(SABOT_ORG_ID, String(currentUser.id)).first()
-      if (currentMembership?.role) {
-        user = currentUser
-        membership = currentMembership
-      }
+  const currentUser = await resolveCurrentBondfireUser({ env, request, db })
+  if (currentUser?.id) {
+    const currentMembership = await db.prepare('SELECT role FROM org_memberships WHERE org_id = ? AND user_id = ? LIMIT 1')
+      .bind(SABOT_ORG_ID, String(currentUser.id)).first()
+    if (currentMembership?.role) {
+      user = currentUser
+      membership = currentMembership
     }
   }
 
@@ -203,6 +199,28 @@ async function consume({ env, request }) {
   }))
 
   return redirect(`${BONDFIRE_ORIGIN}/#/org/${encodeURIComponent(SABOT_ORG_ID)}/overview`, headers)
+}
+
+async function resolveCurrentBondfireUser({ env, request, db }) {
+  const current = await requireUser({ env, request })
+  if (current.ok && current.user?.sub) {
+    return db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1')
+      .bind(String(current.user.sub)).first()
+  }
+
+  // The SPA normally refreshes an expired 15-minute access token with bf_rt
+  // before showing the org. This endpoint runs before the SPA, so recognize the
+  // same still-valid refresh session directly and rotate it below as usual.
+  const refreshToken = getCookie(request, 'bf_rt')
+  if (!refreshToken) return null
+  const refreshHash = await sha256Hex(refreshToken)
+  const row = await db.prepare(
+    'SELECT user_id, expires_at FROM refresh_tokens WHERE token_hash = ? LIMIT 1'
+  ).bind(refreshHash).first()
+  if (!row?.user_id || Number(row.expires_at || 0) < Date.now()) return null
+
+  return db.prepare('SELECT id, email, name FROM users WHERE id = ? LIMIT 1')
+    .bind(String(row.user_id)).first()
 }
 
 async function ensureSchema(db) {
