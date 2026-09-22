@@ -361,12 +361,15 @@ export default function Overview() {
         const payload = await response.json().catch(() => ({}));
         if (!alive) return;
         if (!response.ok || !Array.isArray(payload?.enabled_modules)) {
-          setEnabledModules(new Set());
+          // Keep the existing dashboard summaries visible until a module
+          // configuration is successfully resolved. An unavailable endpoint
+          // must not look like every optional feature was disabled.
           return;
         }
         setEnabledModules(new Set(payload.enabled_modules.map((id) => String(id))));
       } catch {
-        if (alive) setEnabledModules(new Set());
+        // Preserve the last resolved configuration (or the unresolved
+        // fallback) during a transient module-config read failure.
       }
     };
 
@@ -682,6 +685,12 @@ export default function Overview() {
 
   const cardBtnStyle = { width: "100%", textAlign: "left", border: "none", background: "transparent", padding: 0, cursor: "pointer" };
 
+  // A resolved configuration is authoritative. Until it resolves, keep the
+  // existing at-a-glance summaries instead of replacing them with a blank
+  // dashboard during a rollout or a transient request failure.
+  const isDashboardModuleEnabled = (moduleId) =>
+    enabledModules === null || enabledModules.has(moduleId);
+
   const panelWrap = (title, button, content, className = "") => (
     <div className={`card bfDashPanel ${className}`.trim()} style={{ padding: 16 }}>
       <div className="bfDashGrab" style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -722,7 +731,7 @@ export default function Overview() {
       mk("pledgesActive", "Pledges", "/logos/pledges.png", countsNormalized.pledgesActive, "active", "settings?tab=pledges", "pledges"),
       mk("subsTotal", "New Subs", "/logos/newsletter.svg", countsNormalized.subsTotal, "total", "settings?tab=newsletter", "newsletter"),
       mk("publicInbox", "Inbox", "/logos/intake.png", countsNormalized.publicInbox, "open items", "settings?tab=public-inbox", "intake"),
-    ].filter((card) => !card.moduleId || enabledModules?.has(card.moduleId));
+    ].filter((card) => !card.moduleId || isDashboardModuleEnabled(card.moduleId));
   }, [countsNormalized, deltas, historySeries, enabledModules]);
 
   const inboxPanel = panelWrap(
@@ -893,7 +902,7 @@ export default function Overview() {
     { key: "inventory", moduleId: "inventory", panel: inventoryPanel },
     { key: "needs", moduleId: "needs", panel: needsPanel },
     { key: "pledges", moduleId: "pledges", panel: pledgesPanel },
-  ].filter((item) => enabledModules?.has(item.moduleId));
+  ].filter((item) => isDashboardModuleEnabled(item.moduleId));
 
   return (
     <div style={{ padding: 16 }}>
