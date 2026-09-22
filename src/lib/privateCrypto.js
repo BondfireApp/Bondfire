@@ -39,7 +39,7 @@ export async function loadPrivateKey(orgId,status,transport) {
   if(scoped.key)return scoped.key;
   // Always obtain the current account's wrapped key through the role-gated API.
   // A shared browser's old raw-key cache is never authority to open a private org.
-  const device=await ensureDeviceKeypair();
+  const device=await ensureDeviceKeypair({register:false});
   const deviceId=await deviceKeyId(device.pubJwk);
   const response=await transport(`/api/orgs/${encodeURIComponent(orgId)}/crypto?device_id=${deviceId}`);
   if(!response.wrapped_key) throw new Error('This account/device needs an encryption-key invitation from an organization administrator.');

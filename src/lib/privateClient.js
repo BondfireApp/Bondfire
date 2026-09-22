@@ -159,7 +159,7 @@ export async function dispatchPrivate(path,opts,transport) {
   ].includes(tail)) return null;
   const key=await loadPrivateKey(orgId,status,transport);
   const method=String(opts.method||'GET').toUpperCase();
-  if(method!=='GET'&&key.rotationRequired)throw new Error('Membership or devices changed. An owner must rotate encryption keys in Security before saving.');
+  if(method!=='GET'&&key.rotationRequired)throw new Error('Membership or role changed. An owner must rotate encryption keys in Security before saving.');
   async function submissions() {
     if(!key.scopes?.admin)return [];
     const data=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/submissions`);

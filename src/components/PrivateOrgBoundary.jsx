@@ -49,7 +49,7 @@ export default function PrivateOrgBoundary({children}) {
   const maintenanceBanner=state.rotationRequired ? (
     <div role="alert" style={{margin:'12px auto',maxWidth:1100,padding:'12px 14px',border:'1px solid #d97706',borderRadius:10,background:'rgba(120,53,15,.22)',color:'#fde68a'}}>
       <div style={{fontWeight:800,marginBottom:4}}>Encrypted writes are paused for this organization.</div>
-      <div style={{marginBottom:8}}>Membership or registered devices changed, so Bondfire requires one owner key rotation before any private module can save again. This is organization-wide, not a problem with the module you are using.</div>
+      <div style={{marginBottom:8}}>Membership or role changed, so Bondfire requires one owner key rotation before any private module can save again. This is organization-wide, not a problem with the module you are using.</div>
       {state.role==='owner'
         ? <Link className="btn" to={prefix+'/settings?tab=security'}>Rotate encryption keys</Link>
         : <div>An organization owner needs to rotate the encryption keys in Settings → Security.</div>}

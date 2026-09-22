@@ -3,6 +3,7 @@ import {env,sql,db,call} from './private-storage-regression.mjs';
 import {encryptPrivate,decryptPrivate} from '../src/lib/privateCrypto.js';
 import {registerDeviceKey} from '../functions/api/_lib/deviceKeys.js';
 import {KEY_SCOPES,canReadScope} from '../shared/privateKeyScopes.js';
+import {deviceKeyId} from '../shared/privateContent.js';
 const b64=b=>Buffer.from(b).toString('base64url');
 const device=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
 const pub=await crypto.subtle.exportKey('jwk',device.publicKey);
@@ -29,11 +30,21 @@ const tampered=structuredClone(first.body);tampered.keys.find(k=>k.scope==='admi
 await call(base+'/privacy/keys',{body:tampered},400);
 await call(base+'/privacy/keys',{body:first.body,user:'member'},403);
 await call(base+'/privacy/keys',{body:first.body});
+const secondOwnerDevice=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+const secondOwnerPublic=await crypto.subtle.exportKey('jwk',secondOwnerDevice.publicKey);
+await registerDeviceKey(db,'owner',secondOwnerPublic);
+info=await call(base+'/privacy/keys');assert(!info.rotationRequired,'registering a device must not pause every organization');
 for(const [user,n] of [['viewer',1],['member',2],['owner',3]]) {
  const result=await call(base+'/privacy/keys?device_id='+deviceId,{user});assert.equal(result.keys.length,n);assert(result.keys.every(k=>k.wrapped_key));
 }
 const ownBackup={epoch:1,device_id:deviceId,keys:first.body.keys.filter(k=>k.scope==='viewer').map(k=>({scope:k.scope,wrapped_key:wrappedKey,recovery}))};
 await call(base+'/privacy/keys/device',{body:ownBackup,user:'viewer'});
+const restoredDevice=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+const restoredPublic=await crypto.subtle.exportKey('jwk',restoredDevice.publicKey);
+const restoredDeviceId=await deviceKeyId(restoredPublic);
+await call(base+'/privacy/keys/device',{body:{...ownBackup,device_id:restoredDeviceId,device_public_key:restoredPublic},user:'viewer'});
+assert(await db.prepare('SELECT device_id FROM user_device_keys WHERE user_id=? AND device_id=?').bind('viewer',restoredDeviceId).first(),'recovery must register the restored device');
+info=await call(base+'/privacy/keys');assert(!info.rotationRequired,'recovery must not create a false rotation requirement');
 await call(base+'/privacy/keys/device',{body:{...ownBackup,keys:[...ownBackup.keys,{scope:'admin',wrapped_key:wrappedKey,recovery}]},user:'viewer'},400);
 await call(base+'/privacy/keys/device',{body:{...ownBackup,epoch:2},user:'viewer'},409);
 const secret=await encryptPrivate(first.key,{note:'PRIVATE admin field'},id,'public/config',id);

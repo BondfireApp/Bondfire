@@ -14,7 +14,7 @@ const scopes = read('functions/api/_lib/privateKeyScopes.js');
 // Roster/key maintenance is organization-wide. Individual modules must not be
 // left to discover the write barrier independently through failed save buttons.
 assert.match(scopes, /rotationRequired:/, 'key status must expose organization-wide rotation state');
-assert.match(client, /key\.rotationRequired[\s\S]*Membership or devices changed/, 'private writes must enforce the rotation barrier centrally');
+assert.match(client, /key\.rotationRequired[\s\S]*Membership or role changed/, 'private writes must enforce the rotation barrier centrally');
 assert.match(boundary, /privacy\/keys\?device_id=/, 'private org boundary must load key-maintenance state');
 assert.match(boundary, /rotationRequired/, 'private org boundary must track rotation-required state');
 assert.match(boundary, /Encrypted writes are paused for this organization/, 'UI must explain the org-wide write pause');

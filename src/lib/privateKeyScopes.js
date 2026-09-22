@@ -5,7 +5,7 @@ import {encryptPrivate,decryptPrivate} from './privateCrypto.js';
 import {ensureDeviceKeypair,unwrapOrgKey,wrapForMember,randomOrgKey,fromB64,toB64,wrapOrgKeyForRecovery,unwrapOrgKeyFromRecovery} from './zk.js';
 
 export async function loadScopedKeys(orgId,transport,passphrase) {
-  const device=await ensureDeviceKeypair();
+  const device=await ensureDeviceKeypair({register:false});
   const info=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/keys?device_id=${await deviceKeyId(device.pubJwk)}`);
   if(!info.epoch)return {info,key:null};
   const scopes={};let legacy;
@@ -54,10 +54,10 @@ export async function saveScopedRecovery(orgId,passphrase,transport,{restore=fal
   if(String(passphrase||'').length<20)throw new Error('Use a recovery passphrase of at least 20 characters.');
   const {info,key}=await loadScopedKeys(orgId,transport,restore?passphrase:undefined);
   if(!key)throw new Error('Role-based keys have not been enabled.');
-  const device=await ensureDeviceKeypair(),keys=[];
+  const device=await ensureDeviceKeypair({register:false}),keys=[];
   for(const [scope,raw] of Object.entries(key.scopes)) {
     const {salt,iv,ct}=await wrapOrgKeyForRecovery(raw,passphrase);
     keys.push({scope,wrapped_key:await wrapForMember(raw,device.pubJwk),recovery:{salt,iv,ct}});
   }
-  await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/keys/device`,{method:'POST',body:JSON.stringify({epoch:info.epoch,device_id:await deviceKeyId(device.pubJwk),keys})});
+  await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy/keys/device`,{method:'POST',body:JSON.stringify({epoch:info.epoch,device_id:await deviceKeyId(device.pubJwk),device_public_key:device.pubJwk,keys})});
 }

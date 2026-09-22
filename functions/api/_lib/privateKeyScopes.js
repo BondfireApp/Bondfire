@@ -4,6 +4,7 @@ import {requireCookieCsrf} from './csrf.js';
 import {validWrappedKey,validRecoveryPayload,validPublicKey} from './wrappedKeyValidation.js';
 import {KEY_SCOPES,canReadScope,contentScope} from '../../../shared/privateKeyScopes.js';
 import {contentContext,isCiphertext} from '../../../shared/privateContent.js';
+import {deviceKeyId,registerDeviceKey} from './deviceKeys.js';
 
 export async function ensureScopedKeys(db) {
   for(const sql of [
@@ -18,9 +19,38 @@ export async function ensureScopedKeys(db) {
     const name=op.split(' ')[0].toLowerCase();
     await db.prepare(`CREATE TRIGGER IF NOT EXISTS bf_private_roster_${name} AFTER ${op} ON org_memberships BEGIN UPDATE org_private_key_state SET roster_revision=roster_revision+1 WHERE org_id=${ref}.org_id; END`).run();
   }
-  await db.prepare(`CREATE TRIGGER IF NOT EXISTS bf_private_roster_device AFTER INSERT ON user_device_keys BEGIN UPDATE org_private_key_state SET roster_revision=roster_revision+1 WHERE org_id IN (SELECT org_id FROM org_memberships WHERE user_id=NEW.user_id); END`).run();
+  // Device registration alone does not grant access to any organization key.
+  // It must not pause private writes across every organization a user belongs
+  // to. Membership and role changes above remain the rotation boundary.
+  await db.prepare('DROP TRIGGER IF EXISTS bf_private_roster_device').run();
   const scopeSql="CASE WHEN NEW.kind='public/config' OR NEW.kind LIKE 'intake/%' OR NEW.kind LIKE 'newsletter/%' THEN 'admin' WHEN NEW.kind='pledges' THEN 'member' ELSE 'viewer' END";
   for(const op of ['INSERT','UPDATE OF ciphertext'])await db.prepare(`CREATE TRIGGER IF NOT EXISTS bf_private_epoch_${op.split(' ')[0].toLowerCase()} BEFORE ${op} ON org_private_records WHEN EXISTS(SELECT 1 FROM org_private_key_state WHERE org_id=NEW.org_id AND epoch>0) AND NOT EXISTS(SELECT 1 FROM org_private_key_state WHERE org_id=NEW.org_id AND roster_revision=rotated_revision AND json_extract(NEW.ciphertext,'$.v')=3 AND json_extract(NEW.ciphertext,'$.epoch')=epoch AND json_extract(NEW.ciphertext,'$.scope')=${scopeSql}) BEGIN SELECT RAISE(ABORT,'PRIVATE_KEY_ROTATION_REQUIRED'); END`).run();
+}
+
+// Older deployments counted a newly registered device as a roster change. A
+// stale state can be repaired only when the current membership and roles are
+// already fully represented by the existing key wraps and the only absent
+// recipients are additional devices for people who already hold that scope.
+// Membership removals, role changes, and new members keep their rotation gate.
+async function repairDeviceOnlyRotation(db,orgId,state) {
+  if(!state?.epoch||state.roster_revision===state.rotated_revision)return false;
+  const roster=(await db.prepare('SELECT m.user_id,m.role,d.device_id FROM org_memberships m LEFT JOIN user_device_keys d ON d.user_id=m.user_id WHERE m.org_id=?').bind(orgId).all()).results||[];
+  if(!roster.length||roster.some(row=>!row.device_id))return false;
+  const wraps=(await db.prepare('SELECT scope,user_id,device_id FROM org_private_scope_wraps WHERE org_id=?').bind(orgId).all()).results||[];
+  const active=new Map();
+  for(const row of roster)active.set(`${row.user_id}:${row.device_id}`,row.role);
+  for(const wrap of wraps) {
+    const role=active.get(`${wrap.user_id}:${wrap.device_id}`);
+    if(!role||!canReadScope(role,wrap.scope))return false;
+  }
+  for(const scope of KEY_SCOPES) {
+    for(const row of roster) {
+      if(!canReadScope(row.role,scope))continue;
+      if(!wraps.some(wrap=>wrap.scope===scope&&wrap.user_id===row.user_id&&active.has(`${wrap.user_id}:${wrap.device_id}`)))return false;
+    }
+  }
+  const result=await db.prepare('UPDATE org_private_key_state SET rotated_revision=roster_revision WHERE org_id=? AND epoch=? AND roster_revision=? AND rotated_revision=?').bind(orgId,state.epoch,state.roster_revision,state.rotated_revision).run();
+  return Number(result?.meta?.changes||0)===1;
 }
 export async function scopedKeys({env,request,orgId}) {
   const gate=await requireOrgRole({env,request,orgId,minRole:request.method==='GET'?'viewer':'owner'});
@@ -28,7 +58,8 @@ export async function scopedKeys({env,request,orgId}) {
   const db=getDb(env);
   await ensureScopedKeys(db);
   await db.prepare('INSERT OR IGNORE INTO org_private_key_state VALUES(?,0,0,0)').bind(orgId).run();
-  const state=await db.prepare('SELECT * FROM org_private_key_state WHERE org_id=?').bind(orgId).first();
+  let state=await db.prepare('SELECT * FROM org_private_key_state WHERE org_id=?').bind(orgId).first();
+  if(await repairDeviceOnlyRotation(db,orgId,state))state=await db.prepare('SELECT * FROM org_private_key_state WHERE org_id=?').bind(orgId).first();
   if(request.method==='GET') {
     const device=new URL(request.url).searchParams.get('device_id')||'';
     const rows=(await db.prepare('SELECT k.*,w.wrapped_key,r.payload AS recovery FROM org_private_scope_keys k LEFT JOIN org_private_scope_wraps w ON w.org_id=k.org_id AND w.scope=k.scope AND w.user_id=? AND w.device_id=? LEFT JOIN org_private_scope_recovery r ON r.org_id=k.org_id AND r.scope=k.scope AND r.user_id=? WHERE k.org_id=?').bind(gate.user.sub,device,gate.user.sub,orgId).all()).results||[];
@@ -89,10 +120,14 @@ export async function provisionOwnScopedDevice({env,request,orgId}) {
   const csrf=requireCookieCsrf(request);if(csrf)return csrf;
   const db=getDb(env);await ensureScopedKeys(db);
   const b=await request.json().catch(()=>null);
-  if(!b||Object.keys(b).some(k=>!['epoch','device_id','keys'].includes(k))||!Array.isArray(b.keys))return bad(400,'INVALID_SCOPED_KEY');
+  if(!b||Object.keys(b).some(k=>!['epoch','device_id','device_public_key','keys'].includes(k))||!Array.isArray(b.keys))return bad(400,'INVALID_SCOPED_KEY');
   const state=await db.prepare('SELECT epoch FROM org_private_key_state WHERE org_id=?').bind(orgId).first();
   if(!state||b.epoch!==state.epoch)return bad(409,'PRIVATE_KEY_ROSTER_CHANGED');
-  if(!await db.prepare('SELECT device_id FROM user_device_keys WHERE user_id=? AND device_id=?').bind(gate.user.sub,b.device_id).first())return bad(400,'KEY_RECIPIENT_DEVICE_UNKNOWN');
+  const existingDevice=await db.prepare('SELECT device_id FROM user_device_keys WHERE user_id=? AND device_id=?').bind(gate.user.sub,b.device_id).first();
+  if(!existingDevice) {
+    if(!validPublicKey(b.device_public_key)||await deviceKeyId(b.device_public_key)!==b.device_id)return bad(400,'KEY_RECIPIENT_DEVICE_UNKNOWN');
+    await registerDeviceKey(db,gate.user.sub,b.device_public_key);
+  }
   const expected=new Set(KEY_SCOPES.filter(scope=>canReadScope(gate.role,scope)));
   for(const k of b.keys)if(!expected.delete(k.scope)||Object.keys(k).some(f=>!['scope','wrapped_key','recovery'].includes(f))||!validWrappedKey(k.wrapped_key)||!validRecoveryPayload(k.recovery)||Object.keys(k.recovery).some(f=>!['salt','iv','ct'].includes(f)))return bad(400,'INVALID_SCOPED_KEY');
   if(expected.size)return bad(400,'KEY_RECIPIENT_MISSING');

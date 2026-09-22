@@ -24,7 +24,7 @@ export default function ScopedKeysPanel({orgId}) {
   const refresh=async()=>{
     const privacy=await api(`/api/orgs/${encodeURIComponent(orgId)}/privacy`);
     if(privacy.state!=='enabled'){setState(null);return;}
-    const device=await ensureDeviceKeypair();
+    const device=await ensureDeviceKeypair({register:false});
     const id=await deviceKeyId(device.pubJwk);
     const info=await api(`/api/orgs/${encodeURIComponent(orgId)}/privacy/keys?device_id=${encodeURIComponent(id)}`);
     setState({...info,privacy,deviceId:id});
@@ -107,7 +107,7 @@ export default function ScopedKeysPanel({orgId}) {
       <li><strong>Member key:</strong> member-level protected content in addition to reader access.</li>
       <li><strong>Administrator key:</strong> admin-only material such as private intake, newsletter settings, and private publication configuration.</li>
     </ul>
-    <p><strong>{state.epoch?`Key version ${state.epoch}.`:'Role-based keys have not been enabled yet.'}</strong> {state.rotationRequired?'Membership or registered devices changed. An owner must rotate keys before new private writes can continue.':''}</p>
+    <p><strong>{state.epoch?`Key version ${state.epoch}.`:'Role-based keys have not been enabled yet.'}</strong> {state.rotationRequired?'Membership or role changed. An owner must rotate keys before new private writes can continue.':''}</p>
 
     {missingCurrentDevice&&<div role="alert" style={{padding:12,border:'1px solid #d97706',borderRadius:8,marginBottom:12}}>
       <strong>This browser does not have the current organization keys.</strong>
