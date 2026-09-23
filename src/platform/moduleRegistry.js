@@ -25,6 +25,11 @@ const CORE_MODULES = [
 ];
 
 const LIVE_MODULES = [
+  {'id': 'tasks', 'label': 'Tasks', 'name': 'Tasks', 'mark': 'TA', 'description': 'Track assignments, due dates, checklists and follow-through.', 'routeBase': 'tasks', 'tier': 'live', 'available': true, 'defaultEnabled': false},
+  {'id': 'working-groups', 'label': 'Working Groups', 'name': 'Working Groups', 'mark': 'WG', 'description': 'Connect the work of subgroups within this organization.', 'routeBase': 'working-groups', 'tier': 'live', 'available': true, 'defaultEnabled': false},
+  {'id': 'decisions', 'label': 'Decisions', 'name': 'Decisions', 'mark': 'DE', 'description': 'Record decisions, their process and implementation.', 'routeBase': 'decisions', 'tier': 'live', 'available': true, 'defaultEnabled': false},
+  {'id': 'cases', 'label': 'Cases', 'name': 'Cases', 'mark': 'CA', 'description': 'Follow through on selected requests from Public Inbox.', 'routeBase': 'cases', 'tier': 'live', 'available': true, 'defaultEnabled': false},
+  {'id': 'treasury', 'label': 'Treasury', 'name': 'Treasury', 'mark': 'TR', 'description': 'Manage collective funds, spending and optional public transparency.', 'routeBase': 'treasury', 'tier': 'live', 'available': true, 'defaultEnabled': false},
   {
     id: "people",
     label: "People",

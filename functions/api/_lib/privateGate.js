@@ -7,6 +7,7 @@ import { privateStudio } from './privateStudio.js';
 import {publicPrivateResponse} from './privatePublication.js';
 import { isOrgModuleEnabled } from './orgModules.js';
 import { decorateDriveRecord } from './driveShares.js';
+import { workEndpoint, publicTreasury } from './workStore.js';
 
 function isMembershipCiphertext(value) {
   if (typeof value !== 'string' || value.length < 24 || value.length > 1024 * 1024) return false;
@@ -29,6 +30,8 @@ export async function privateRequestGate({env,request}) {
   if(/^\/api\/orgs\/(create|index)\/?$/.test(path)) return null;
   const m=path.match(/^\/api\/orgs\/([^/]+)(?:\/(.*))?$/);
   if(!m) {
+    const treasury = path.match(/^\/api\/p\/([^/]+)\/treasury\/?$/);
+    if (treasury) return publicTreasury({env,request,slug:decodeURIComponent(treasury[1])});
     const page=path.match(/^\/api\/(p|public)\/([^/]+)/);
     const form=path.match(/^\/api\/public\/forms\/([^/]+)/);
     if(form) return null;
@@ -43,6 +46,7 @@ export async function privateRequestGate({env,request}) {
     return null;
   }
   const orgId=decodeURIComponent(m[1]),route=(m[2]||'').replace(/\/+$/,'');
+  if (route.startsWith('work/')) return workEndpoint({env,request,orgId,path:route.slice(5)});
   if(route==='privacy'||route.startsWith('privacy/')) return privateProtocol({env,request,orgId,path:route.slice(8)});
   const mode=await getPrivateMode(env,orgId);
   if(!mode) return null;

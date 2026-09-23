@@ -1,3 +1,5 @@
+import WorkPage from "./modules/work/WorkPage.jsx";
+import PublicTreasury from "./modules/work/PublicTreasury.jsx";
 import DeviceApprovalInbox from './components/DeviceApprovalInbox.jsx';
 import React from "react";
 import {
@@ -315,6 +317,7 @@ function Shell() {
 			<Routes>
 				{/* PUBLIC */}
 				<Route path="/public/:slug" element={<PublicPage />} />
+				<Route path="/p/:slug/treasury" element={<PublicTreasury />} />
 				<Route path="/p/:slug" element={<PublicPage />} />
 				<Route path="/site/:slug" element={<PublicPage />} />
 				<Route path="/public/*" element={<PublicPage />} />
@@ -374,6 +377,11 @@ function Shell() {
 					<Route path="intake" element={<ModuleRouteGate moduleId="intake"><Navigate to="../settings?tab=public-inbox" replace /></ModuleRouteGate>} />
 					<Route index element={<Overview />} />
 					<Route path="overview" element={<Overview />} />
+					<Route path="tasks" element={<ModuleRouteGate moduleId="tasks"><WorkPage page="tasks" /></ModuleRouteGate>} />
+					<Route path="working-groups" element={<ModuleRouteGate moduleId="working-groups"><WorkPage page="working-groups" /></ModuleRouteGate>} />
+					<Route path="decisions" element={<ModuleRouteGate moduleId="decisions"><WorkPage page="decisions" /></ModuleRouteGate>} />
+					<Route path="cases" element={<ModuleRouteGate moduleId="cases"><WorkPage page="cases" /></ModuleRouteGate>} />
+					<Route path="treasury" element={<ModuleRouteGate moduleId="treasury"><WorkPage page="treasury" /></ModuleRouteGate>} />
 					<Route path="people" element={<ModuleRouteGate moduleId="people"><People /></ModuleRouteGate>} />
 					<Route path="inventory" element={<ModuleRouteGate moduleId="inventory"><Inventory /></ModuleRouteGate>} />
 					<Route path="needs" element={<ModuleRouteGate moduleId="needs"><Needs /></ModuleRouteGate>} />

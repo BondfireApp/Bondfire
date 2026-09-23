@@ -1,3 +1,4 @@
+import { TreasuryPublicLink } from "../modules/work/WorkIntegrations.jsx";
 import React from "react";
 import { useParams } from "react-router-dom";
 import PublicPageDefault from "./PublicPageDefault.jsx";
@@ -56,6 +57,7 @@ export default function PublicPage() {
       }}
     >
       {pageContent}
+      <TreasuryPublicLink slug={publicSlug} />
     </PublicPageAdminBar>
   );
 }

@@ -293,6 +293,11 @@ export default function AppHeader({ onLogout, showLogout }) {
     : [];
   const moduleItems = base
     ? [
+        { label: "Tasks", to: `${base}/tasks`, moduleId: "tasks" },
+        { label: "Working Groups", to: `${base}/working-groups`, moduleId: "working-groups" },
+        { label: "Decisions", to: `${base}/decisions`, moduleId: "decisions" },
+        { label: "Cases", to: `${base}/cases`, moduleId: "cases" },
+        { label: "Treasury", to: `${base}/treasury`, moduleId: "treasury" },
         { label: "People", to: `${base}/people`, tourId: "nav-people", moduleId: "people" },
         {
           label: "Newsletter",
@@ -312,7 +317,7 @@ export default function AppHeader({ onLogout, showLogout }) {
         { label: "Intake", to: `${base}/intake`, tourId: "nav-intake", moduleId: "intake" },
         { label: "Studio", to: `${base}/studio`, tourId: "nav-studio", moduleId: "studio" },
         { label: "Colophon", to: `${base}/colophon`, tourId: "nav-colophon", moduleId: "publishing-colophon" },
-      ].filter((item) => !enabledModules || enabledModules.has(item.moduleId))
+      ].filter((item) => ["tasks", "working-groups", "decisions", "cases", "treasury"].includes(item.moduleId) ? enabledModules?.has(item.moduleId) : !enabledModules || enabledModules.has(item.moduleId))
     : [];
   const supportTo = "/support";
 

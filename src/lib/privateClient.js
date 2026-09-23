@@ -140,6 +140,8 @@ export async function dispatchPrivate(path,opts,transport) {
   const m=url.pathname.match(/^\/api\/orgs\/([^/]+)\/(.*)$/);
   if(!m||['create','index'].includes(m[1])) return null;
   const orgId=decodeURIComponent(m[1]), tail=m[2];
+  // Workflow records have their own per-record envelope and permission-bound transport.
+  if (tail.startsWith('work/')) return null;
   if(/^(privacy|crypto|zk|emergency|members|modules|invites|drive\/shares)(\/|$)/.test(tail)||tail==='drive/forms-public') return null;
   const status=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy`);
   if(status.state==='off') return null;

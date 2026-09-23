@@ -1,3 +1,4 @@
+import PublicTreasury from "../modules/work/PublicTreasury.jsx";
 import React from "react";
 import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 import PublicPage from "../pages/PublicPage.jsx";
@@ -51,6 +52,7 @@ export default function HostedDomainEntry({ children }) {
   }
 
   if (state.data.surface === "organization" && state.data.slug) {
+    if (window.location.pathname.replace(/\/$/, "") === "/treasury") return <MemoryRouter><PublicTreasury slug={state.data.slug} /></MemoryRouter>;
     const route = `/p/${encodeURIComponent(state.data.slug)}`;
     return (
       <MemoryRouter initialEntries={[route]}>

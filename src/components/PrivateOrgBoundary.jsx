@@ -66,6 +66,6 @@ export default function PrivateOrgBoundary({children}) {
   if(!tail||tail==='overview')return withMaintenance(children);
   if(tail==='intake')return <Navigate to={prefix+'/settings?tab=public-inbox'} replace/>;
   if(tail==='pledges')return <Navigate to={prefix+'/settings?tab=pledges'} replace/>;
-  if(/^(public|build|needs|inventory|people|meetings|events|drive|witness|chat|chat-module|studio|colophon)(\/|$)/.test(tail))return withMaintenance(children);
+  if(/^(public|build|needs|inventory|people|meetings|events|drive|witness|chat|chat-module|studio|colophon|tasks|working-groups|decisions|cases|treasury)(\/|$)/.test(tail))return withMaintenance(children);
   return withMaintenance(<main style={{padding:24}}><h2>Unavailable in member-only mode</h2><p>This feature has not been connected to member-only encrypted storage. It cannot send or process readable organization content here.</p><Link to={prefix}>Return to private organization</Link></main>);
 }

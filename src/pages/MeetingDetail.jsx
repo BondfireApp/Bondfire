@@ -1,3 +1,4 @@
+import { WorkFromRecord } from "../modules/work/WorkIntegrations.jsx";
 // src/pages/MeetingDetail.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -134,6 +135,7 @@ export default function MeetingDetail() {
         <h2 className="section-title" style={{ margin: 0, flex: 1 }}>
           Meeting
         </h2>
+        <WorkFromRecord orgId={orgId} type="meetings" id={meetingId} />
         <button className="btn" onClick={() => nav(-1)} disabled={busy}>
           Back
         </button>

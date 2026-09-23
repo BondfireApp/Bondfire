@@ -26,6 +26,7 @@ const DEFAULT_ENABLED_MODULES = Object.freeze([
 const MODULE_ORDER = Object.freeze([
   ...DEFAULT_ENABLED_MODULES,
   "module-chat",
+  "tasks", "working-groups", "decisions", "cases", "treasury",
 ]);
 
 const EDITOR_ROLES = new Set(["admin", "owner"]);

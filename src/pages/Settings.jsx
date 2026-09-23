@@ -1,3 +1,4 @@
+import { PromoteToCase } from "../modules/work/WorkIntegrations.jsx";
 import { api } from '../utils/api.js';
 // src/pages/Settings.jsx
 import * as React from "react";
@@ -1780,7 +1781,9 @@ React.useEffect(() => {
               <option value="new">Status: new</option>
               <option value="reviewed">Status: reviewed</option>
               <option value="contacted">Status: contacted</option>
-              <option value="closed">Status: closed</option>
+              <option value="closed">Status: resolved</option>
+              <option value="archived">Status: archived</option>
+              <option value="spam">Status: spam</option>
             </select>
             {publicInboxMsg ? <span className={publicInboxMsg.includes("Saved") ? "success" : "helper"}>{publicInboxMsg}</span> : null}
           </div>
@@ -1829,7 +1832,9 @@ React.useEffect(() => {
                             <option value="new">new</option>
                             <option value="reviewed">reviewed</option>
                             <option value="contacted">contacted</option>
-                            <option value="closed">closed</option>
+                            <option value="closed">resolved</option>
+                            <option value="archived">archived</option>
+                            <option value="spam">spam</option>
                           </select>
                         </label>
 
@@ -1857,6 +1862,13 @@ React.useEffect(() => {
                           Save
                         </button>
                       </div>
+                    </div>
+
+                    <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+                      {(String(item.contact || "").match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) && <a className="btn" href={`mailto:${encodeURIComponent(item.contact)}`}>Reply by email</a>}
+                      <button className="btn" disabled={publicInboxBusy} onClick={() => savePublicInboxItem(item, "closed", document.getElementById(`public-inbox-note-${item.type}-${item.id}`)?.value || "")}>Mark resolved</button>
+                      <button className="btn" disabled={publicInboxBusy} onClick={() => savePublicInboxItem(item, "archived", document.getElementById(`public-inbox-note-${item.type}-${item.id}`)?.value || "")}>Archive</button>
+                      <PromoteToCase orgId={orgId} item={item} />
                     </div>
 
                     {item.details ? (

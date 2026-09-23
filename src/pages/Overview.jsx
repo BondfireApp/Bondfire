@@ -1,3 +1,4 @@
+import { WorkDashboard } from "../modules/work/WorkIntegrations.jsx";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Responsive } from "react-grid-layout";
@@ -914,6 +915,7 @@ export default function Overview() {
       </div>
 
       <OrgKeyBackupNudge orgId={orgId} />
+      <WorkDashboard orgId={orgId} enabledModules={enabledModules} />
 
       <div className="bfTopMetricsRow">
         {!hasLoadedOnce && loading ? (

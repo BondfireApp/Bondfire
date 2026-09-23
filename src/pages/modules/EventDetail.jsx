@@ -1,3 +1,4 @@
+import { WorkFromRecord } from "../../modules/work/WorkIntegrations.jsx";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../utils/api.js";
@@ -124,6 +125,7 @@ export default function EventDetail() {
         <h2 className="section-title" style={{ margin: 0, flex: 1 }}>
           Event Detail
         </h2>
+        <WorkFromRecord orgId={orgId} type="events" id={eventId} />
         <button className="btn" type="button" onClick={() => refresh().catch(console.error)} disabled={loading}>
           {loading ? "Refreshing..." : "Refresh"}
         </button>
