@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Tasks</title>
+  <rect x=".5" y=".5" width="63" height="63" rx="4" fill="#ffb703"/>
+  <path d="M20 10C6 12 10 26 7 37S13 58 29 56s22 5 26-10-1-18 0-26S39 5 32 9" fill="none" stroke="#4530ff" stroke-width=".7"/>
+  <rect x="19" y="13" width="34" height="44" rx="5" fill="#ff365f"/>
+  <rect x="15" y="10" width="34" height="44" rx="5" fill="#fff4df"/>
+  <rect x="11" y="8" width="34" height="44" rx="5" fill="#080808"/>
+  <rect x="21" y="6" width="14" height="9" rx="3" fill="#fff4df"/>
+  <path d="m17 24 3 3 5-6m-8 16 3 3 5-6" fill="none" stroke="#fff4df" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M30 24h8M30 37h8" stroke="#fff4df" stroke-width="3" stroke-linecap="round"/>
+</svg>

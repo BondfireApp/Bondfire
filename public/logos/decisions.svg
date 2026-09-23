@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Decisions</title>
+  <rect x=".5" y=".5" width="63" height="63" rx="4" fill="#ff365f"/>
+  <path d="M16 24C2 28 8 37 5 46s10 13 24 12 30 2 30-12-8-15-9-28S31 3 25 9" fill="none" stroke="#4530ff" stroke-width=".7"/>
+  <path d="m18 31 8-8h23l9 9v24H18Z" fill="#ff7a00"/>
+  <path d="m10 29 9-8h23l10 8v25H10Z" fill="#080808"/>
+  <path d="m10 29 9-8h23l10 8Z" fill="#fff4df"/>
+  <path d="M23 26h18" stroke="#080808" stroke-width="3" stroke-linecap="round"/>
+  <path d="m23 7 21 4-3 15H20Z" fill="#fff4df" stroke="#080808" stroke-width="2" stroke-linejoin="round"/>
+  <path d="m27 17 4 4 7-7" fill="none" stroke="#080808" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M23 40h16" stroke="#fff4df" stroke-width="3" stroke-linecap="round"/>
+</svg>

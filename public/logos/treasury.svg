@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Treasury</title>
+  <rect x=".5" y=".5" width="63" height="63" rx="4" fill="#17d5db"/>
+  <path d="M18 16C1 19 7 33 5 43s10 15 24 13 26 5 29-9-8-18-6-28S32 4 26 10" fill="none" stroke="#4530ff" stroke-width=".7"/>
+  <path d="M16 29h29v21c0 10-29 10-29 0Z" fill="#ff365f"/>
+  <path d="M10 27h29v22c0 9-29 9-29 0Z" fill="#080808"/>
+  <ellipse cx="24.5" cy="27" rx="14.5" ry="6" fill="#fff4df" stroke="#080808" stroke-width="2.5"/>
+  <path d="M11 35c5 6 22 6 27 0M11 43c5 6 22 6 27 0" fill="none" stroke="#fff4df" stroke-width="2.5"/>
+  <circle cx="44" cy="22" r="13" fill="#ff7a00"/>
+  <circle cx="40" cy="18" r="12" fill="#080808"/>
+  <circle cx="40" cy="18" r="6" fill="none" stroke="#fff4df" stroke-width="2.5"/>
+</svg>

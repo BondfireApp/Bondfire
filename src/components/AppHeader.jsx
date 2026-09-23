@@ -6,6 +6,11 @@ import { loadOrgIdentity } from "../lib/orgIdentity.js";
 
 const homeHref = "/orgs";
 const NAV_MODULE_LOGOS = Object.freeze({
+  tasks: "/logos/tasks.svg",
+  "working-groups": "/logos/working-groups.svg",
+  decisions: "/logos/decisions.svg",
+  cases: "/logos/cases.svg",
+  treasury: "/logos/treasury.svg",
   people: "/logos/people.svg",
   newsletter: "/logos/newsletter.svg",
   needs: "/logos/needs.png",

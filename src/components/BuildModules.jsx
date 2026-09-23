@@ -20,6 +20,11 @@ import {
 
 const CORE_LOGO_PATH = "/logos/core.png";
 const MODULE_LOGO_PATHS = Object.freeze({
+  tasks: "/logos/tasks.svg",
+  "working-groups": "/logos/working-groups.svg",
+  decisions: "/logos/decisions.svg",
+  cases: "/logos/cases.svg",
+  treasury: "/logos/treasury.svg",
   people: "/logos/people.svg",
   newsletter: "/logos/newsletter.svg",
   needs: "/logos/needs.png",
