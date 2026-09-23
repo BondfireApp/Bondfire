@@ -92,7 +92,7 @@ export async function privateRequestGate({env,request}) {
   // REC management is metadata-only and role-gated by its own handlers. The server never sees recovery phrases or recording plaintext.
   if(/^rec\/(claim|archive)$/.test(route)) return null;
   if(mode.state==='migrating') return bad(409,'PRIVATE_MIGRATION_IN_PROGRESS');
-  if(route==='drive/shares'||route==='drive/forms-public') return null;
+  if(route==='drive/shares'||route==='drive/forms-public'||route==='drive/public-share') return null;
   // These endpoints only manage intentionally public configuration/hostnames.
   // Their own handlers still enforce org roles and write lockdown.
   if((route==='public/get'&&request.method==='GET')||(route==='public/save'&&request.method==='POST')||route==='public/publication'||route==='public/domains') return null;

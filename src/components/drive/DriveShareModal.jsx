@@ -5,6 +5,8 @@ import { deviceKeyId } from "../../../shared/privateContent.js";
 import { ensureDeviceKeypair, getCachedOrgKey } from "../../lib/zk.js";
 import { decryptRows } from "../../utils/decryptRow.js";
 
+import DrivePublicShare from "./DrivePublicShare.jsx";
+
 function memberId(member) {
   return String(member?.userId || member?.user_id || "").trim();
 }
@@ -29,7 +31,7 @@ function shareLink(orgId, target) {
   return `${window.location.origin}${window.location.pathname}${route}`;
 }
 
-export default function DriveShareModal({ open, orgId, target, onClose, onApply }) {
+export default function DriveShareModal({ open, orgId, target, onClose, onApply, onPublish }) {
   const [members, setMembers] = useState([]);
   const [meUserId, setMeUserId] = useState("");
   const [detail, setDetail] = useState(null);
@@ -52,6 +54,7 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
 
     (async () => {
       try {
+        if (target.kind === "drive/templates") { setDetail({}); setMembers([]); return; }
         const device = await ensureDeviceKeypair({ register: false });
         const deviceId = await deviceKeyId(device.pubJwk);
         const shareData = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/shares?kind=${encodeURIComponent(target.kind)}&itemId=${encodeURIComponent(target.id)}&deviceId=${encodeURIComponent(deviceId)}`);
@@ -177,6 +180,8 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
         </div>
 
         <div style={{ padding: 16, display: "grid", gap: 16 }}>
+          <DrivePublicShare key={`${orgId}:${target.kind}:${target.id}`} orgId={orgId} target={target} onPublish={onPublish} onBusy={setBusy} />
+          {target.kind !== "drive/templates" && <>
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: 12, border: "1px solid rgba(255,255,255,.09)", borderRadius: 12, background: "rgba(255,255,255,.025)" }}>
             <LockKeyhole size={17} style={{ marginTop: 2, flex: "0 0 auto" }} />
             <div className="helper" style={{ lineHeight: 1.5 }}>
@@ -230,6 +235,8 @@ export default function DriveShareModal({ open, orgId, target, onClose, onApply 
               </div>
             )}
           </div>
+
+          </>}
 
           {error ? <div role="alert" style={{ color: "#ff9b9b", whiteSpace: "pre-wrap" }}>{error}</div> : null}
 

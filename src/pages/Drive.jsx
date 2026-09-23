@@ -16,6 +16,15 @@ import FormFileView from "../components/drive/FormFileView.jsx";
 import { renderTemplate } from "../components/drive/templateEngine.js";
 import { buildDriveSharePreparation, cacheDriveShareKey, resolveDriveShareKey } from "../lib/driveSharing.js";
 
+import { publicDriveItem, publishDriveShare } from "../lib/drivePublicSharing.js";
+
+function upsertDriveItem(rows, item) {
+  if (!item?.id) return rows;
+  const previous = rows.find(row => row.id === item.id);
+  const updated = { ...previous, ...item };
+  return previous ? rows.map(row => row.id === item.id ? updated : row) : [updated, ...rows];
+}
+
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
 async function mapWithConcurrency(items, worker, limit = 6) {
@@ -200,6 +209,15 @@ export default function Drive() {
   const [shareTarget, setShareTarget] = useState(null);
   const [sharedItems, setSharedItems] = useState([]);
 
+  const [revealItem, setRevealItem] = useState(null);
+  const driveLoadRevision = useRef(0);
+  function revealCreatedItem(kind, item) {
+    driveLoadRevision.current++;
+    setLoadState("ready");
+    setSearch("");
+    setRevealItem({ kind, id: item.id, parentId: item.parentId || null, stamp: Date.now() });
+  }
+
   const saveTimer = useRef(null);
   const pendingSave = useRef(null);
   const saveDrain = useRef(null);
@@ -262,10 +280,12 @@ export default function Drive() {
 
   async function loadDrive({ preserveSelection = true } = {}) {
     if (!orgId) return;
+    const revision = ++driveLoadRevision.current;
     setLoadState("loading");
     setLoadError("");
     try {
       const data = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive`);
+      if (revision !== driveLoadRevision.current) return;
       const nextFolders = Array.isArray(data?.folders) ? data.folders : [];
       const nextNotes = Array.isArray(data?.notes) ? data.notes : [];
       const nextFiles = (Array.isArray(data?.files) ? data.files : []).map((file) => withFileUrls(orgId, file));
@@ -299,6 +319,7 @@ export default function Drive() {
       setLoadState("ready");
       loadSharedItems();
     } catch (e) {
+      if (revision !== driveLoadRevision.current) return;
       setLoadError(String(e?.message || e || "Failed to load Drive"));
       setLoadState("error");
     }
@@ -306,6 +327,7 @@ export default function Drive() {
 
   useEffect(() => {
     loadDrive({ preserveSelection: false });
+    return () => { driveLoadRevision.current++; };
   }, [orgId]);
 
   useEffect(() => {
@@ -474,7 +496,8 @@ export default function Drive() {
     });
     const folder = res?.folder;
     if (!folder) return;
-    setFolders((prev) => [...prev, folder]);
+    setFolders((prev) => upsertDriveItem(prev, folder));
+    revealCreatedItem("folder", folder);
     setCurrentFolder(folder.id);
   }
   async function renameFolder(id) {
@@ -571,7 +594,8 @@ export default function Drive() {
     const note = res?.note;
     if (!note) return null;
     skipNextSave.current = true;
-    setNotes((prev) => [note, ...prev]);
+    setNotes((prev) => upsertDriveItem(prev, note));
+    revealCreatedItem("note", note);
     setSelectedId(note.id);
     setSelectedKind("note");
     setTitle(note.title || "untitled");
@@ -666,7 +690,8 @@ export default function Drive() {
     });
     const file = res?.file ? withFileUrls(orgId, res.file) : null;
     if (!file) return null;
-    setFiles((prev) => [file, ...prev.filter((existing) => existing.id !== file.id)]);
+    setFiles((prev) => upsertDriveItem(prev, file));
+    revealCreatedItem("file", file);
     skipNextSave.current = true;
     setSelectedId(file.id);
     setSelectedKind("file");
@@ -1004,7 +1029,10 @@ export default function Drive() {
         method: "PATCH",
         body: JSON.stringify({ title: snapshot.title, body: snapshot.content, tags: combinedTags }),
       });
-      if (res?.note) setNotes((prev) => prev.map((n) => (n.id === snapshot.id ? res.note : n)));
+      if (!res?.note?.id) throw new Error("The server did not confirm the saved note.");
+      driveLoadRevision.current++;
+      setLoadState("ready");
+      setNotes((prev) => upsertDriveItem(prev, res.note));
       return;
     }
     if (snapshot.kind === "file" && snapshot.fileEditable) {
@@ -1020,9 +1048,11 @@ export default function Drive() {
           textContent: snapshot.content,
         }),
       });
-      if (res?.file) {
-        setFiles((prev) => prev.map((file) => (file.id === snapshot.id ? withFileUrls(orgId, { ...file, ...res.file }) : file)));
-      }
+      if (!res?.file?.id) throw new Error("The server did not confirm the saved file.");
+      driveLoadRevision.current++;
+      setLoadState("ready");
+      setFiles((prev) => upsertDriveItem(prev, withFileUrls(orgId, { ...res.file, textContent: snapshot.content, dataUrl })));
+
       if (snapshot.fileSubtype === "form") await syncPublicFormProjection(snapshot.id, snapshot.content);
     }
   }
@@ -1231,6 +1261,7 @@ export default function Drive() {
     if (createdFiles.length) {
       const createdIds = new Set(createdFiles.map((file) => file.id));
       setFiles((previous) => [...createdFiles, ...previous.filter((file) => !createdIds.has(file.id))]);
+      revealCreatedItem("file", createdFiles[0]);
     }
     const failures = results.filter((result) => result?.error);
     if (failures.length) {
@@ -1313,6 +1344,7 @@ export default function Drive() {
     if (createdFiles.length) {
       const createdIds = new Set(createdFiles.map((file) => file.id));
       setFiles((previous) => [...createdFiles, ...previous.filter((file) => !createdIds.has(file.id))]);
+      revealCreatedItem("file", createdFiles[0]);
     }
     event.target.value = "";
     const failures = results.filter((result) => result?.error);
@@ -1543,6 +1575,58 @@ export default function Drive() {
     return targets;
   }
 
+  async function publishPublicShare(target, existing) {
+    if (selectedId && !await flushPendingDriveSave()) throw new Error("Finish saving before sharing.");
+    // Read after the save, so the shared copy includes the acknowledged content.
+    const data = await api(`/api/orgs/${encodeURIComponent(orgId)}/drive`);
+    const rows = [
+      ...(data.folders || []).map(row => ({ kind: "drive/folders", row })),
+      ...(data.notes || []).map(row => ({ kind: "drive/notes", row })),
+      ...(data.files || []).map(row => ({ kind: "drive/files", row })),
+      ...(data.templates || []).map(row => ({ kind: "drive/templates", row })),
+    ];
+    const root = rows.find(item => item.kind === target.kind && item.row.id === target.id);
+    if (!root) throw new Error("This Drive item is no longer available.");
+    const selected = [root];
+    if (target.kind === "drive/folders") {
+      const pending = [target.id], visited = new Set();
+      while (pending.length) {
+        const parent = pending.shift();
+        if (visited.has(parent)) continue;
+        visited.add(parent);
+        for (const item of rows.filter(item => item.row.parentId === parent)) {
+          selected.push(item);
+          if (item.kind === "drive/folders") pending.push(item.row.id);
+        }
+      }
+    }
+    const folderMap = new Map((data.folders || []).map(folder => [folder.id, folder]));
+    const items = [];
+    for (const item of selected) {
+      if (item.row.sharePermission === "view") throw new Error(`You need edit access to share ${item.row.name || item.row.title || "this item"}.`);
+      let row = item.row;
+      if (item.kind === "drive/files") {
+        row = (await api(`/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(row.id)}`)).file;
+        if (!row) throw new Error("Could not read a file for sharing.");
+        if (row.textContent === undefined && !row.dataUrl) {
+          const response = await fetch(row.downloadUrl || `/api/orgs/${encodeURIComponent(orgId)}/drive/files/${encodeURIComponent(row.id)}/download`, { credentials: "include" });
+          if (!response.ok) throw new Error(`Could not read ${row.name}.`);
+          row = { ...row, dataUrl: await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; response.blob().then(blob => reader.readAsDataURL(blob), reject); }) };
+        }
+      }
+      const path = [], seen = new Set();
+      let parent = target.kind === "drive/folders" ? row.parentId : null;
+      while (parent && parent !== target.id && !seen.has(parent)) {
+        seen.add(parent);
+        const folder = folderMap.get(parent);
+        if (!folder) break;
+        path.unshift(folder.name || "Folder"); parent = folder.parentId;
+      }
+      items.push(publicDriveItem(item.kind, row, path.join("/")));
+    }
+    return publishDriveShare(orgId, target, existing, items, selected.map(item => ({ kind: item.kind, id: item.row.id })));
+  }
+
   async function applyDriveShare({ target, members, meUserId, grants, onProgress }) {
     if (!target?.id || !target?.kind) throw new Error("Choose a Drive item to share.");
 
@@ -1714,6 +1798,7 @@ export default function Drive() {
                     selectedKind={selectedKind}
                     search={search}
                     setSearch={setSearch}
+                revealItem={revealItem}
                     onSelectFolder={(id) => { setCurrentFolder(id); setMobileSidebarOpen(false); }}
                     onSelectNote={(id) => { selectNote(id); setMobileSidebarOpen(false); }}
                     onSelectFile={(file) => { openFile(file); setMobileSidebarOpen(false); }}
@@ -1768,6 +1853,7 @@ export default function Drive() {
                 selectedKind={selectedKind}
                 search={search}
                 setSearch={setSearch}
+                revealItem={revealItem}
                 onSelectFolder={setCurrentFolder}
                 onSelectNote={selectNote}
                 onSelectFile={openFile}
@@ -1987,6 +2073,7 @@ export default function Drive() {
         target={shareTarget}
         onClose={() => setShareTarget(null)}
         onApply={applyDriveShare}
+        onPublish={publishPublicShare}
       />
 
       {inspectorOpen && selectedNote ? (

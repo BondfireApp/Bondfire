@@ -15,6 +15,7 @@ const commitSha =
 //   always serve /index.html without the SW trying to be clever.
 
 export default defineConfig({
+  build: { rollupOptions: { input: { main: "index.html", driveShare: "drive-share.html" } } },
   define: {
     __BONDFIRE_COMMIT_SHA__: JSON.stringify(commitSha),
   },

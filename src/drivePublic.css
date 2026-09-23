@@ -1,0 +1,14 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; color: #eee; background: #0d0e10; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.public-drive { max-width: 1180px; margin: auto; padding: 24px 16px; }
+.public-drive h1, .public-drive h2 { overflow-wrap: anywhere; }
+.public-drive h1 { font-size: 1.6rem; }
+.public-drive h2 { font-size: 1.1rem; }
+.helper { color: #b7bac2; line-height: 1.5; }
+.btn { display: inline-flex; align-items: center; padding: 9px 12px; background: #202126; color: #eee; border: 1px solid #41434b; border-radius: 8px; font: inherit; text-decoration: none; cursor: pointer; overflow-wrap: anywhere; }
+.btn:focus-visible { outline: 2px solid #9ed0ff; outline-offset: 3px; }
+.btn[aria-pressed="true"] { border-color: #9ed0ff; }
+.public-drive nav, .public-drive-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 20px 0; }
+.public-drive-actions h2 { flex: 1; min-width: 0; }
+.input { background: #17181b; color: inherit; border: 1px solid #41434b; padding: 8px; border-radius: 6px; }

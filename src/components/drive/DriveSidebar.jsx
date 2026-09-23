@@ -352,6 +352,7 @@ export default function DriveSidebar({
   selectedKind,
   search,
   setSearch,
+  revealItem,
   onSelectFolder,
   onSelectNote,
   onSelectFile,
@@ -439,6 +440,21 @@ export default function DriveSidebar({
       localStorage.setItem(expandStorageKey, JSON.stringify(expandedFolders));
     } catch {}
   }, [expandStorageKey, expandedFolders, expandedStateReadyKey]);
+
+  useEffect(() => {
+    if (!revealItem || expandedStateReadyKey !== expandStorageKey) return;
+    const ids = [], seen = new Set();
+    let parent = revealItem.kind === "folder" ? revealItem.id : revealItem.parentId;
+    while (parent && !seen.has(parent)) {
+      seen.add(parent); ids.push(parent);
+      parent = folders.find(folder => folder.id === parent)?.parentId;
+    }
+    setExpandedFolders(previous => {
+      if (ids.every(id => previous[id])) return previous;
+      return { ...previous, ...Object.fromEntries(ids.map(id => [id, true])) };
+    });
+    setActivePane("explorer");
+  }, [revealItem, expandedStateReadyKey, expandStorageKey]);
 
   async function moveDroppedItem(item, targetFolderId) {
     if (!item?.id || !item?.kind) return;
@@ -773,6 +789,7 @@ export default function DriveSidebar({
               { label: isExpanded ? "Collapse" : "Expand", onClick: () => setExpandedFolders((prev) => ({ ...prev, [folder.id]: !prev[folder.id] })) },
               !readOnly ? { label: "Rename", onClick: () => onRenameFolder?.(folder.id) } : null,
               { label: "Manage access", onClick: () => onShareItem?.({ kind: "drive/folders", id: folder.id, label: folder.name || "Folder" }) },
+              { label: "Share publicly", onClick: () => onShareItem?.({ kind: "drive/folders", id: folder.id, label: folder.name || "Folder" }) },
               !readOnly ? { label: "Delete folder and contents", danger: true, onClick: () => onDeleteFolder?.(folder.id) } : null,
             ].filter(Boolean)}
           />,
@@ -796,6 +813,7 @@ export default function DriveSidebar({
               !readOnly ? { label: "Rename", onClick: () => onRenameNote?.(note.id) } : null,
               !readOnly ? { label: "Move", onClick: () => onMoveNote?.(note.id) } : null,
               { label: "Manage access", onClick: () => onShareItem?.({ kind: "drive/notes", id: note.id, label: note.title || "Untitled note" }) },
+              { label: "Share publicly", onClick: () => onShareItem?.({ kind: "drive/notes", id: note.id, label: note.title || "Untitled note" }) },
               !readOnly ? { label: "Delete", danger: true, onClick: () => onDeleteNote?.(note.id) } : null,
             ].filter(Boolean)}
           />,
@@ -825,6 +843,7 @@ export default function DriveSidebar({
               !readOnly && batchIds.length === 1 ? { label: "Rename", onClick: () => onRenameFile?.(file.id) } : null,
               !readOnly ? { label: batchIds.length > 1 ? `Move ${batchIds.length} selected files` : "Move", onClick: () => batchIds.length > 1 ? onMoveFiles?.(batchIds) : onMoveFile?.(file.id) } : null,
               { label: "Manage access", onClick: () => onShareItem?.({ kind: "drive/files", id: file.id, label: file.name || "File" }) },
+              { label: "Share publicly", onClick: () => onShareItem?.({ kind: "drive/files", id: file.id, label: file.name || "File" }) },
               !readOnly ? { label: batchIds.length > 1 ? `Delete ${batchIds.length} selected files` : "Delete", danger: true, onClick: () => batchIds.length > 1 ? onDeleteFiles?.(batchIds) : onDeleteFile?.(file.id) } : null,
               batchIds.length > 1 ? { label: "Clear selection", onClick: () => setSelectedFileIds([]) } : null,
             ].filter(Boolean)}
@@ -975,6 +994,7 @@ export default function DriveSidebar({
                       onClick={() => openTemplateEditor(tpl)}
                       menuItems={[
                         { label: "Edit template", onClick: () => openTemplateEditor(tpl) },
+                        { label: "Share publicly", onClick: () => onShareItem?.({ kind: "drive/templates", id: tpl.id, label: tpl.name || "Template" }) },
                         { label: "Insert into current note", onClick: () => onApplyTemplate?.(tpl) },
                         { label: "New note from template", onClick: () => onNewFromTemplate?.(tpl) },
                         { label: "Delete template", danger: true, onClick: () => deleteTemplateDirect(tpl) },

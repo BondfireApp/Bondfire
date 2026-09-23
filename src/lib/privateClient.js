@@ -142,7 +142,7 @@ export async function dispatchPrivate(path,opts,transport) {
   const orgId=decodeURIComponent(m[1]), tail=m[2];
   // Workflow records have their own per-record envelope and permission-bound transport.
   if (tail.startsWith('work/')) return null;
-  if(/^(privacy|crypto|zk|emergency|members|modules|invites|drive\/shares)(\/|$)/.test(tail)||tail==='drive/forms-public') return null;
+  if(/^(privacy|crypto|zk|emergency|members|modules|invites|drive\/shares)(\/|$)/.test(tail)||tail==='drive/forms-public'||tail==='drive/public-share') return null;
   const status=await transport(`/api/orgs/${encodeURIComponent(orgId)}/privacy`);
   if(status.state==='off') return null;
   if(status.state!=='enabled') throw new Error('Finish the encrypted-data conversion in Settings → Security before editing this organization.');
