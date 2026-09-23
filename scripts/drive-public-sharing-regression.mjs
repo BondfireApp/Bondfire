@@ -81,6 +81,8 @@ assert.equal((await anonymous(fresh.token)).status, 404, 'deletion must invalida
 
 const form = publicDriveItem('drive/files', { name: 'intake.bfform', mime: 'application/vnd.bondfire.form+json', textContent: JSON.stringify({ title: 'Public questions', blocks: [{ label: 'Question' }], responses: [{ answer: 'secret answer' }], publicShare: { recipientPrivateKey: 'secret key' } }), dataUrl: 'data:PRIVATE ORIGINAL' });
 assert.ok(!JSON.stringify(form).includes('secret') && !JSON.stringify(form).includes('PRIVATE ORIGINAL'));
+const renamedForm = publicDriveItem('drive/files', { name: 'intake.json', mime: 'application/json', textContent: JSON.stringify({ type: 'bondfire-form', title: 'Questions', blocks: [], responses: ['private answer'], publicShare: { recipientPrivateKey: 'private key' } }) });
+assert.ok(!JSON.stringify(renamedForm).includes('private answer') && !JSON.stringify(renamedForm).includes('private key'), 'form privacy must follow content type even after renaming');
 for (const [kind, id] of [['drive/notes', 'notes'], ['drive/folders', 'folders'], ['drive/templates', 'templates']]) {
   const result = await call('POST', { kind, itemId: id, ciphertext, wrappedKey: await encryptPrivate(wrapKey, {}, 'org', kind, id), manifest: [{ kind, id }] });
   assert.equal(result.status, 200, `${kind}: ${await result.clone().text()}`);

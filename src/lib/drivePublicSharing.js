@@ -37,9 +37,11 @@ export function publicDriveItem(kind, row, path = '') {
   const item = { kind, name: row.name || 'File', mime: row.mime || 'application/octet-stream', path };
   if (row.textContent !== undefined) item.text = String(row.textContent);
   if (row.dataUrl) item.dataUrl = row.dataUrl;
-  if (/\.bfform$/i.test(item.name) || item.mime.includes('bondfire.form')) {
+  let parsed = null;
+  try { parsed = JSON.parse(item.text || ''); } catch {}
+  if (/\.bfform$/i.test(item.name) || item.mime.includes('bondfire.form') || parsed?.type === 'bondfire-form') {
     // Only publish the form definition, never submissions or response keys.
-    const form = JSON.parse(item.text || '');
+    const form = parsed || JSON.parse(item.text || '');
     item.text = JSON.stringify({ type: 'bondfire-form', version: form.version, title: form.title, description: form.description, blocks: form.blocks || [], fields: form.fields || [], responses: [], publicShare: { enabled: false } });
     delete item.dataUrl;
   }
