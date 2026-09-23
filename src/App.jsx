@@ -1,3 +1,4 @@
+import DeviceApprovalInbox from './components/DeviceApprovalInbox.jsx';
 import React from "react";
 import {
 	HashRouter,
@@ -303,6 +304,7 @@ function Shell() {
 
 	return (
 		<AuthCtx.Provider value={ctxValue}>
+            {state.authed && <DeviceApprovalInbox key={state.user?.sub || state.user?.id || 'signed-in'} />}
 			{!hideHeader && (
 				<AppHeader
 					showLogout={state.authed}

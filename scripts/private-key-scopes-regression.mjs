@@ -1,3 +1,5 @@
+import {deviceApprovals} from '../functions/api/_lib/deviceApprovals.js';
+import {signJwt} from '../functions/api/_lib/jwt.js';
 import assert from 'node:assert/strict';
 import {env,sql,db,call} from './private-storage-regression.mjs';
 import {encryptPrivate,decryptPrivate} from '../src/lib/privateCrypto.js';
@@ -63,6 +65,37 @@ await call(base+'/privacy/keys/device',{body:{...approval,keys:[{...approval.key
 
 await call(base+'/privacy/keys/device',{body:{...ownBackup,keys:[...ownBackup.keys,{scope:'admin',wrapped_key:wrappedKey,recovery}]},user:'viewer'},400);
 await call(base+'/privacy/keys/device',{body:{...ownBackup,epoch:2},user:'viewer'},409);
+// Approval requests are delivered only within the authenticated account.
+const requestPath=base+'/privacy/keys/approvals';
+const pending=await call(requestPath,{body:{action:'request',publicKey:pairedPublic,label:'Test phone'},user:'viewer'});
+assert.equal(pending.request.status,'pending');
+const requestId=pending.request.id;
+assert.equal((await call(requestPath,{body:{action:'request',publicKey:pairedPublic},user:'viewer'})).request.id,requestId,'duplicate request reuses pending request');
+assert.equal((await call(requestPath,{user:'owner'})).requests.length,0);
+assert.equal((await call(requestPath,{user:'viewer'})).requests.length,1);
+for(const [user,expected] of [['viewer',1],['owner',0]]) {
+  const token=await signJwt(env.JWT_SECRET,{sub:user},3600);
+  const response=await deviceApprovals({env,request:new Request('https://test/api/auth/device-approvals',{headers:{authorization:'Bearer '+token}})});
+  assert.equal(response.status,200);assert.equal((await response.json()).requests.length,expected);
+}
+const unauthenticated=await deviceApprovals({env,request:new Request('https://test/api/auth/device-approvals')});
+assert.equal(unauthenticated.status,401);
+
+await call(requestPath+'?id='+requestId,{user:'owner'},404);
+await call(requestPath,{body:{action:'request',publicKey:pairedPublic},user:'outsider'},403);
+const approveBody={...approval,approval_id:requestId};
+await call(base+'/privacy/keys/device',{body:{...approveBody,device_id:deviceId},user:'viewer'},409);
+await call(base+'/privacy/keys/device',{body:approveBody,user:'viewer'});
+assert.equal((await call(requestPath+'?id='+requestId,{user:'viewer'})).request.status,'approved');
+await call(base+'/privacy/keys/device',{body:approveBody,user:'viewer'},409);
+const denied=await call(requestPath,{body:{action:'request',publicKey:pairedPublic},user:'viewer'});
+await call(requestPath,{body:{action:'deny',id:denied.request.id},user:'viewer'});
+await call(base+'/privacy/keys/device',{body:{...approval,approval_id:denied.request.id},user:'viewer'},409);
+const expired=await call(requestPath,{body:{action:'request',publicKey:pairedPublic},user:'viewer'});
+sql.prepare('UPDATE private_device_approvals SET expires_at=? WHERE id=?').run(Date.now()-1,expired.request.id);
+assert.equal((await call(requestPath+'?id='+expired.request.id,{user:'viewer'})).request.status,'expired');
+await call(base+'/privacy/keys/device',{body:{...approval,approval_id:expired.request.id},user:'viewer'},409);
+assert.equal(sql.prepare('SELECT payload FROM org_private_scope_recovery WHERE org_id=? AND user_id=? AND scope=?').get(id,'viewer','viewer').payload,beforeRecovery);
 const secret=await encryptPrivate(first.key,{note:'PRIVATE admin field'},id,'public/config',id);
 const viewer=first.key.slice();viewer.epoch=1;viewer.scopes={viewer};
 await assert.rejects(decryptPrivate(viewer,secret,id,'public/config',id));

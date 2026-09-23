@@ -1,3 +1,4 @@
+import {ensureDeviceApprovals} from './deviceApprovals.js';
 import {getDb,requireOrgRole} from './auth.js';
 import {bad,json} from './http.js';
 import {requireCookieCsrf} from './csrf.js';
@@ -120,9 +121,14 @@ export async function provisionOwnScopedDevice({env,request,orgId}) {
   const csrf=requireCookieCsrf(request);if(csrf)return csrf;
   const db=getDb(env);await ensureScopedKeys(db);
   const b=await request.json().catch(()=>null);
-  if(!b||Object.keys(b).some(k=>!['epoch','device_id','device_public_key','keys'].includes(k))||!Array.isArray(b.keys))return bad(400,'INVALID_SCOPED_KEY');
+  if(!b||Object.keys(b).some(k=>!['epoch','device_id','device_public_key','keys','approval_id'].includes(k))||!Array.isArray(b.keys))return bad(400,'INVALID_SCOPED_KEY');
   const state=await db.prepare('SELECT epoch FROM org_private_key_state WHERE org_id=?').bind(orgId).first();
   if(!state||b.epoch!==state.epoch)return bad(409,'PRIVATE_KEY_ROSTER_CHANGED');
+  if(b.approval_id!==undefined) {
+    await ensureDeviceApprovals(db);
+    const approval=await db.prepare("SELECT * FROM private_device_approvals WHERE id=? AND org_id=? AND user_id=? AND status='pending' AND expires_at>?").bind(b.approval_id,orgId,gate.user.sub,Date.now()).first();
+    if(!approval||approval.epoch!==b.epoch||approval.device_id!==b.device_id||JSON.stringify(b.device_public_key)!==approval.public_key)return bad(409,'DEVICE_REQUEST_UNAVAILABLE');
+  }
   const existingDevice=await db.prepare('SELECT device_id FROM user_device_keys WHERE user_id=? AND device_id=?').bind(gate.user.sub,b.device_id).first();
   if(!existingDevice) {
     if(!validPublicKey(b.device_public_key)||await deviceKeyId(b.device_public_key)!==b.device_id)return bad(400,'KEY_RECIPIENT_DEVICE_UNKNOWN');
@@ -132,6 +138,10 @@ export async function provisionOwnScopedDevice({env,request,orgId}) {
   for(const k of b.keys)if(!expected.delete(k.scope)||Object.keys(k).some(f=>!['scope','wrapped_key','recovery'].includes(f))||!validWrappedKey(k.wrapped_key)||(k.recovery!==undefined&&(!validRecoveryPayload(k.recovery)||Object.keys(k.recovery).some(f=>!['salt','iv','ct'].includes(f)))))return bad(400,'INVALID_SCOPED_KEY');
   if(expected.size)return bad(400,'KEY_RECIPIENT_MISSING');
   const statements=[db.prepare('INSERT OR REPLACE INTO org_private_key_assertions SELECT ?,CASE WHEN EXISTS(SELECT 1 FROM org_private_key_state s JOIN org_memberships m ON m.org_id=s.org_id WHERE s.org_id=? AND s.epoch=? AND m.user_id=? AND m.role=?) THEN 1 ELSE 0 END').bind(orgId,orgId,b.epoch,gate.user.sub,gate.role)];
+  if(b.approval_id!==undefined) {
+    statements.push(db.prepare("UPDATE private_device_approvals SET status='approved' WHERE id=? AND org_id=? AND user_id=? AND device_id=? AND epoch=? AND status='pending' AND expires_at>?").bind(b.approval_id,orgId,gate.user.sub,b.device_id,b.epoch,Date.now()));
+    statements.push(db.prepare('INSERT OR REPLACE INTO org_private_key_assertions VALUES(?,changes())').bind(orgId));
+  }
   for(const k of b.keys) {
     statements.push(db.prepare('INSERT INTO org_private_scope_wraps VALUES(?,?,?,?,?) ON CONFLICT(org_id,scope,user_id,device_id) DO UPDATE SET wrapped_key=excluded.wrapped_key').bind(orgId,k.scope,gate.user.sub,b.device_id,k.wrapped_key));
     if(k.recovery!==undefined)statements.push(db.prepare('INSERT INTO org_private_scope_recovery VALUES(?,?,?,?) ON CONFLICT(org_id,scope,user_id) DO UPDATE SET payload=excluded.payload').bind(orgId,k.scope,gate.user.sub,JSON.stringify(k.recovery)));

@@ -1,3 +1,4 @@
+import {deviceApprovals} from './deviceApprovals.js';
 import {readPrivateSubmissions} from './privateSubmissions.js';
 import { scopedKeys, provisionOwnScopedDevice } from './privateKeyScopes.js';
 import { privateEncryptionReset } from './privateReset.js';
@@ -13,6 +14,7 @@ import { publishColophonCopy } from './privateColophonPublication.js';
 import { driveAccessForUser } from './driveShares.js';
 
 export async function privateProtocol({env,request,orgId,path=''}) {
+  if(path==='keys/approvals')return deviceApprovals({env,request,orgId});
   if(path==='submissions')return readPrivateSubmissions({env,request,orgId});
   if(path==='reset')return privateEncryptionReset({env,request,orgId});
   if(path==='keys/device')return provisionOwnScopedDevice({env,request,orgId});

@@ -1,7 +1,7 @@
 import React from 'react';
 import {api} from '../utils/api.js';
 import {loadPrivateKey} from '../lib/privateCrypto.js';
-import {rotateScopedKeys,saveScopedRecovery,createDeviceApprovalRequest,approveScopedDevice} from '../lib/privateKeyScopes.js';
+import {rotateScopedKeys,saveScopedRecovery} from '../lib/privateKeyScopes.js';
 import {ensureDeviceKeypair} from '../lib/zk.js';
 import {deviceKeyId} from '../../shared/privateContent.js';
 import {readCachedOrgName} from '../lib/orgIdentity.js';
@@ -10,7 +10,6 @@ import {fetchPrivateEncryptionResetInventory,resetPrivateEncryption} from '../li
 export default function ScopedKeysPanel({orgId}) {
   const [state,setState]=React.useState(null);
   const [deviceRequest,setDeviceRequest]=React.useState('');
-  const [approvalRequest,setApprovalRequest]=React.useState('');
   const [deviceMessage,setDeviceMessage]=React.useState('');
   const [pass,setPass]=React.useState('');
   const [again,setAgain]=React.useState('');
@@ -37,7 +36,7 @@ export default function ScopedKeysPanel({orgId}) {
     setResetName(readCachedOrgName(orgId));
     setResetOpen(false);
     setResetInventory(null);
-    setDeviceRequest('');setApprovalRequest('');setDeviceMessage('');
+    setDeviceRequest('');setDeviceMessage('');
     refresh().catch(e=>setError(e.message));
   },[orgId]);
 
@@ -71,19 +70,36 @@ export default function ScopedKeysPanel({orgId}) {
   }
 
   async function requestDevice() {
-    setBusy(true);setError('');
-    try{setDeviceRequest(await createDeviceApprovalRequest(orgId,api));}
-    catch(e){setError(e.message);}finally{setBusy(false);}
-  }
-
-  async function approveDevice() {
-    if(!window.confirm('Approve the browser that generated this request? Only continue if you copied it from your own device. This grants it your current role’s access to this organization.'))return;
     setBusy(true);setError('');setDeviceMessage('');
     try{
-      await approveScopedDevice(orgId,approvalRequest,api);
-      setApprovalRequest('');setDeviceMessage('Device approved. On the other device, choose Check approval, then return to Drive.');
+      const device=await ensureDeviceKeypair({register:false});
+      const label=/Android/i.test(navigator.userAgent)?'Android browser':/iPhone|iPad/i.test(navigator.userAgent)?'iPhone or iPad browser':'Another browser';
+      const result=await api(`/api/orgs/${encodeURIComponent(orgId)}/privacy/keys/approvals`,{method:'POST',body:JSON.stringify({action:'request',publicKey:device.pubJwk,label})});
+      setDeviceRequest(result.request);
     }catch(e){setError(e.message);}finally{setBusy(false);}
   }
+
+  React.useEffect(()=>{
+    if(!deviceRequest?.id)return;
+    let stopped=false,timer;
+    async function poll(){
+      try{
+        const result=await api(`/api/orgs/${encodeURIComponent(orgId)}/privacy/keys/approvals?id=${encodeURIComponent(deviceRequest.id)}`);
+        if(stopped)return;
+        if(result.request.status==='approved'){
+          await loadPrivateKey(orgId,state.privacy,api);
+          if(stopped)return;
+          setDeviceRequest('');await refresh();window.dispatchEvent(new Event('bf-private-mode-changed'));
+          setDeviceMessage('Approved. This browser is unlocked. You can return to Drive.');return;
+        }
+        if(['denied','expired'].includes(result.request.status)){
+          setDeviceMessage(result.request.status==='denied'?'Request denied. You can send a new request.':'Request expired. Send a new request when your working device is available.');setDeviceRequest('');return;
+        }
+      }catch(e){if(!stopped)setError(e.message);}
+      if(!stopped)timer=setTimeout(poll,3000);
+    }
+    poll();return()=>{stopped=true;clearTimeout(timer);};
+  },[deviceRequest?.id,orgId]);
 
   async function checkApproval() {
     setBusy(true);setError('');
@@ -141,13 +157,12 @@ export default function ScopedKeysPanel({orgId}) {
       <strong>This browser does not have the current organization keys.</strong>
       <p>Signing in through Sabot connects your account. A new browser also needs approval to open encrypted content.</p>
       <h3>Don’t have your recovery passphrase?</h3>
-      <p>Use another browser where this organization’s Drive already opens. Sign in to the same Bondfire account there, open Settings → Security → Encryption keys &amp; recovery, and choose Approve another device. You do not need the old recovery passphrase.</p>
-      <button className="btn" type="button" disabled={busy} onClick={requestDevice}>Generate device request</button>
-      {deviceRequest&&<div style={{display:'grid',gap:8,marginTop:8}}>
-        <label>Copy this request to your working device (valid for 15 minutes)
-          <textarea className="input" readOnly rows={5} value={deviceRequest} onFocus={e=>e.target.select()} style={{width:'100%',boxSizing:'border-box',overflowWrap:'anywhere'}} />
-        </label>
-        <button className="btn" type="button" disabled={busy} onClick={checkApproval}>Check approval</button>
+      <p>Send an approval request to your working device. Keep Bondfire open there, signed in to the same account. An Approve / Deny prompt will appear automatically; you do not need to open Security settings.</p>
+      <button className="btn" type="button" disabled={busy||!!deviceRequest} onClick={requestDevice}>{deviceRequest?'Request sent':'Send approval request'}</button>
+      {deviceRequest&&<div role="status" style={{marginTop:12}}>
+        <p>Waiting for your other device. Match this code before approving: <strong>{deviceRequest.id.slice(0,8).toUpperCase()}</strong>.</p>
+        <p>This phone will unlock automatically after approval. The request expires after 15 minutes. If the other device is closed or offline, open Bondfire there to receive it.</p>
+        <button className="btn" type="button" disabled={busy} onClick={checkApproval}>Check now</button>
       </div>}
       <p>If no other browser has access, you will need the recovery passphrase. Signing in alone cannot decrypt these files.</p>
       <p style={{marginBottom:8}}>If you know the recovery passphrase, restore the existing keys to this browser. This does not rotate or replace them.</p>
@@ -184,13 +199,7 @@ export default function ScopedKeysPanel({orgId}) {
       </div>
     </div>}
 
-    {!missingCurrentDevice&&!!state.epoch&&<details style={{marginBottom:16}}>
-      <summary>Approve another device</summary>
-      <p>On your other device, open this organization’s Security settings and generate a device request. Paste that request here. Both devices must use the same Bondfire account. Only approve requests you generated yourself.</p>
-      <label>Device request<textarea className="input" rows={5} maxLength={4096} value={approvalRequest} onChange={e=>setApprovalRequest(e.target.value)} style={{width:'100%',boxSizing:'border-box'}} disabled={busy}/></label>
-      <button className="btn" type="button" disabled={busy||!approvalRequest.trim()} onClick={approveDevice}>Approve device</button>
-      <p>This preserves your files, current keys, and recovery passphrase.</p>
-    </details>}
+    {!missingCurrentDevice&&!!state.epoch&&<p>Requests from your other devices appear automatically while Bondfire is open. Choose Approve only when you recognize the request and its matching code.</p>}
     {deviceMessage&&<p role="status">{deviceMessage}</p>}
     {!missingCurrentDevice&&<form onSubmit={rotate} style={{display:'grid',gap:8}}>
       <h3 style={{marginBottom:0}}>Key maintenance</h3>
