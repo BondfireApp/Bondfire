@@ -64,7 +64,7 @@ export async function scopedKeys({env,request,orgId}) {
     const device=new URL(request.url).searchParams.get('device_id')||'';
     const rows=(await db.prepare('SELECT k.*,w.wrapped_key,r.payload AS recovery FROM org_private_scope_keys k LEFT JOIN org_private_scope_wraps w ON w.org_id=k.org_id AND w.scope=k.scope AND w.user_id=? AND w.device_id=? LEFT JOIN org_private_scope_recovery r ON r.org_id=k.org_id AND r.scope=k.scope AND r.user_id=? WHERE k.org_id=?').bind(gate.user.sub,device,gate.user.sub,orgId).all()).results||[];
     const roster=gate.role==='owner'?(await db.prepare('SELECT m.user_id,m.role,d.device_id,d.public_key FROM org_memberships m LEFT JOIN user_device_keys d ON d.user_id=m.user_id WHERE m.org_id=? ORDER BY m.user_id,d.device_id').bind(orgId).all()).results:undefined;
-    return json({ok:true,epoch:state?.epoch||0,rosterRevision:state?.roster_revision||0,rotationRequired:!!state&&state.roster_revision!==state.rotated_revision,keys:rows.filter(k=>canReadScope(gate.role,k.scope)),...(roster?{roster}:{})});
+    return json({ok:true,userId:gate.user.sub,epoch:state?.epoch||0,rosterRevision:state?.roster_revision||0,rotationRequired:!!state&&state.roster_revision!==state.rotated_revision,keys:rows.filter(k=>canReadScope(gate.role,k.scope)),...(roster?{roster}:{})});
   }
   if(request.method!=='POST')return bad(405,'METHOD_NOT_ALLOWED');
   const csrf=requireCookieCsrf(request);if(csrf)return csrf;
@@ -129,12 +129,12 @@ export async function provisionOwnScopedDevice({env,request,orgId}) {
     await registerDeviceKey(db,gate.user.sub,b.device_public_key);
   }
   const expected=new Set(KEY_SCOPES.filter(scope=>canReadScope(gate.role,scope)));
-  for(const k of b.keys)if(!expected.delete(k.scope)||Object.keys(k).some(f=>!['scope','wrapped_key','recovery'].includes(f))||!validWrappedKey(k.wrapped_key)||!validRecoveryPayload(k.recovery)||Object.keys(k.recovery).some(f=>!['salt','iv','ct'].includes(f)))return bad(400,'INVALID_SCOPED_KEY');
+  for(const k of b.keys)if(!expected.delete(k.scope)||Object.keys(k).some(f=>!['scope','wrapped_key','recovery'].includes(f))||!validWrappedKey(k.wrapped_key)||(k.recovery!==undefined&&(!validRecoveryPayload(k.recovery)||Object.keys(k.recovery).some(f=>!['salt','iv','ct'].includes(f)))))return bad(400,'INVALID_SCOPED_KEY');
   if(expected.size)return bad(400,'KEY_RECIPIENT_MISSING');
   const statements=[db.prepare('INSERT OR REPLACE INTO org_private_key_assertions SELECT ?,CASE WHEN EXISTS(SELECT 1 FROM org_private_key_state s JOIN org_memberships m ON m.org_id=s.org_id WHERE s.org_id=? AND s.epoch=? AND m.user_id=? AND m.role=?) THEN 1 ELSE 0 END').bind(orgId,orgId,b.epoch,gate.user.sub,gate.role)];
   for(const k of b.keys) {
     statements.push(db.prepare('INSERT INTO org_private_scope_wraps VALUES(?,?,?,?,?) ON CONFLICT(org_id,scope,user_id,device_id) DO UPDATE SET wrapped_key=excluded.wrapped_key').bind(orgId,k.scope,gate.user.sub,b.device_id,k.wrapped_key));
-    statements.push(db.prepare('INSERT INTO org_private_scope_recovery VALUES(?,?,?,?) ON CONFLICT(org_id,scope,user_id) DO UPDATE SET payload=excluded.payload').bind(orgId,k.scope,gate.user.sub,JSON.stringify(k.recovery)));
+    if(k.recovery!==undefined)statements.push(db.prepare('INSERT INTO org_private_scope_recovery VALUES(?,?,?,?) ON CONFLICT(org_id,scope,user_id) DO UPDATE SET payload=excluded.payload').bind(orgId,k.scope,gate.user.sub,JSON.stringify(k.recovery)));
   }
   statements.push(db.prepare('DELETE FROM org_private_key_assertions WHERE org_id=?').bind(orgId));
   try{await db.batch(statements);}catch(e){const detail=`${e?.code||''} ${e?.message||''}`;if(/CHECK constraint failed|SQLITE_CONSTRAINT_CHECK|org_private_key_assertions/.test(detail))return bad(409,'PRIVATE_KEY_ROSTER_CHANGED');throw e;}

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { api } from "../utils/api.js";
 import DriveSidebar from "../components/drive/DriveSidebar.jsx";
 import NoteEditor from "../components/drive/NoteEditor.jsx";
@@ -1851,6 +1851,7 @@ export default function Drive() {
             <div className="card" style={{ padding: 14, maxWidth: 560 }}>
               <h2 style={{ marginTop: 0, marginBottom: 10 }}>Drive</h2>
               <div className="helper" style={{ marginBottom: 12 }}>{loadError || "Drive failed to load."}</div>
+              {/current scoped keys/.test(loadError || '') && <p><Link className="btn" to={`/org/${encodeURIComponent(orgId)}/settings?section=security&tab=security`}>Unlock this device</Link></p>}
               <button className="btn" type="button" onClick={() => loadDrive({ preserveSelection: false })}>Retry</button>
             </div>
           ) : showEditableDocument ? (

@@ -1,7 +1,7 @@
 import React from 'react';
 import {api} from '../utils/api.js';
 import {loadPrivateKey} from '../lib/privateCrypto.js';
-import {rotateScopedKeys,saveScopedRecovery} from '../lib/privateKeyScopes.js';
+import {rotateScopedKeys,saveScopedRecovery,createDeviceApprovalRequest,approveScopedDevice} from '../lib/privateKeyScopes.js';
 import {ensureDeviceKeypair} from '../lib/zk.js';
 import {deviceKeyId} from '../../shared/privateContent.js';
 import {readCachedOrgName} from '../lib/orgIdentity.js';
@@ -9,6 +9,9 @@ import {fetchPrivateEncryptionResetInventory,resetPrivateEncryption} from '../li
 
 export default function ScopedKeysPanel({orgId}) {
   const [state,setState]=React.useState(null);
+  const [deviceRequest,setDeviceRequest]=React.useState('');
+  const [approvalRequest,setApprovalRequest]=React.useState('');
+  const [deviceMessage,setDeviceMessage]=React.useState('');
   const [pass,setPass]=React.useState('');
   const [again,setAgain]=React.useState('');
   const [restorePass,setRestorePass]=React.useState('');
@@ -34,6 +37,7 @@ export default function ScopedKeysPanel({orgId}) {
     setResetName(readCachedOrgName(orgId));
     setResetOpen(false);
     setResetInventory(null);
+    setDeviceRequest('');setApprovalRequest('');setDeviceMessage('');
     refresh().catch(e=>setError(e.message));
   },[orgId]);
 
@@ -63,6 +67,30 @@ export default function ScopedKeysPanel({orgId}) {
       await saveScopedRecovery(orgId,restorePass,api,{restore:true});
       setRestorePass('');await refresh();
       window.dispatchEvent(new Event('bf-private-mode-changed'));
+    }catch(e){setError(e.message);}finally{setBusy(false);}
+  }
+
+  async function requestDevice() {
+    setBusy(true);setError('');
+    try{setDeviceRequest(await createDeviceApprovalRequest(orgId,api));}
+    catch(e){setError(e.message);}finally{setBusy(false);}
+  }
+
+  async function approveDevice() {
+    if(!window.confirm('Approve the browser that generated this request? Only continue if you copied it from your own device. This grants it your current role’s access to this organization.'))return;
+    setBusy(true);setError('');setDeviceMessage('');
+    try{
+      await approveScopedDevice(orgId,approvalRequest,api);
+      setApprovalRequest('');setDeviceMessage('Device approved. On the other device, choose Check approval, then return to Drive.');
+    }catch(e){setError(e.message);}finally{setBusy(false);}
+  }
+
+  async function checkApproval() {
+    setBusy(true);setError('');
+    try{
+      await loadPrivateKey(orgId,state.privacy,api);
+      await refresh();window.dispatchEvent(new Event('bf-private-mode-changed'));
+      setDeviceMessage('This browser is ready. You can return to Drive.');
     }catch(e){setError(e.message);}finally{setBusy(false);}
   }
 
@@ -111,11 +139,22 @@ export default function ScopedKeysPanel({orgId}) {
 
     {missingCurrentDevice&&<div role="alert" style={{padding:12,border:'1px solid #d97706',borderRadius:8,marginBottom:12}}>
       <strong>This browser does not have the current organization keys.</strong>
+      <p>Signing in through Sabot connects your account. A new browser also needs approval to open encrypted content.</p>
+      <h3>Don’t have your recovery passphrase?</h3>
+      <p>Use another browser where this organization’s Drive already opens. Sign in to the same Bondfire account there, open Settings → Security → Encryption keys &amp; recovery, and choose Approve another device. You do not need the old recovery passphrase.</p>
+      <button className="btn" type="button" disabled={busy} onClick={requestDevice}>Generate device request</button>
+      {deviceRequest&&<div style={{display:'grid',gap:8,marginTop:8}}>
+        <label>Copy this request to your working device (valid for 15 minutes)
+          <textarea className="input" readOnly rows={5} value={deviceRequest} onFocus={e=>e.target.select()} style={{width:'100%',boxSizing:'border-box',overflowWrap:'anywhere'}} />
+        </label>
+        <button className="btn" type="button" disabled={busy} onClick={checkApproval}>Check approval</button>
+      </div>}
+      <p>If no other browser has access, you will need the recovery passphrase. Signing in alone cannot decrypt these files.</p>
       <p style={{marginBottom:8}}>If you know the recovery passphrase, restore the existing keys to this browser. This does not rotate or replace them.</p>
       {recoveryAvailable?<>
         <label style={{display:'grid',gap:6,maxWidth:520}}>Recovery passphrase<input className="input" type="password" autoComplete="current-password" minLength={20} value={restorePass} onChange={e=>setRestorePass(e.target.value)} disabled={busy}/></label>
         <button className="btn-red" type="button" disabled={busy||restorePass.length<20} onClick={restoreCurrentDevice} style={{marginTop:8}}>{busy?'Restoring keys…':'Restore keys on this device'}</button>
-      </>:<p>No recovery copy is available for this account. A key-holding owner must provision this device.</p>}
+      </>:<p>No recovery copy is available for this account. Use device approval from another browser where this account can open Drive.</p>}
       {canReset&&<div style={{marginTop:12,paddingTop:12,borderTop:'1px solid rgba(217,119,6,.45)'}}>
         <p style={{margin:'0 0 8px'}}><strong>Lost the recovery passphrase?</strong> For a new single-member organization whose encrypted private records can be discarded, reset creates fresh keys without deleting the organization, modules, membership, domains, or published public copies.</p>
         {!resetOpen?<button className="btn" type="button" disabled={busy} onClick={openReset}>{busy?'Checking reset safety…':'Reset encryption…'}</button>:null}
@@ -145,6 +184,14 @@ export default function ScopedKeysPanel({orgId}) {
       </div>
     </div>}
 
+    {!missingCurrentDevice&&!!state.epoch&&<details style={{marginBottom:16}}>
+      <summary>Approve another device</summary>
+      <p>On your other device, open this organization’s Security settings and generate a device request. Paste that request here. Both devices must use the same Bondfire account. Only approve requests you generated yourself.</p>
+      <label>Device request<textarea className="input" rows={5} maxLength={4096} value={approvalRequest} onChange={e=>setApprovalRequest(e.target.value)} style={{width:'100%',boxSizing:'border-box'}} disabled={busy}/></label>
+      <button className="btn" type="button" disabled={busy||!approvalRequest.trim()} onClick={approveDevice}>Approve device</button>
+      <p>This preserves your files, current keys, and recovery passphrase.</p>
+    </details>}
+    {deviceMessage&&<p role="status">{deviceMessage}</p>}
     {!missingCurrentDevice&&<form onSubmit={rotate} style={{display:'grid',gap:8}}>
       <h3 style={{marginBottom:0}}>Key maintenance</h3>
       <p style={{marginTop:0}}>Rotation creates new keys for future writes and retains encrypted key history so authorized members can still read older records. Saving a recovery backup keeps the current keys but protects a recovery copy with the passphrase you choose.</p>
