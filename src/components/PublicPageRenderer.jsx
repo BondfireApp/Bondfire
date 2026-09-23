@@ -257,6 +257,7 @@ export function PublicPageRenderer({
   onDuplicate,
   onRemove,
   onMove,
+  children,
 }) {
   const normalized = page || { blocks: [] };
   const [draggedId, setDraggedId] = React.useState("");
@@ -315,6 +316,7 @@ export function PublicPageRenderer({
     <main className={"pp-page" + (preview ? " pp-preview" : "") + (editor ? " pp-editor-canvas" : "")} style={themeStyle(normalized)} onClick={() => editor && onSelect?.("")}>
       <div className="pp-page-inner">
         {Array.isArray(normalized.blocks) ? normalized.blocks.map(frameFor) : null}
+        {children}
         {editor && !normalized.blocks.length ? <div className="pp-empty-page">Add a block from the left to start building this page.</div> : null}
       </div>
     </main>

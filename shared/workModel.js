@@ -81,27 +81,3 @@ export function nextDueDate(date, recurrence) {
   } else d.setUTCDate(d.getUTCDate() + (recurrence === 'weekly' ? 7 : recurrence === 'yearly' ? 365 : 1));
   return d.toISOString().slice(0, 10);
 }
-// Only explicit public selections enter this object. Never spread a private record here.
-export function buildTreasuryProjection({ heading, introduction, funds, transactions, selections }) {
-  const totals = treasuryTotals(funds, transactions);
-  return {
-    heading: String(heading || 'Treasury'), introduction: String(introduction || ''),
-    explanation: 'This is a selected snapshot published by the organization. It may exclude private funds and transactions and is not an audited account.',
-    funds: totals.filter(f => selections.funds?.[f.id]?.publish).map(f => {
-      const s = selections.funds[f.id];
-      return { name: f.title, currency: f.currency || 'USD', ...(s.balance ? { balance: f.balance } : {}), ...(s.budget ? { budget: f.budgetMinor ?? 0 } : {}), ...(s.totals ? { income: f.income, expenses: f.expenses } : {}) };
-    }),
-    transactions: transactions.filter(t => selections.transactions?.[t.id]?.publish && !t.archived && t.status !== 'void').map(t => {
-      const s = selections.transactions[t.id], fund = funds.find(f => f.id === t.fundId);
-      return { date: t.date, type: t.type, amount: t.amountMinor, currency: fund?.currency || 'USD', ...(s.description ? { description: String(t.publicDescription || '') } : {}), ...(s.category ? { category: String(t.category || '') } : {}) };
-    }),
-  };
-}
-export function validTreasuryProjection(p) {
-  const exact = (o, keys) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every(k => keys.includes(k));
-  const text = v => typeof v === 'string' && v.length <= 5000;
-  const amount = v => Number.isSafeInteger(v) && Math.abs(v) <= Number.MAX_SAFE_INTEGER;
-  return exact(p, ['heading', 'introduction', 'explanation', 'funds', 'transactions']) && text(p.heading) && text(p.introduction) && text(p.explanation)
-    && Array.isArray(p.funds) && p.funds.length <= 1000 && p.funds.every(f => exact(f, ['name', 'currency', 'balance', 'budget', 'income', 'expenses']) && text(f.name) && /^[A-Z]{3}$/.test(f.currency) && ['balance', 'budget', 'income', 'expenses'].every(k => f[k] === undefined || amount(f[k])))
-    && Array.isArray(p.transactions) && p.transactions.length <= 2000 && p.transactions.every(t => exact(t, ['date', 'type', 'amount', 'currency', 'description', 'category']) && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && ['income', 'expense', 'reimbursement', 'transfer', 'contribution', 'adjustment'].includes(t.type) && amount(t.amount) && /^[A-Z]{3}$/.test(t.currency) && ['description', 'category'].every(k => t[k] === undefined || text(t[k])));
-}

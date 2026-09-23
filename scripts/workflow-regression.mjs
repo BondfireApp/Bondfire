@@ -6,7 +6,8 @@ import { onRequest as middleware } from '../functions/api/_middleware.js';
 import { ensureScopedKeys } from '../functions/api/_lib/privateKeyScopes.js';
 import { registerDeviceKey } from '../functions/api/_lib/deviceKeys.js';
 import { encryptPrivate, decryptPrivate } from '../src/lib/privateCrypto.js';
-import { WORK_MODULES, partKind, moneyMinor, treasuryTotals, validateTransaction, buildTreasuryProjection, validTreasuryProjection, nextDueDate } from '../shared/workModel.js';
+import { WORK_MODULES, partKind, moneyMinor, treasuryTotals, validateTransaction, nextDueDate } from '../shared/workModel.js';
+import { publicTreasuryRecord, validPublicTreasuryRecord, buildTreasuryLedger } from '../shared/treasuryTransparency.js';
 import { getDefaultEnabledModuleIds, normalizeSelectedModuleIds } from '../src/platform/moduleRegistry.js';
 import { parseEnabledModules } from '../functions/api/orgs/[orgId]/modules.js';
 
@@ -156,20 +157,84 @@ assert.equal(moneyMinor('0.29'), 29); assert.equal(moneyMinor('-1.01'), -101); a
 assert.throws(() => validateTransaction({ ...txs[2], toFundId: 'f1' }, funds));
 assert.throws(() => validateTransaction(txs[2], [funds[0], { ...funds[1], currency: 'EUR' }]));
 assert.equal(nextDueDate('2026-01-31', 'monthly'), '2026-02-28');
-const projection = buildTreasuryProjection({ heading: 'Our funds', introduction: 'Selected activity', funds, transactions: txs, selections: { funds: { f1: { publish: true, balance: true } }, transactions: { i: { publish: true, description: true, category: true } } } });
-assert(validTreasuryProjection(projection)); assert(!JSON.stringify(projection).includes('SECRET')); assert(!JSON.stringify(projection).includes('f1')); assert.equal(projection.funds[0].name, 'Our own fund label');
-assert(!validTreasuryProjection({ ...projection, notes: 'SECRET' }));
-assert(!validTreasuryProjection({ ...projection, transactions: [{ ...projection.transactions[0], receipt: 'SECRET' }] }));
+// Organization-wide transparency requires every record, including restricted records.
 const publicRequest = new Request('https://example.test/api/p/test/treasury');
 kv.set('slug:test', 'a'); kv.set('org:a', JSON.stringify({ enabled: true, slug: 'test' }));
+const publicLedger = async () => { const response = await publicTreasury({ env, request: publicRequest, slug: 'test' }); assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store'); return (await response.json()).public; };
 assert.equal((await publicTreasury({ env, request: publicRequest, slug: 'test' })).status, 404);
-await call('publication', { method: 'PUT', body: { public: projection, sources: [] }, user: 'member' }, 404);
-await call('publication', { method: 'PUT', body: { public: { ...projection, notes: 'SECRET' }, sources: [] } }, 400);
-await call('publication', { method: 'PUT', body: { public: projection, sources: [{ type: 'funds', id: 'funds-one', revision: 99 }] } }, 409);
-await call('publication', { method: 'PUT', body: { public: projection, sources: [{ type: 'funds', id: 'funds-one', revision: 1 }] } });
-const published = await (await publicTreasury({ env, request: publicRequest, slug: 'test' })).json(); assert.deepEqual(published.public, projection);
-await call('publication', { method: 'DELETE' });
+await call('options', { method: 'PUT', body: { approvalsRequired: false, version: 1 } });
+for (const id of ['transactions-one', 'requires-approval']) {
+  const row = (await call('transactions/' + id)).records[0];
+  const access = await body('transactions', id, { grants: id === 'requires-approval' ? ['owner'] : [], parents: [{ type: 'funds', id: 'funds-one' }] });
+  await call('transactions/' + id, { method: 'PUT', body: { ...access, action: 'access', revision: row.revision, parts: row.parts } });
+}
+const safeFund = { name: 'Collective fund', currency: 'USD', startingMinor: 10000 };
+const safeTx = { name: 'Printing', date: '2026-09-10', type: 'expense', amountMinor: 1000, fundId: 'funds-one', status: 'posted', reimbursementState: 'requested', approval: 'pending' };
+const entries = [{ type: 'funds', id: 'funds-one', revision: 1, public: safeFund }, ...await Promise.all(['transactions-one', 'requires-approval'].map(async id => ({ type: 'transactions', id, revision: (await call('transactions/' + id)).records[0].revision, public: safeTx })))];
+assert(validPublicTreasuryRecord('transactions', safeTx));
+assert(!validPublicTreasuryRecord('transactions', { ...safeTx, notes: 'SECRET' }));
+assert(!validPublicTreasuryRecord('transactions', { ...safeTx, name: '' }));
+const safeFromPrivate = publicTreasuryRecord('transactions', { ...safeTx, title: 'SECRET person', publicDescription: 'Printing', payee: 'SECRET', notes: 'SECRET', receipt: 'SECRET' });
+assert(!JSON.stringify(safeFromPrivate).includes('SECRET'));
+await call('publication', { method: 'PUT', body: { version: 0, records: entries }, user: 'member' }, 404);
+await call('publication', { method: 'PUT', body: { version: 0, records: [] } }, 400);
+await call('publication', { method: 'PUT', body: { version: 0, records: entries.slice(1) } }, 400);
+await call('publication', { method: 'PUT', body: { version: 0, records: entries }, user: 'admin' }, 409);
+await call('publication', { method: 'PUT', body: { version: 0, records: [entries[0], entries[1], entries[1]] } }, 409);
+await call('publication', { method: 'PUT', body: { version: 0, records: entries.map((r, i) => i ? r : { ...r, public: { ...r.public, notes: 'SECRET' } }) } }, 400);
+await call('publication', { method: 'PUT', body: { version: 0, records: entries.map((r, i) => i ? r : { ...r, revision: 99 }) } }, 409);
+await call('publication', { method: 'PUT', body: { version: 0, records: entries } });
+let ledger = await publicLedger();
+assert.equal(ledger.transactions.length, 2); assert.equal(ledger.funds[0].balance, 9000);
+assert(!JSON.stringify(ledger).includes('funds-one')); assert(!JSON.stringify(ledger).includes('SECRET'));
+const extra = await body('transactions', 'automatic', { parents: [{ type: 'funds', id: 'funds-one' }] });
+await call('transactions', { body: extra }, 400);
+assert(!sql.prepare("SELECT id FROM org_private_records WHERE kind='work/transactions' AND id='automatic'").get());
+await call('transactions', { body: { ...extra, public: { ...safeTx, name: 'Room rental', amountMinor: 2000 } } });
+ledger = await publicLedger(); assert.equal(ledger.transactions.length, 3); assert.equal(ledger.funds[0].balance, 7000);
+await call('transactions/automatic', { method: 'PUT', body: { ...await edit('transactions', 'automatic', 1, 'edit', { amountMinor: 3000, notes: 'SECRET' }), public: { ...safeTx, name: 'Room rental', amountMinor: 3000 } } });
+ledger = await publicLedger(); assert.equal(ledger.funds[0].balance, 6000); assert.equal(ledger.transactions.find(t => t.name === 'Room rental').changes[0].amount, 2000);
+await call('transactions/automatic', { method: 'PUT', body: { ...await edit('transactions', 'automatic', 2, 'state', { status: 'posted', archived: true }), public: { ...safeTx, name: 'Room rental', amountMinor: 3000 } } });
+ledger = await publicLedger(); assert.equal(ledger.funds[0].balance, 6000); assert.equal(ledger.transactions.length, 3, 'archived transactions remain public');
+await call('transactions/automatic', { method: 'PUT', body: { ...await edit('transactions', 'automatic', 3, 'state', { status: 'void', archived: true }), public: { ...safeTx, name: 'Room rental', amountMinor: 3000, status: 'void' } } });
+ledger = await publicLedger(); assert.equal(ledger.funds[0].balance, 9000); assert.equal(ledger.transactions.length, 3); assert.equal(ledger.transactions.find(t => t.name === 'Room rental').status, 'void');
+await call('transactions/automatic', { method: 'DELETE' }, 405);
+await call('transactions/automatic', { method: 'PUT', body: { ...await edit('transactions', 'automatic', 4, 'state', {}), public: { ...safeTx, name: 'Concealed', amountMinor: 1, status: 'void' } } }, 400);
+await call('funds/funds-one', { method: 'PUT', body: { ...await edit('funds', 'funds-one', 1, 'edit', {}), public: { ...safeFund, startingMinor: 123 } } }, 400);
+const approvalRow = (await call('transactions/requires-approval')).records[0];
+await call('transactions/requires-approval', { method: 'PUT', body: { ...await edit('transactions', 'requires-approval', approvalRow.revision, 'approval', { value: 'approved' }), public: { ...safeTx, approval: 'approved' } } });
+assert.equal((await publicLedger()).funds[0].balance, 8000, 'approval immediately updates public balances');
+await call('transactions/requires-approval', { method: 'PUT', body: { ...await edit('transactions', 'requires-approval', approvalRow.revision + 1, 'edit', {}), public: { ...safeTx, amountMinor: 1200 } } });
+assert.equal((await publicLedger()).funds[0].balance, 9000, 'editing resets approval atomically');
+// New funds and transfers update both balances without changing the combined total.
+await call('funds', { body: { ...await body('funds', 'second'), public: { ...safeFund, name: 'Second fund', startingMinor: 0 } } });
+const transfer = { ...safeTx, name: 'Fund transfer', type: 'transfer', toFundId: 'second', amountMinor: 500 };
+await call('transactions', { body: { ...await body('transactions', 'transfer', { parents: [{ type: 'funds', id: 'funds-one' }, { type: 'funds', id: 'second' }] }), public: transfer } });
+ledger = await publicLedger(); assert.equal(ledger.funds.reduce((n, f) => n + f.balance, 0), 9000); assert.equal(ledger.transactions.find(t => t.type === 'transfer').destinationBalance, 500);
+// Disabling hides the entire ledger; older clients cannot clear individual rows.
+await call('publication', { method: 'DELETE', body: { version: 0 } }, 409);
+await call('publication', { method: 'DELETE', body: { version: 1 } });
 assert.equal((await publicTreasury({ env, request: publicRequest, slug: 'test' })).status, 404);
+assert.equal((await call('context')).transparency.enabled, false);
+
+// Turning transparency back on preserves correction history and includes all records.
+const currentEntries = sql.prepare("SELECT p.kind,p.id,p.payload,r.revision FROM org_public_projections p JOIN org_private_records r ON r.org_id=p.org_id AND r.id=p.id AND r.kind=CASE p.kind WHEN 'work/treasury-funds' THEN 'work/funds' ELSE 'work/transactions' END WHERE p.org_id='a' AND p.kind IN ('work/treasury-funds','work/treasury-transactions')").all().map(r => ({ type: r.kind === 'work/treasury-funds' ? 'funds' : 'transactions', id: r.id, revision: r.revision, public: JSON.parse(r.payload).public }));
+await call('publication', { method: 'PUT', body: { version: 2, records: currentEntries } });
+assert.equal((await publicLedger()).transactions.find(t => t.name === 'Room rental').changes.length, 2);
+// A concurrent setting change rolls back both the ciphertext and public projection.
+const originalBatch = db.batch;
+const beforeRace = (await call('transactions/automatic')).records[0];
+db.batch = async statements => {
+  db.batch = originalBatch;
+  sql.prepare("UPDATE org_public_projections SET source_revision=4,payload=? WHERE org_id='a' AND kind='work/treasury-config'").run(JSON.stringify({ enabled: false }));
+  return originalBatch(statements);
+};
+await call('transactions/automatic', { method: 'PUT', body: { ...await edit('transactions', 'automatic', beforeRace.revision, 'edit', { amountMinor: 7 }), public: { ...safeTx, name: 'Room rental', amountMinor: 7, status: 'void' } } }, 409);
+assert.equal((await call('transactions/automatic')).records[0].revision, beforeRace.revision);
+assert.equal(JSON.parse(sql.prepare("SELECT payload FROM org_public_projections WHERE org_id='a' AND kind='work/treasury-transactions' AND id='automatic'").get().payload).public.amountMinor, 3000);
+// Erasure removes both the ledger and its configuration.
+sql.prepare("DELETE FROM org_private_records WHERE org_id='a' AND kind='work/funds' AND id='second'").run();
+assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM org_public_projections WHERE org_id='a' AND kind LIKE 'work/treasury%'").get().n, 0);
 
 // Outer epoch checks still protect every new encrypted fragment.
 await ensureScopedKeys(db);

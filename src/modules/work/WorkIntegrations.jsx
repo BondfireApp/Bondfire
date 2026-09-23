@@ -44,10 +44,3 @@ export function WorkDashboard({ orgId, enabledModules }) {
   if (!blocks.length) return null;
   return <div className="work-dashboard">{blocks.map(([module, title, rows]) => <section className="card" key={module}><h3>{title}</h3><ul>{rows.slice(0, 5).map(r => <li key={r.id}><Link to={module === 'treasury' ? `/org/${orgId}/treasury?type=transactions&record=${encodeURIComponent(r.id)}` : route(orgId, module, r.id)}>{r.title}</Link>{r.dueDate && <span> · {r.dueDate}</span>}</li>)}</ul>{rows.length > 5 && <p className="helper">{rows.length - 5} more</p>}</section>)}</div>;
 }
-export function TreasuryPublicLink({ slug }) {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => { let alive = true; fetch(`/api/p/${encodeURIComponent(slug)}/treasury`, { credentials: 'omit', cache: 'no-store' }).then(r => alive && setEnabled(r.ok)).catch(() => {}); return () => { alive = false; }; }, [slug]);
-  if (!enabled) return null;
-  const customPath = !window.location.hash.startsWith('#/');
-  return <div className="work-page"><a href={customPath ? '/treasury' : `#/p/${encodeURIComponent(slug)}/treasury`}>Financial transparency</a></div>;
-}

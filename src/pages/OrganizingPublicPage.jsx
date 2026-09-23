@@ -141,7 +141,7 @@ function ListCard({ title, items }) {
   );
 }
 
-export default function OrganizingPublicPage({ slug, initialData = null }) {
+export default function OrganizingPublicPage({ slug, initialData = null, children }) {
   const publicSlug = String(slug || "").trim();
   const [state, setState] = React.useState(() => initialData
     ? { loading: false, error: "", data: initialData }
@@ -563,7 +563,7 @@ export default function OrganizingPublicPage({ slug, initialData = null }) {
         </nav>
       </header>
 
-      <main className="bf-organizing-main">{orderedKeys.map((key) => sections[key])}</main>
+      <main className="bf-organizing-main">{orderedKeys.map((key) => sections[key])}{children}</main>
 
       <footer className="bf-organizing-footer">
         <div>{title}</div>

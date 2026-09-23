@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { api } from '../../utils/api.js';
-import { treasuryTotals, transactionEffect, buildTreasuryProjection, canWork, moneyMinor } from '../../../shared/workModel.js';
+import { treasuryTotals, transactionEffect, canWork, moneyMinor } from '../../../shared/workModel.js';
 import { Field, Select } from './WorkRecordForm.jsx';
+import { completePublicLedger } from './workClient.js';
+import { buildTreasuryLedger } from '../../../shared/treasuryTransparency.js';
 import { TreasuryPublicView } from './PublicTreasury.jsx';
 
-export function formatMoney(minor, currency = 'USD') {
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(Number(minor || 0) / 100); }
-  catch { return `${(Number(minor || 0) / 100).toFixed(2)} ${currency}`; }
-}
+import { formatMoney } from './money.js';
+
 const DEFAULT_COLUMNS = ['date', 'title', 'type', 'fund', 'amount', 'category', 'status'];
 export default function Treasury({ session, all, type, setType, onSelect, busy, run, onInlineEdit }) {
   const [query, setQuery] = useState(''), [fundId, setFundId] = useState(''), [period, setPeriod] = useState(''), [groupId, setGroupId] = useState(''), [view, setView] = useState('active');
@@ -30,7 +30,7 @@ export default function Treasury({ session, all, type, setType, onSelect, busy, 
   const visible = column => columns.includes(column);
   return <section className="work-treasury">
     <div className="work-actions"><button className={type === 'funds' ? 'btn-red' : 'btn'} onClick={() => setType('funds')}>Funds</button><button className={type === 'transactions' ? 'btn-red' : 'btn'} onClick={() => setType('transactions')}>Transactions</button>{canWork(session.context.role, session.context.permissions.treasury, 'publish') && <button className="btn" onClick={() => setPublishOpen(!publishOpen)}>Public transparency</button>}</div>
-    {publishOpen && <TransparencyEditor key={session.orgId} session={session} all={all} totals={totals} busy={busy} run={run} />}
+    {publishOpen && <TransparencyEditor key={session.orgId} session={session} all={all} busy={busy} run={run} />}
     <div className="work-filters"><Field label="Search Treasury" value={query} onChange={e => setQuery(e.target.value)} /><Select label="View" value={view} onChange={setView} options={[{ value: 'active', label: 'Active' }, { value: 'archived', label: 'Archived' }, ...(type === 'transactions' ? [{ value: 'reimbursements', label: 'Outstanding reimbursements' }, { value: 'recurring', label: 'Recurring records' }] : [])]} />
       {type === 'transactions' && <><Select label="Fund" value={fundId} onChange={setFundId} options={[{ value: '', label: 'All funds' }, ...funds.map(f => ({ value: f.id, label: f.title }))]} /><Select label="Month" value={period} onChange={setPeriod} options={[{ value: '', label: 'All dates' }, ...months]} /></>}
       <Select label="Working Group" value={groupId} onChange={setGroupId} options={[{ value: '', label: 'All groups' }, ...(all.groups || []).filter(r => !r.locked).map(g => ({ value: g.id, label: g.title }))]} />
@@ -50,22 +50,37 @@ function InlineCell({ value, inputValue, format = String, editable, label, onSav
   if (!editing) return editable ? <button className="work-text-button" aria-label={`Edit ${label}`} onClick={() => { setDraft(inputValue ?? String(value)); setError(''); setEditing(true); }}>{format(value) || 'Add'}</button> : <span>{format(value) || '—'}</span>;
   return <form onSubmit={async e => { e.preventDefault(); setSaving(true); try { await onSave(draft); setEditing(false); } catch (e) { setError(e.message); } finally { setSaving(false); } }}><input className="input" aria-label={label} value={draft} onChange={e => setDraft(e.target.value)} autoFocus /><div className="work-actions"><button className="btn" disabled={saving}>Save</button><button className="btn" type="button" disabled={saving} onClick={() => setEditing(false)}>Cancel</button></div>{error && <span role="alert">{error}</span>}</form>;
 }
-function TransparencyEditor({ session, all, totals, busy, run }) {
-  const [heading, setHeading] = useState('Our funds'), [introduction, setIntroduction] = useState(''), [selections, setSelections] = useState({ funds: {}, transactions: {} }), [preview, setPreview] = useState(null), [published, setPublished] = useState(null), [error, setError] = useState(''), [slug, setSlug] = useState('');
+function TransparencyEditor({ session, all, busy, run }) {
+  const [preview, setPreview] = useState(null), [error, setError] = useState(''), [slug, setSlug] = useState('');
+  React.useEffect(() => setPreview(null), [all]);
   const base = `/api/orgs/${encodeURIComponent(session.orgId)}/work/publication`;
-  React.useEffect(() => { let alive = true; Promise.all([api(base), api(`/api/orgs/${encodeURIComponent(session.orgId)}/public/get`)]).then(([result, site]) => { if (alive) { setPublished(result.public); setSlug(site.public?.slug || site.config?.slug || site.slug || ''); } }).catch(e => alive && setError(e.message)); return () => { alive = false; }; }, [base, session.orgId]);
-  function select(kind, id, field, checked) { setPreview(null); setSelections(s => ({ ...s, [kind]: { ...s[kind], [id]: { ...s[kind][id], [field]: checked } } })); }
-  const transactions = (all.transactions || []).filter(t => !t.locked && !t.archived && t.status !== 'void');
-  return <section className="card work-editor"><h2>Public Treasury transparency</h2><p>{published ? 'A selected snapshot is public. Editing private records does not change it. Preview and publish again when you want to update it.' : 'Off. No Treasury information is public.'}</p><p className="helper">Select every field deliberately. Internal notes, receipts, identities, reimbursements and linked records are excluded. Transaction descriptions use only the separate public-description field.</p>
-    <Field label="Page heading" value={heading} onChange={e => { setHeading(e.target.value); setPreview(null); }} /><Field label="Introduction"><textarea className="textarea" value={introduction} onChange={e => { setIntroduction(e.target.value); setPreview(null); }} /></Field>
-    <h3>Funds</h3>{totals.map(f => <fieldset key={f.id}><legend>{f.title}</legend><div className="work-actions">{[['publish', 'Publish fund name'], ['balance', 'Balance'], ['budget', 'Budget'], ['totals', 'Income and expense totals']].map(([key, label]) => <label key={key}><input type="checkbox" checked={!!selections.funds[f.id]?.[key]} onChange={e => select('funds', f.id, key, e.target.checked)} />{label}</label>)}</div></fieldset>)}
-    <details><summary>Select individual transactions</summary>{transactions.map(t => <fieldset key={t.id}><legend>{t.date} · {t.title}</legend><div className="work-actions">{[['publish', 'Publish date, type and amount'], ['description', 'Public description'], ['category', 'Category']].map(([key, label]) => <label key={key}><input type="checkbox" checked={!!selections.transactions[t.id]?.[key]} onChange={e => select('transactions', t.id, key, e.target.checked)} />{label}</label>)}</div></fieldset>)}</details>
+  const state = session.context.transparency || { enabled: false, version: 0 };
+  React.useEffect(() => { let alive = true; api(`/api/orgs/${encodeURIComponent(session.orgId)}/public/get`).then(site => alive && setSlug(site.public?.slug || site.config?.slug || site.slug || '')).catch(() => {}); return () => { alive = false; }; }, [session.orgId]);
+  const unnamed = (all.transactions || []).filter(t => !t.locked && !t.publicDescription?.trim());
+  function review() {
+    setError('');
+    try {
+      const records = completePublicLedger(all);
+      setPreview(buildTreasuryLedger(records.filter(r => r.type === 'funds').map(r => ({ ...r.public, id: r.id })), records.filter(r => r.type === 'transactions').map(r => ({ ...r.public, id: r.id, approvalRequired: all.transactions.find(t => t.id === r.id).approvalRequired }))));
+    } catch (e) { setError(e.message); }
+  }
+  async function toggle(enabled) {
+    setError('');
+    try {
+      const body = { version: state.version, ...(enabled ? { records: completePublicLedger(all) } : {}) };
+      await run(() => api(base, { method: enabled ? 'PUT' : 'DELETE', body: JSON.stringify(body) }), enabled ? 'Transparency is on. Every financial save now updates your Organization Page.' : 'Transparency is off for this organization.');
+      setPreview(null);
+    } catch (e) { setError(e.message.includes('COMPLETE_LEDGER_REQUIRED') ? 'Every fund and transaction must be included. Use a device and account with access to the complete Treasury, then refresh and try again.' : e.message); }
+  }
+  return <section className="card work-editor"><h2>Public Treasury transparency</h2>
+    <p><strong>{state.enabled ? 'On for this organization' : 'Off for this organization'}</strong></p>
+    <p>When on, every fund and transaction appears automatically on your existing Organization Page, with the public transaction name, date, amount, status and running balance. The page includes a balance graph.</p>
+    <p className="helper">There are no individual publication switches. Archiving never hides a transaction. Voided entries and corrections remain visible. Payer/payee names, responsible members, private titles, notes, categories, receipts and linked records are withheld. Use public fund and transaction names that do not identify people.</p>
+    {!state.enabled && unnamed.length > 0 && <div className="work-notice"><p>Add a public name to these existing transactions before turning transparency on:</p><ul>{unnamed.map(t => <li key={t.id}><a href={`#/org/${encodeURIComponent(session.orgId)}/treasury?type=transactions&record=${encodeURIComponent(t.id)}`}>{t.title}</a></li>)}</ul></div>}
     {error && <p role="alert" className="error">{error}</p>}
-    <div className="work-actions"><button className="btn" disabled={busy} onClick={() => setPreview(buildTreasuryProjection({ heading, introduction, funds: totals, transactions, selections }))}>Preview selected information</button>{published && <button className="btn" disabled={busy} onClick={() => { if (window.confirm('Remove the public Treasury snapshot?')) run(() => api(base, { method: 'DELETE' }), 'Public Treasury page removed.').then(() => setPublished(null)).catch(e => setError(e.message)); }}>Unpublish</button>}</div>
-    {preview && <><TreasuryPublicView data={preview} preview /><button className="btn-red" disabled={busy} onClick={() => {
-      const sources = [...totals.map(r => ({ type: 'funds', id: r.id, revision: r.revision })), ...transactions.map(r => ({ type: 'transactions', id: r.id, revision: r.revision }))];
-      run(() => api(base, { method: 'PUT', body: JSON.stringify({ public: preview, sources }) }), 'Selected Treasury snapshot published.').then(() => setPublished(preview)).catch(e => setError(e.message));
-    }}>Publish this preview</button></>}
-    {published && slug && <p><a href={`#/p/${encodeURIComponent(slug)}/treasury`} target="_blank" rel="noreferrer">Open public transparency page</a></p>}
+    <div className="work-actions">{state.enabled ? <button className="btn" disabled={busy} onClick={() => { if (window.confirm('Turn off the complete public ledger for this organization?')) toggle(false); }}>Turn transparency off</button> : <button className="btn" disabled={busy} onClick={review}>Preview complete ledger</button>}</div>
+    {!state.enabled && preview && <><TreasuryPublicView data={preview} preview /><button className="btn-red" disabled={busy} onClick={() => toggle(true)}>Turn transparency on</button></>}
+    {state.enabled && slug && <p><a href={`#/p/${encodeURIComponent(slug)}?section=treasury`} target="_blank" rel="noreferrer">View ledger on Organization Page</a></p>}
+    {state.enabled && !slug && <p className="helper">Set up and publish your Organization Page to make the ledger visible to visitors.</p>}
   </section>;
 }

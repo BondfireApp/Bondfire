@@ -4,6 +4,8 @@ import { randomOrgKey, wrapForMember, unwrapOrgKey, ensureDeviceKeypair, decrypt
 import { deviceKeyId } from '../../../shared/privateContent.js';
 import { WORK_MODULES, PARTS, partKind, canWork } from '../../../shared/workModel.js';
 
+import { publicTreasuryRecord, validPublicTreasuryRecord } from '../../../shared/treasuryTransparency.js';
+
 const base = orgId => `/api/orgs/${encodeURIComponent(orgId)}/work`;
 export async function openWorkSession(orgId) {
   const [context, status, device] = await Promise.all([api(base(orgId) + '/context'), api(`/api/orgs/${encodeURIComponent(orgId)}/privacy`), ensureDeviceKeypair({ register: false })]);
@@ -74,6 +76,12 @@ export async function saveWork(session, all, type, record, { action = 'edit', pa
     const inner = await encryptPrivate(itemKey, value, session.orgId, partKind(type, part), id);
     body.parts[part] = await encryptPrivate(session.key, { format: 'bondfire-work-item-v1', ciphertext: inner }, session.orgId, partKind(type, part), id);
   }
+  if (session.context.transparency?.enabled && ['funds', 'transactions'].includes(type)) {
+    const merged = { ...(record?.clearParts || {}), ...(clear || {}) };
+    const current = { ...merged.content, ...merged.state, approval: action === 'edit' || creating ? 'pending' : merged.approval?.value || 'pending' };
+    body.public = publicTreasuryRecord(type, current);
+    if (!validPublicTreasuryRecord(type, body.public)) throw new Error('Add a short public transaction name without personal information before saving.');
+  }
   return api(`${base(session.orgId)}/${type}${creating ? '' : '/' + encodeURIComponent(id)}`, { method: creating ? 'POST' : 'PUT', body: JSON.stringify(body) });
 }
 export async function workMemberNames(orgId) {
@@ -102,4 +110,13 @@ export async function promoteSubmission(session, all, item) {
     grants: [session.context.userId], parents: [], source: { type: item.type, id: item.id },
     parts: { content: { title: item.title || 'Public intake follow-up', description: item.details || '', caseType: '', priority: 'normal', labels: [], links: [], timeline: [] }, state: { status: 'open', archived: false }, assignment: { assignees: [session.context.userId] }, source: { submittedAt: original.created_at, data: opened } },
   });
+}
+
+export function completePublicLedger(all) {
+  return ['funds', 'transactions'].flatMap(type => (all[type] || []).map(record => {
+    if (record.locked) throw new Error('Open every Treasury record on this device before enabling transparency. No record can be left out.');
+    const safe = publicTreasuryRecord(type, record);
+    if (!validPublicTreasuryRecord(type, safe)) throw new Error(`Add a public transaction name for “${record.title}” before enabling transparency.`);
+    return { type, id: record.id, revision: record.revision, public: safe };
+  }));
 }

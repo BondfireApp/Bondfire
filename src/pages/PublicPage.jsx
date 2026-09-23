@@ -1,4 +1,4 @@
-import { TreasuryPublicLink } from "../modules/work/WorkIntegrations.jsx";
+import { PublicTreasurySection } from "../modules/work/PublicTreasury.jsx";
 import React from "react";
 import { useParams } from "react-router-dom";
 import PublicPageDefault from "./PublicPageDefault.jsx";
@@ -33,13 +33,14 @@ export default function PublicPage() {
   if (!publicSlug) return <PublicPageDefault />;
   if (state.loading) return <div style={{ padding: 24 }} className="helper">Loading public site…</div>;
 
+  const treasury = <PublicTreasurySection slug={publicSlug} />;
   let pageContent;
   if (state.data?.public?.page?.blocks?.length) {
-    pageContent = <BlockPublicPage slug={publicSlug} initialData={state.data} />;
+    pageContent = <BlockPublicPage slug={publicSlug} initialData={state.data}>{treasury}</BlockPublicPage>;
   } else if (!state.data?.public || state.data.public.template !== "organizing") {
-    pageContent = <PublicPageDefault />;
+    pageContent = <PublicPageDefault>{treasury}</PublicPageDefault>;
   } else {
-    pageContent = <OrganizingPublicPage slug={publicSlug} initialData={state.data} />;
+    pageContent = <OrganizingPublicPage slug={publicSlug} initialData={state.data}>{treasury}</OrganizingPublicPage>;
   }
 
   return (
@@ -57,7 +58,6 @@ export default function PublicPage() {
       }}
     >
       {pageContent}
-      <TreasuryPublicLink slug={publicSlug} />
     </PublicPageAdminBar>
   );
 }

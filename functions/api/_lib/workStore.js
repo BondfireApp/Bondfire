@@ -7,7 +7,9 @@ import { ensurePublicationSchema } from './privatePublication.js';
 import { isOrgModuleEnabled } from './orgModules.js';
 import { validWrappedKey } from './wrappedKeyValidation.js';
 import { contentContext, isCiphertext } from '../../../shared/privateContent.js';
-import { WORK_MODULES, WORK_ROLES, PARTS, partKind, defaultPermissions, canWork, rank, validTreasuryProjection } from '../../../shared/workModel.js';
+import { WORK_MODULES, WORK_ROLES, PARTS, partKind, defaultPermissions, canWork, rank } from '../../../shared/workModel.js';
+
+import { treasuryTransparencyState, toggleTreasuryTransparency, prepareTreasuryPublicWrite, readTreasuryLedger } from './treasuryTransparency.js';
 
 const parse = (s, fallback) => { try { return JSON.parse(s); } catch { return fallback; } };
 const validId = v => typeof v === 'string' && /^[A-Za-z0-9_.:-]{1,160}$/.test(v);
@@ -17,12 +19,14 @@ const exact = (o, keys) => o && typeof o === 'object' && !Array.isArray(o) && Ob
 export async function ensureWorkSchema(db) {
   await ensurePrivateSchema(db);
   await ensureDeviceKeySchema(db);
+  await ensurePublicationSchema(db);
   for (const sql of [
     `CREATE TABLE IF NOT EXISTS org_work_access(org_id TEXT NOT NULL,type TEXT NOT NULL,id TEXT NOT NULL,grants_json TEXT NOT NULL,parents_json TEXT NOT NULL,keys_json TEXT NOT NULL,owner_id TEXT NOT NULL,source_type TEXT,source_id TEXT,approval_required INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(org_id,type,id),UNIQUE(org_id,source_type,source_id))`,
     `CREATE TABLE IF NOT EXISTS org_work_options(org_id TEXT PRIMARY KEY,approvals_required INTEGER NOT NULL DEFAULT 0,version INTEGER NOT NULL DEFAULT 1)`,
     `CREATE TABLE IF NOT EXISTS org_work_permissions(org_id TEXT NOT NULL,module TEXT NOT NULL,permissions_json TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 1,PRIMARY KEY(org_id,module))`,
     `CREATE TABLE IF NOT EXISTS org_work_history(org_id TEXT NOT NULL,type TEXT NOT NULL,id TEXT NOT NULL,revision INTEGER NOT NULL,action TEXT NOT NULL,actor_id TEXT NOT NULL,at INTEGER NOT NULL,PRIMARY KEY(org_id,type,id,revision))`,
     `CREATE TABLE IF NOT EXISTS org_work_assertions(org_id TEXT NOT NULL,id TEXT NOT NULL,valid INTEGER CHECK(valid=1),PRIMARY KEY(org_id,id))`,
+    `CREATE TRIGGER IF NOT EXISTS bf_work_ledger_cleanup AFTER DELETE ON org_private_records WHEN OLD.kind IN ('work/funds','work/transactions') BEGIN DELETE FROM org_public_projections WHERE org_id=OLD.org_id AND kind LIKE 'work/treasury%'; END`,
     // Metadata must disappear with the encrypted source on reset or emergency erasure.
     `CREATE TRIGGER IF NOT EXISTS bf_work_cleanup AFTER DELETE ON org_private_records WHEN OLD.kind LIKE 'work/%' AND instr(OLD.kind,':')=0 BEGIN DELETE FROM org_work_access WHERE org_id=OLD.org_id AND 'work/'||type=OLD.kind AND id=OLD.id; DELETE FROM org_work_history WHERE org_id=OLD.org_id AND 'work/'||type=OLD.kind AND id=OLD.id; END`,
   ]) await db.prepare(sql).run();
@@ -36,7 +40,7 @@ export async function workContext(db, env, orgId) {
   const enabled = [];
   for (const module of Object.keys(permissions)) if (await isOrgModuleEnabled(env, orgId, module)) enabled.push(module);
   const options = await db.prepare('SELECT * FROM org_work_options WHERE org_id=?').bind(orgId).first();
-  return { policies, permissions, enabled, settings, options: { approvalsRequired: !!options?.approvals_required, version: Number(options?.version || 0) } };
+  return { policies, permissions, enabled, settings, transparency: await treasuryTransparencyState(db, orgId), options: { approvalsRequired: !!options?.approvals_required, version: Number(options?.version || 0) } };
 }
 
 export function workAccess(context, policy, userId, role, seen = new Set()) {
@@ -82,7 +86,7 @@ export async function workEndpoint({ env, request, orgId, path = '' }) {
   const userId = gate.user.sub, url = new URL(request.url), deviceId = url.searchParams.get('deviceId') || '';
   if (path === 'context' && method === 'GET') {
     const members = rank(gate.role) >= rank('member') ? await roster(db, orgId) : [];
-    return json({ ok: true, userId, role: gate.role, enabled: context.enabled, permissions: context.permissions, options: context.options, permissionVersions: Object.fromEntries(context.settings.map(s => [s.module, s.version])), roster: members });
+    return json({ ok: true, userId, role: gate.role, enabled: context.enabled, permissions: context.permissions, options: context.options, transparency: context.transparency, permissionVersions: Object.fromEntries(context.settings.map(s => [s.module, s.version])), roster: members });
   }
   if (path === 'options' && method === 'PUT') {
     if (rank(gate.role) < rank('admin') || !context.enabled.includes('treasury')) return bad(403, 'INSUFFICIENT_ROLE');
@@ -107,28 +111,9 @@ export async function workEndpoint({ env, request, orgId, path = '' }) {
   }
   if (path === 'publication') {
     if (!context.enabled.includes('treasury') || !canWork(gate.role, context.permissions.treasury, 'publish')) return bad(404, 'NOT_FOUND');
-    await ensurePublicationSchema(db);
-    if (method === 'GET') {
-      const row = await db.prepare("SELECT payload,updated_at FROM org_public_projections WHERE org_id=? AND kind='work/treasury' AND id='page'").bind(orgId).first();
-      return json({ ok: true, public: row ? parse(row.payload, null) : null, updatedAt: row?.updated_at || null });
-    }
-    if (method === 'DELETE') {
-      await db.prepare("DELETE FROM org_public_projections WHERE org_id=? AND kind='work/treasury'").bind(orgId).run();
-      return json({ ok: true, published: false });
-    }
-    if (method !== 'PUT') return bad(405, 'METHOD_NOT_ALLOWED');
-    const b = await request.json().catch(() => null);
-    if (!exact(b, ['public', 'sources']) || !validTreasuryProjection(b.public) || !Array.isArray(b.sources) || JSON.stringify(b).length > 512 * 1024) return bad(400, 'ONLY_SELECTED_PUBLIC_FIELDS_ALLOWED');
-    const checks = [];
-    for (const s of b.sources) {
-      const policy = context.policies.get(`${s.type}:${s.id}`);
-      if (!['funds', 'transactions'].includes(s.type) || !policy || !workAccess(context, policy, userId, gate.role) || policy.revision !== s.revision) return bad(409, 'PRIVATE_REVISION_CONFLICT');
-      checks.push(assertRevision(db, orgId, s.type, s.id, s.revision));
-    }
-    checks.push(db.prepare("INSERT INTO org_public_projections VALUES(?,'work/treasury','page',1,?,?) ON CONFLICT(org_id,kind,id) DO UPDATE SET source_revision=source_revision+1,payload=excluded.payload,updated_at=excluded.updated_at").bind(orgId, JSON.stringify(b.public), Date.now()));
-    checks.push(db.prepare('DELETE FROM org_work_assertions WHERE org_id=?').bind(orgId));
-    return runBatch(db, checks, { ok: true, published: true });
+    return toggleTreasuryTransparency({ db, orgId, request, context, userId, role: gate.role, access: workAccess, assertRevision, runBatch });
   }
+
   const [type, id = ''] = path.split('/');
   const module = WORK_MODULES[type];
   if (!module || !context.enabled.includes(module) || !canWork(gate.role, context.permissions[module], 'view')) return bad(404, 'NOT_FOUND');
@@ -141,7 +126,8 @@ export async function workEndpoint({ env, request, orgId, path = '' }) {
   }
   if (method === 'DELETE') return bad(405, 'ARCHIVE_RECORD_INSTEAD');
   const b = await request.json().catch(() => null);
-  if (!exact(b, ['id', 'revision', 'action', 'parts', 'grants', 'parents', 'wraps', 'source'])) return bad(400, 'PLAINTEXT_FIELDS_FORBIDDEN');
+  if (!exact(b, ['id', 'revision', 'action', 'parts', 'grants', 'parents', 'wraps', 'source', 'public'])) return bad(400, 'PLAINTEXT_FIELDS_FORBIDDEN');
+  if (!['funds', 'transactions'].includes(type) && b.public !== undefined) return bad(400, 'PLAINTEXT_FIELDS_FORBIDDEN');
   const recordId = id || b.id, action = b.action;
   if (!validId(recordId) || (id && b.id && b.id !== id)) return bad(400, 'INVALID_ID');
   const creating = method === 'POST' && !id;
@@ -203,6 +189,11 @@ export async function workEndpoint({ env, request, orgId, path = '' }) {
   for (const [part, ciphertext] of Object.entries(b.parts)) statements.push(db.prepare(`INSERT INTO org_private_records(org_id,kind,id,ciphertext,revision,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(org_id,kind,id) DO UPDATE SET ciphertext=excluded.ciphertext,revision=excluded.revision,updated_at=excluded.updated_at`).bind(orgId, partKind(type, part), recordId, ciphertext, revision, t, t, userId));
   if (!b.parts.content) statements.push(db.prepare('UPDATE org_private_records SET revision=?,updated_at=? WHERE org_id=? AND kind=? AND id=?').bind(revision, t, orgId, partKind(type, 'content'), recordId));
   const approvalRequired = type === 'transactions' && (existing?.approval_required || context.options.approvalsRequired);
+  if (['funds', 'transactions'].includes(type)) {
+    const publication = await prepareTreasuryPublicWrite({ db, orgId, type, id: recordId, action, revision, body: b, context, approvalRequired: !!approvalRequired, parents });
+    if (publication.error) return publication.error;
+    statements.push(...publication.statements);
+  }
   statements.push(db.prepare(`INSERT INTO org_work_access VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(org_id,type,id) DO UPDATE SET grants_json=excluded.grants_json,parents_json=excluded.parents_json,keys_json=excluded.keys_json,approval_required=excluded.approval_required`).bind(orgId, type, recordId, JSON.stringify(grants), JSON.stringify(parents), JSON.stringify(wraps), proposed.owner_id, source?.type || null, source?.id || null, Number(!!approvalRequired)));
   // Changing financial content invalidates a previous approval in the same transaction.
   if (type === 'transactions' && action === 'edit') statements.push(db.prepare('DELETE FROM org_private_records WHERE org_id=? AND kind=? AND id=?').bind(orgId, partKind(type, 'approval'), recordId));
@@ -226,8 +217,8 @@ export async function publicTreasury({ env, request, slug }) {
   const config = parse(await env.BF_PUBLIC.get(`org:${orgId}`), {});
   if (!config.enabled || config.slug !== slug) return bad(404, 'NOT_FOUND');
   const db = getDb(env); await ensurePublicationSchema(db);
-  const row = await db.prepare("SELECT payload,updated_at FROM org_public_projections WHERE org_id=? AND kind='work/treasury' AND id='page'").bind(orgId).first();
-  const data = parse(row?.payload, null);
-  if (!validTreasuryProjection(data)) return bad(404, 'NOT_FOUND');
-  return json({ ok: true, public: data, updatedAt: row.updated_at });
+  const state = await treasuryTransparencyState(db, orgId);
+  if (!state.enabled) return bad(404, 'NOT_FOUND');
+  const data = await readTreasuryLedger(db, orgId);
+  return json({ ok: true, public: data, updatedAt: state.updatedAt }, { headers: { 'Cache-Control': 'no-store' } });
 }

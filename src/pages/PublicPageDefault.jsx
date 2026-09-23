@@ -934,6 +934,7 @@ export default function PublicPage(props) {
             ) : null}
           </aside>
         </section>
+        {props.children}
       </div>
 
       {selectedNeed ? (

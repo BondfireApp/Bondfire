@@ -16,6 +16,7 @@ const vite=await createServer({root,configFile:false,plugins:[{name:'qa-env',enf
 const React=await import(root+'/node_modules/react/index.js');
 const {createRoot}=await import(root+'/node_modules/react-dom/client.js');
 const {HashRouter,Routes,Route}=await import(root+'/node_modules/react-router-dom/dist/index.mjs');
+const {PublicTreasurySection}=await vite.ssrLoadModule('/src/modules/work/PublicTreasury.jsx');
 const {default:WorkPage}=await vite.ssrLoadModule('/src/modules/work/WorkPage.jsx');
 const {workEndpoint,ensureWorkSchema,publicTreasury}=await import(root+'/functions/api/_lib/workStore.js');
 const {signJwt}=await import(root+'/functions/api/_lib/jwt.js');
@@ -30,6 +31,7 @@ const enabled=['public-site','tasks','working-groups','decisions','cases','treas
 const token=await signJwt(env.JWT_SECRET,{sub:'owner'},3600);let wrapped;const errors=[];
 globalThis.fetch=async(path,opts={})=>{const url=new URL(path,win.location.origin),p=url.pathname;let data={};
 try{
+if(p==='/api/p/qa/treasury')return publicTreasury({env,request:new Request(url),slug:'qa'});
 if(p.includes('/work/')){const resp=await workEndpoint({env,orgId:'qa',path:p.split('/work/')[1],request:new Request(url,{...opts,headers:{...Object.fromEntries(new Headers(opts.headers)),authorization:'Bearer '+token}})});if(resp.status>=400)errors.push(await resp.clone().text());return resp}
 if(p.endsWith('/privacy/keys'))data={epoch:0,keys:[]};else if(p.endsWith('/privacy'))data={state:'enabled',role:'owner',userId:'owner'};else if(p.endsWith('/crypto'))data={wrapped_key:wrapped};else if(p.endsWith('/modules'))data={enabled_modules:enabled};else if(p.endsWith('/members'))data={members:[{userId:'owner',is_self:true,role:'owner'}]};else if(p.endsWith('/public/get'))data={public:{slug:'qa'}};return Response.json(data);
 }catch(e){errors.push(e.stack);throw e}};
@@ -51,12 +53,17 @@ try{
  await navigate('decisions');await click('New decision');input('Title','Assembly');input('Proposal / question','Meet');await submit();await wait(()=>document.querySelector('.work-detail h2')?.textContent==='Assembly','decision');console.log('Decision creation passed');
  await navigate('cases');await click('New case');input('Title','Organizing request');input('Case type','Custom');await submit();await wait(()=>document.querySelector('.work-detail h2')?.textContent==='Organizing request','case');console.log('Case creation passed');
  await navigate('treasury?type=funds');await click('New fund');input('Name','User chosen fund');input('Starting balance','100');await submit();await wait(()=>document.querySelector('.work-detail h2')?.textContent==='User chosen fund','fund');console.log('Fund creation passed');
- await click('Transactions');await click('New transaction');input('Title','Printing');input('Amount','12.34');const fundId=sql.prepare("SELECT id FROM org_work_access WHERE type='funds'").get().id;
- const fundLabel=[...document.querySelectorAll('form.work-editor label')].find(l=>l.querySelector('span')?.textContent==='Fund');const sel=fundLabel.querySelector('select');sel.value=fundId;sel.dispatchEvent(new win.Event('change',{bubbles:true}));await submit();await wait(()=>document.querySelector('.work-detail h2')?.textContent==='Printing','transaction');console.log('Transaction creation passed');
+ await click('Transactions');await click('New transaction');input('Title','Private printing record');input('Public transaction name','Printing');input('Private notes','SECRET internal note');input('Payer / payee (private)','SECRET person');input('Amount','12.34');const fundId=sql.prepare("SELECT id FROM org_work_access WHERE type='funds'").get().id;
+ const fundLabel=[...document.querySelectorAll('form.work-editor label')].find(l=>l.querySelector('span')?.textContent==='Fund');const sel=fundLabel.querySelector('select');sel.value=fundId;sel.dispatchEvent(new win.Event('change',{bubbles:true}));await submit();await wait(()=>document.querySelector('.work-detail h2')?.textContent==='Private printing record','transaction');console.log('Transaction creation passed');
  await click('Funds');await wait(()=>document.body.textContent.includes('$87.66'),'financial balance');console.log('Financial balance passed');
- await click('Public transparency');await wait(()=>document.body.textContent.includes('Off. No Treasury'),'publication settings');
- const checks=[...document.querySelectorAll('label')];for(const name of ['Publish fund name','Balance']){const l=checks.find(l=>l.textContent.trim()===name);assert(l,name);l.querySelector('input').click()}await sleep(20);
- await click('Preview selected information');await click('Publish this preview');await wait(()=>document.body.textContent.includes('Open public transparency page'),'published snapshot');
- const publicResponse=await publicTreasury({env,request:new Request('https://example.test/api/p/qa/treasury'),slug:'qa'});const published=await publicResponse.json();assert.equal(published.public.funds[0].balance,8766);assert.equal(published.public.transactions.length,0);console.log('Explicit field-selected public snapshot passed');
+ await click('Public transparency');await wait(()=>document.body.textContent.includes('Off for this organization'),'publication settings');
+ await click('Preview complete ledger');await click('Turn transparency on');await wait(()=>document.body.textContent.includes('On for this organization'),'enabled transparency');
+ const publicResponse=await publicTreasury({env,request:new Request('https://example.test/api/p/qa/treasury'),slug:'qa'});const published=await publicResponse.json();assert.equal(published.public.funds[0].balance,8766);assert.equal(published.public.transactions.length,1);assert.equal(published.public.transactions[0].name,'Printing');assert(!JSON.stringify(published).includes('SECRET'));assert(!JSON.stringify(published).includes('Private printing record'));console.log('Complete privacy-safe ledger published');
+ await click('Transactions');await click('New transaction');input('Title','Private room reservation');input('Public transaction name','Meeting room');input('Amount','10.00');
+ const fundSelect=[...document.querySelectorAll('form.work-editor label')].find(l=>l.querySelector('span')?.textContent==='Fund').querySelector('select');fundSelect.value=fundId;fundSelect.dispatchEvent(new win.Event('change',{bubbles:true}));await submit();await wait(()=>document.querySelector('.work-detail h2')?.textContent==='Private room reservation','automatic transaction');
+ const updated=await (await publicTreasury({env,request:new Request('https://example.test/api/p/qa/treasury'),slug:'qa'})).json();assert.equal(updated.public.funds[0].balance,7766);assert.equal(updated.public.transactions.length,2);console.log('Financial saves automatically update ledger and running balances');
+ const publicContainer=document.createElement('div');document.body.append(publicContainer);const publicApp=createRoot(publicContainer);publicApp.render(el(PublicTreasurySection,{slug:'qa'}));
+ await wait(()=>publicContainer.querySelector('.work-account-balance')?.textContent==='$77.66','embedded balance');assert(publicContainer.querySelector('.work-chart-area'));assert(publicContainer.querySelector('.work-recent-list').textContent.includes('Meeting room'));assert(!publicContainer.textContent.includes('SECRET'));
+ publicContainer.querySelector('.work-recent-heading button').click();await wait(()=>publicContainer.querySelector('.work-ledger tbody tr'),'inline complete ledger');assert.equal(publicContainer.querySelectorAll('.work-ledger tbody tr').length,2);publicApp.unmount();console.log('Embedded balance graph, recent transactions and See all ledger passed');
  assert.deepEqual(errors,[]);console.log('DOM/WebCrypto/API integration passed for all five modules.');
 }catch(e){console.error(e);process.exitCode=1}finally{app.unmount();await vite.close();win.happyDOM.abort();}

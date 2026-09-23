@@ -14,7 +14,7 @@ const listText = value => Array.isArray(value) ? value.join(', ') : value || '';
 const list = value => String(value || '').split(',').map(x => x.trim()).filter(Boolean);
 const amountInput = n => n == null ? '' : (n / 100).toFixed(2);
 
-export default function WorkRecordForm({ type, initial, all, members, catalog, settings, me, busy, onSave, onCancel }) {
+export default function WorkRecordForm({ type, initial, all, members, catalog, settings, me, busy, transparency = false, onSave, onCancel }) {
   const [form, setForm] = useState(() => ({
     title: '', description: '', priority: 'normal', dueDate: '', labels: [], links: [], checklist: [], recurrence: 'none', currency: 'USD', type: 'expense', date: new Date().toISOString().slice(0, 10),
     method: 'consensus', proposedDate: new Date().toISOString().slice(0, 10), ...initial?.clearParts?.content, ...(!initial?.revision ? initial || {} : {}),
@@ -47,6 +47,7 @@ export default function WorkRecordForm({ type, initial, all, members, catalog, s
         if (!/^[A-Z]{3}$/.test(data.currency)) throw new Error('Use a three-letter currency code.');
         if (initial?.revision && data.currency !== initial.currency && all.transactions.some(t => t.fundId === initial.id || t.toFundId === initial.id)) throw new Error('Create a separate fund to use a different currency once transactions exist.');
       }
+      if (type === 'transactions' && transparency && !data.publicDescription?.trim()) throw new Error('Add a public transaction name without personal information.');
       if (type === 'transactions') { data.amountMinor = moneyMinor(form.amount); validateTransaction(data, all.funds || []); }
       if (restricted && !grants.includes(me)) throw new Error('Keep yourself selected so you can manage access.');
       const parents = [...(initial?.parents || []).filter(p => !['groups', 'funds'].includes(p.type))];
@@ -97,7 +98,7 @@ export default function WorkRecordForm({ type, initial, all, members, catalog, s
       {field('Important dates / next steps', 'importantDates')}{area('Internal notes', 'notes')}
     </>}
     {type === 'funds' && <div className="work-form-grid">
-      {field('Currency code', 'currency', { maxLength: 3, required: true })}{field('Starting balance', 'starting', { inputMode: 'decimal' })}
+      {field('Currency code', 'currency', { maxLength: 3, required: true, disabled: transparency && !!initial?.revision })}{field('Starting balance', 'starting', { inputMode: 'decimal', disabled: transparency && !!initial?.revision })}{transparency && initial?.revision && <p className="helper">Record an adjustment transaction to correct a balance. Public opening balances and currencies cannot be rewritten.</p>}
       {field('Target (optional)', 'target', { inputMode: 'decimal' })}{field('Budget (optional)', 'budget', { inputMode: 'decimal' })}
     </div>}
     {type === 'transactions' && <>
@@ -111,7 +112,7 @@ export default function WorkRecordForm({ type, initial, all, members, catalog, s
         <Select label="Recurring schedule (recorded; no automatic charges)" value={form.recurrence} onChange={v => update('recurrence', v)} options={['none', 'monthly', 'weekly', 'yearly']} />
         <Select label="Related Case" value={form.caseId} onChange={v => update('caseId', v)} options={[{ value: '', label: 'None' }, ...(all.cases || []).filter(r => !r.locked).map(r => ({ value: r.id, label: r.title }))]} disabled={immutableParents} />
       </div>
-      {area('Private notes', 'notes')}{area('Public description (published only when explicitly selected)', 'publicDescription')}
+      {area('Private notes', 'notes')}{field('Public transaction name', 'publicDescription', { maxLength: 250, required: transparency })}<p className="helper">{transparency ? 'This name, date, amount and resulting balance are posted automatically to your Organization Page.' : 'Used for every transaction if your organization turns transparency on.'} Use a short description such as ‘Printing’ or ‘Meeting room’. Keep personal names in the private payer/payee field.</p>
     </>}
     <fieldset><legend>Related records / documents</legend>
       <p className="helper">Links keep their original permissions. Linking a private workflow record also restricts access here.</p>
