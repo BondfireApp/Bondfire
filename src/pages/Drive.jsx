@@ -16,6 +16,7 @@ import FormFileView from "../components/drive/FormFileView.jsx";
 import { renderTemplate } from "../components/drive/templateEngine.js";
 import { buildDriveSharePreparation, cacheDriveShareKey, resolveDriveShareKey } from "../lib/driveSharing.js";
 
+import { createDriveHistory, driveHistoryShortcut } from "../lib/driveHistory.js";
 import { publicDriveItem, publishDriveShare } from "../lib/drivePublicSharing.js";
 
 function upsertDriveItem(rows, item) {
@@ -422,6 +423,42 @@ export default function Drive() {
   const isStructuredDriveDoc = selectedFileSubtype === "sheet" || selectedFileSubtype === "form" || selectedFileSubtype === "drawio";
   const selectedAccessItem = selectedKind === "note" ? selectedNote : selectedFile;
   const canEditSelected = selectedAccessItem?.sharePermission !== "view";
+  const documentHistory = useRef(null);
+  if (!documentHistory.current) documentHistory.current = createDriveHistory();
+  const historyKey = selectedId ? `${orgId}:${selectedKind}:${selectedId}` : "";
+  const currentDocument = useRef(null);
+  currentDocument.current = { title, content };
+
+  function editDocument(field, value, group = null) {
+    if (!historyKey || !canEditSelected) return;
+    const current = currentDocument.current;
+    const next = { ...current, [field]: typeof value === "function" ? value(current[field]) : value };
+    documentHistory.current.record(historyKey, current, next, group);
+    currentDocument.current = next;
+    if (field === "title") setTitle(next.title);
+    else setContent(next.content);
+  }
+  const editContent = (value, group) => editDocument("content", value, group);
+  const editTitle = (value, group) => editDocument("title", value, group);
+
+  useEffect(() => {
+    const onHistoryKey = event => {
+      const direction = driveHistoryShortcut(event);
+      if (!direction || !historyKey || !canEditSelected || createModalOpen || shareTarget) return;
+      const target = event.target;
+      if (target?.closest?.("[data-drive-native-undo], [role=dialog]")) return;
+      if (!target?.closest?.("[data-drive-document-editor]") && target !== document.body) return;
+      event.preventDefault();
+      const next = documentHistory.current.move(historyKey, currentDocument.current, direction);
+      if (!next) return;
+      currentDocument.current = next;
+      setTitle(next.title);
+      setContent(next.content);
+    };
+    window.addEventListener("keydown", onHistoryKey);
+    return () => window.removeEventListener("keydown", onHistoryKey);
+  }, [historyKey, canEditSelected, createModalOpen, shareTarget]);
+
 
   const noteMap = useMemo(() => {
     const map = new Map();
@@ -1375,7 +1412,7 @@ export default function Drive() {
     const start = el.selectionStart || 0;
     const end = el.selectionEnd || 0;
     const selected = content.slice(start, end);
-    setContent(content.slice(0, start) + prefix + selected + suffix + content.slice(end));
+    editContent(content.slice(0, start) + prefix + selected + suffix + content.slice(end));
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(start + prefix.length, end + prefix.length);
@@ -1398,7 +1435,7 @@ export default function Drive() {
       return;
     }
     const insertion = `[${String(label).replace(/\n/g, " ")}](${url})`;
-    setContent(content.slice(0, start) + insertion + content.slice(end));
+    editContent(content.slice(0, start) + insertion + content.slice(end));
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(start + insertion.length, start + insertion.length);
@@ -1411,7 +1448,7 @@ export default function Drive() {
     const end = el.selectionEnd || 0;
     const selected = content.slice(start, end) || "";
     const nextSelected = selected.split("\n").map((line) => `${prefix}${line}`).join("\n");
-    setContent(content.slice(0, start) + nextSelected + content.slice(end));
+    editContent(content.slice(0, start) + nextSelected + content.slice(end));
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(start, start + nextSelected.length);
@@ -1421,7 +1458,7 @@ export default function Drive() {
     const el = editorRef.current;
     if (!el) return;
     const start = el.selectionStart || 0;
-    setContent(content.slice(0, start) + block + content.slice(start));
+    editContent(content.slice(0, start) + block + content.slice(start));
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(start + block.length, start + block.length);
@@ -1430,26 +1467,26 @@ export default function Drive() {
   function insertFrontmatterTemplate() {
     const parsed = parseFrontmatter(content);
     if (parsed.hasFrontmatter) return;
-    setContent(serializeFrontmatter([{ key: "type", value: "bit-log" }, { key: "date", value: "" }, { key: "status", value: "" }, { key: "tags", value: "" }], content));
+    editContent(serializeFrontmatter([{ key: "type", value: "bit-log" }, { key: "date", value: "" }, { key: "status", value: "" }, { key: "tags", value: "" }], content));
   }
   function updateFrontmatterProperty(key, value) {
     const parsed = parseFrontmatter(content);
-    setContent(serializeFrontmatter(parsed.properties.map((p) => (p.key === key ? { ...p, value } : p)), parsed.body));
+    editContent(serializeFrontmatter(parsed.properties.map((p) => (p.key === key ? { ...p, value } : p)), parsed.body));
   }
   function addFrontmatterProperty() {
     const parsed = parseFrontmatter(content);
     const key = prompt("Property name?");
     if (!key) return;
     if (!parsed.hasFrontmatter) {
-      setContent(serializeFrontmatter([{ key: String(key).trim(), value: "" }], content));
+      editContent(serializeFrontmatter([{ key: String(key).trim(), value: "" }], content));
       return;
     }
     if (parsed.properties.some((p) => p.key === String(key).trim())) return;
-    setContent(serializeFrontmatter([...parsed.properties, { key: String(key).trim(), value: "" }], parsed.body));
+    editContent(serializeFrontmatter([...parsed.properties, { key: String(key).trim(), value: "" }], parsed.body));
   }
   function removeFrontmatterProperty(key) {
     const parsed = parseFrontmatter(content);
-    setContent(serializeFrontmatter(parsed.properties.filter((p) => p.key !== key), parsed.body));
+    editContent(serializeFrontmatter(parsed.properties.filter((p) => p.key !== key), parsed.body));
   }
   async function saveCurrentAsTemplate() {
     if (!content) return;
@@ -1489,12 +1526,12 @@ export default function Drive() {
     const el = editorRef.current;
     const insertion = renderedBody || "";
     if (!el) {
-      setContent((prev) => `${prev}${prev ? "\n" : ""}${insertion}`);
+      editContent((prev) => `${prev}${prev ? "\n" : ""}${insertion}`);
       return;
     }
     const start = el.selectionStart || 0;
     const end = el.selectionEnd || 0;
-    setContent((prev) => prev.slice(0, start) + insertion + prev.slice(end));
+    editContent((prev) => prev.slice(0, start) + insertion + prev.slice(end));
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(start + insertion.length, start + insertion.length);
@@ -1909,7 +1946,7 @@ export default function Drive() {
           </>
         )}
 
-        <div style={{ minWidth: 0, overflow: "auto", padding: isMobile ? 8 : 8 }}>
+        <div data-drive-document-editor style={{ minWidth: 0, overflow: "auto", padding: isMobile ? 8 : 8 }}>
           <Breadcrumbs folders={folders} currentFolder={currentFolder} setCurrentFolder={setCurrentFolder} compact />
           {driveNotice ? (
             <div
@@ -1946,7 +1983,7 @@ export default function Drive() {
                 <input
                   className={isStructuredDriveDoc ? "bf-drive-titleInput is-structured" : "bf-drive-titleInput"}
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => editTitle(e.target.value, e.currentTarget)}
                   readOnly={!canEditSelected}
                   placeholder="Untitled"
                   style={{ flex: 1, minWidth: isMobile ? 120 : 220 }}
@@ -2002,13 +2039,13 @@ export default function Drive() {
                 {showEditor ? (
                   <div style={{ minWidth: 0 }}>
                     {selectedFileSubtype === "drawio" ? (
-                      <DrawioFileView key={selectedFile?.id || title} value={content} onChange={setContent} title={title} mode="edit" privateContent={!!selectedFile?.encrypted} />
+                      <DrawioFileView key={selectedFile?.id || title} value={content} onChange={editContent} title={title} mode="edit" privateContent={!!selectedFile?.encrypted} />
                     ) : selectedFileSubtype === "sheet" ? (
-                      <SpreadsheetFileView value={content} onChange={setContent} mode="edit" />
+                      <SpreadsheetFileView value={content} onChange={editContent} mode="edit" />
                     ) : selectedFileSubtype === "form" ? (
-                      <FormFileView value={content} onChange={setContent} mode="edit" fileId={selectedFile?.id || ""} orgId={orgId} saveStatus={status} onBeforePublicUse={flushSaveBeforePublicUse} />
+                      <FormFileView value={content} onChange={editContent} mode="edit" fileId={selectedFile?.id || ""} orgId={orgId} saveStatus={status} onBeforePublicUse={flushSaveBeforePublicUse} />
                     ) : (
-                      <NoteEditor value={content} onChange={setContent} focusMode={focusMode} editorRef={editorRef} compact />
+                      <NoteEditor value={content} onChange={(value) => editContent(value, editorRef.current)} focusMode={focusMode} editorRef={editorRef} compact />
                     )}
                   </div>
                 ) : null}
@@ -2020,7 +2057,7 @@ export default function Drive() {
                     ) : selectedFileSubtype === "sheet" ? (
                       <SpreadsheetFileView value={content} mode="preview" />
                     ) : selectedFileSubtype === "form" ? (
-                      <FormFileView value={content} onChange={setContent} mode="preview" fileId={selectedFile?.id || ""} orgId={orgId} />
+                      <FormFileView value={content} onChange={editContent} mode="preview" fileId={selectedFile?.id || ""} orgId={orgId} />
                     ) : selectedKind === "file" && !fileIsMarkdown ? (
                       <pre style={{ whiteSpace: "pre-wrap", margin: 0, background: "rgba(255,255,255,0.02)", border: "1px solid #1f1f1f", borderRadius: 12, padding: 12, minHeight: "72vh", overflow: "auto" }}>{String(content || "")}</pre>
                     ) : (

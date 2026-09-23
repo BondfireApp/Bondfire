@@ -709,7 +709,7 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
 
   const renameSheet = (sheetId, nextName) => {
     const trimmed = String(nextName || "").trim();
-    if (!trimmed) return;
+    if (!trimmed || doc.sheets.find((sheet) => sheet.id === sheetId)?.name === trimmed) return;
     commit({
       ...doc,
       sheets: doc.sheets.map((sheet) => (sheet.id === sheetId ? { ...sheet, name: trimmed } : sheet)),
@@ -743,11 +743,6 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
     const next = cellKey(nextRow, nextCol);
     setSelectedCell(next);
     setEditingCell(next);
-  };
-
-  const commitFormulaBar = () => {
-    if (readOnly) return;
-    setCellInput(selectedCell, formulaDraft);
   };
 
   const insertFunction = (item) => {
@@ -848,13 +843,12 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
           className="input bf-sheet-formulaInput"
           value={formulaDraft}
           disabled={readOnly}
-          onChange={(e) => setFormulaDraft(e.target.value)}
+          onChange={(e) => { setFormulaDraft(e.target.value); setCellInput(selectedCell, e.target.value); }}
           onFocus={() => setEditingCell(selectedCell)}
-          onBlur={commitFormulaBar}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              commitFormulaBar();
+              inputRefs.current[selectedCell]?.focus();
             }
           }}
           placeholder="Enter a value or formula"
@@ -991,6 +985,7 @@ export default function SpreadsheetFileView({ value, onChange, mode = "edit" }) 
                 <input
                   className="input"
                   autoFocus
+                  data-drive-native-undo
                   value={sheetNameDraft}
                   onChange={(e) => setSheetNameDraft(e.target.value)}
                   onBlur={() => {
