@@ -704,7 +704,7 @@ function applyCropDrag(resizeState, handle, dx, dy) {
 function StudioCroppedMedia({ el, common, src }) {
 	const frame = getContentFrame(el);
 	return (
-		<div style={{ ...common, left: frame.frameX, top: frame.frameY, width: frame.frameWidth, height: frame.frameHeight, overflow: "hidden", borderRadius: Number(el.radius || 0) }}>
+		<div data-studio-element-id={el.id} style={{ ...common, left: frame.frameX, top: frame.frameY, width: frame.frameWidth, height: frame.frameHeight, overflow: "hidden", borderRadius: Number(el.radius || 0) }}>
 			<div
 				style={{
 					position: "absolute",
@@ -1471,7 +1471,7 @@ async function fetchAndApplyRemoteStudioState({ queueIfBusy = true, forceApply =
 				}),
 			}));
 		}));
-	}, [currentDoc, commitDocs]);
+	}, [currentDoc, commitDocs, activePageIndex]);
 
 	const updateElement = React.useCallback((elementId, patchOrFn) => {
 		updateElements([elementId], patchOrFn);
@@ -2073,7 +2073,7 @@ const addImage = () => {
 			});
 			return [...next];
 		});
-	}, [currentDoc]);
+	}, [currentPage]);
 
 	const getEventClientPoint = (e) => {
 		const touch = e?.touches?.[0] || e?.changedTouches?.[0] || null;

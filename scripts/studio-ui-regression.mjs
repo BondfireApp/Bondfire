@@ -17,7 +17,7 @@ const source=native.createCanvas(4,2);source.getContext('2d').fillStyle='#ff0000
 const src=source.toDataURL();
 const image={id:'im',type:'image',name:'Transparent.png',src,x:10,y:10,width:40,height:20,mediaX:10,mediaY:10,mediaWidth:40,mediaHeight:20,fit:'contain',opacity:1};
 const page={id:'p1',width:200,height:120,background:'#00ff00',elements:[image],guides:[]};
-localStorage.setItem('bf_studio_docs_qa',JSON.stringify([{id:'doc',name:'Canvas test',pages:[page]}]));
+localStorage.setItem('bf_studio_docs_qa',JSON.stringify([{id:'doc',name:'Canvas test',pages:[page,{...page,id:'p2',elements:[{...image,id:'second-image'}]}]}]));
 const {createServer}=await import('vite');
 const vite=await createServer({root,configFile:false,plugins:[{name:'qa-api',enforce:'pre',transform(code,id){if(id.endsWith('/src/utils/api.js'))return 'export const api=async()=>({});';if(id.endsWith('/src/hooks/useStudioFonts.js'))return 'export const useStudioFonts=()=>({availableFonts:[],uploadedFonts:[],recentFonts:[],ensureFontLoaded:()=>{},markFontRecent:()=>{},fontStatus:""});';return code.replaceAll('import.meta?.env?.','import.meta.env.');}}],server:{middlewareMode:true},appType:'custom'});
 const React=await import('react');const {createRoot}=await import('react-dom/client');const {HashRouter,Routes,Route}=await import('react-router-dom');
@@ -81,7 +81,14 @@ try {
   assert.equal(saved().elements[1].width/saved().elements[1].height,2,'paste keeps natural ratio');
   app.unmount();await pause(20);
   const remount=createRoot(container);remount.render(el(HashRouter,null,el(Routes,null,el(Route,{path:'/org/:orgId/studio',element:el(Studio)}))));
-  await wait(()=>document.querySelectorAll('img[src^="data:image/png"]').length===2,'reload retains both image sources');
+  await wait(()=>document.querySelectorAll('img[src^="data:image/png"]').length===3,'reload retains both image sources');
+  await pause(100);
+  document.querySelector('[aria-label="Page 2"]').click(); await pause(25);
+  document.querySelector('[data-studio-element-id="second-image"]').parentElement.click();
+  await wait(()=>button('Inspector'),'page two selection');button('Inspector').click();await wait(()=>label('X'),'page two inspector');
+  edit(label('X'),'55');
+  await wait(()=>JSON.parse(localStorage.getItem('bf_studio_docs_qa'))[0].pages[1].elements[0].x===55,'page two edits target page two');
+  assert.equal(saved().elements[0].x,80,'page one unchanged by page two edit');
   remount.unmount();
   console.log('PASS: Studio native PNG alpha/scale/failure checks; Inspector undo/redo, image cleanup/restore, cropped positioning, external paste and reload persistence');
 } finally {try{app.unmount();}catch{}await vite.close();await win.happyDOM.abort();}
