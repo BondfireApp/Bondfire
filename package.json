@@ -10,7 +10,7 @@
     "test": "npm run test:public && npm run test:security && npm run test:product-reliability && npm run test:workflows",
     "test:public": "node scripts/public-surface-regression.mjs && node scripts/public-page-builder-regression.mjs",
     "test:security": "node scripts/auth-hardening-regression.mjs && node scripts/private-storage-regression.mjs && node scripts/private-key-scopes-regression.mjs && node scripts/device-approval-regression.mjs && node scripts/private-encryption-reset-regression.mjs && node scripts/private-org-maintenance-regression.mjs && node scripts/private-singleton-migration-regression.mjs && node scripts/private-submissions-regression.mjs && node scripts/drive-public-form-regression.mjs && node scripts/private-publication-regression.mjs && node scripts/private-colophon-regression.mjs && node scripts/private-studio-regression.mjs && node scripts/drive-sharing-regression.mjs && node scripts/drive-public-sharing-regression.mjs && node scripts/security-boundary-regression.mjs && node scripts/security-data-integrity-regression.mjs && node scripts/emergency-protocol-regression.mjs",
-    "test:product-reliability": "node scripts/product-reliability-regression.mjs && node scripts/drive-empty-state-regression.mjs && node scripts/drive-reliability-regression.mjs && node scripts/drive-history-regression.mjs && node scripts/studio-editor-regression.mjs",
+    "test:product-reliability": "node scripts/product-reliability-regression.mjs && node scripts/drive-empty-state-regression.mjs && node scripts/drive-reliability-regression.mjs && node scripts/drive-history-regression.mjs && node scripts/studio-editor-regression.mjs && node scripts/studio-media-regression.mjs",
     "smoke:thread1": "node scripts/thread1-emergency-smoke.mjs",
     "package:webapp": "node scripts/package-webapp.mjs",
     "desktop": "electron .",
@@ -26,7 +26,8 @@
     "desktop:dist:linux:arm64": "electron-builder --linux --arm64 --publish never",
     "test:workflows": "node scripts/workflow-regression.mjs",
     "test:drive:ui": "node scripts/drive-tree-ui-regression.mjs",
-    "test:workflows:ui": "node scripts/workflow-ui-regression.mjs"
+    "test:workflows:ui": "node scripts/workflow-ui-regression.mjs",
+    "test:studio:ui": "node scripts/studio-ui-regression.mjs"
   },
   "dependencies": {
     "colophon": "https://github.com/colophon-hub/colophon/archive/639561cd7a56d6c6d410767b43c0f0f4a28442eb.tar.gz",
@@ -46,7 +47,8 @@
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.14.5",
     "vite": "^8.3.0",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "@napi-rs/canvas": "^0.1.100"
   },
   "overrides": {
     "colophon": {

@@ -1,4 +1,6 @@
 import React from "react";
+import StudioImageEditor from "../studio/StudioImageEditor.jsx";
+import { imagePlacement, imageDrawRect, loadStudioImage, readImageFile, positionStudioElements } from "../studio/studioMedia.js";
 import { useParams } from "react-router-dom";
 import { api } from "../utils/api.js";
 import { STUDIO_ASSETS } from "../data/studioAssets.js";
@@ -104,7 +106,7 @@ function readStudioSyncMeta(orgId) {
 
 function saveStudioSyncMeta(orgId, meta) {
 	if (!orgId) return;
-	localStorage.setItem(studioSyncMetaKey(orgId), JSON.stringify(normalizeStudioSyncMeta(meta)));
+	try { localStorage.setItem(studioSyncMetaKey(orgId), JSON.stringify(normalizeStudioSyncMeta(meta))); } catch { /* The document save surfaces storage exhaustion. */ }
 }
 
 function uid() {
@@ -290,7 +292,8 @@ function readDocs(orgId) {
 }
 
 function saveDocs(orgId, docs) {
-	localStorage.setItem(storageKey(orgId), JSON.stringify(normalizeDocs(docs)));
+	try { localStorage.setItem(storageKey(orgId), JSON.stringify(normalizeDocs(docs))); return true; }
+	catch { return false; }
 }
 
 function readBlocks(orgId) {
@@ -502,15 +505,7 @@ function iconButtonStyle(active) {
 }
 
 
-async function loadImageData(src) {
-	return await new Promise((resolve, reject) => {
-		const img = new Image();
-		img.crossOrigin = "anonymous";
-		img.onload = () => resolve(img);
-		img.onerror = reject;
-		img.src = src;
-	});
-}
+const loadImageData = loadStudioImage;
 
 function roundRectPath(ctx, x, y, width, height, radius) {
 	const r = Math.max(0, Math.min(radius || 0, width / 2, height / 2));
@@ -523,15 +518,8 @@ function roundRectPath(ctx, x, y, width, height, radius) {
 	ctx.closePath();
 }
 
-function drawImageCover(ctx, img, x, y, width, height) {
-	const iw = Math.max(1, Number(img?.naturalWidth || img?.width || 1));
-	const ih = Math.max(1, Number(img?.naturalHeight || img?.height || 1));
-	const scale = Math.max(width / iw, height / ih);
-	const drawWidth = iw * scale;
-	const drawHeight = ih * scale;
-	const drawX = x + (width - drawWidth) / 2;
-	const drawY = y + (height - drawHeight) / 2;
-	ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+function drawImageCover(ctx, img, x, y, width, height, fit = "cover") {
+	ctx.drawImage(img, ...imageDrawRect(img.naturalWidth || img.width, img.naturalHeight || img.height, x, y, width, height, fit));
 }
 
 function svgMarkupToDataUrl(svg, fill = "#111111") {
@@ -716,7 +704,7 @@ function applyCropDrag(resizeState, handle, dx, dy) {
 function StudioCroppedMedia({ el, common, src }) {
 	const frame = getContentFrame(el);
 	return (
-		<div style={{ ...common, left: frame.frameX, top: frame.frameY, width: frame.frameWidth, height: frame.frameHeight, overflow: "hidden", borderRadius: 12 }}>
+		<div style={{ ...common, left: frame.frameX, top: frame.frameY, width: frame.frameWidth, height: frame.frameHeight, overflow: "hidden", borderRadius: Number(el.radius || 0) }}>
 			<div
 				style={{
 					position: "absolute",
@@ -738,7 +726,7 @@ function StudioCroppedMedia({ el, common, src }) {
 						height: "100%",
 						maxWidth: "none",
 						maxHeight: "none",
-						objectFit: "cover",
+						objectFit: el.fit || "cover",
 						pointerEvents: "none",
 						userSelect: "none",
 					}}
@@ -748,13 +736,19 @@ function StudioCroppedMedia({ el, common, src }) {
 	);
 }
 
-async function renderDocToCanvas(doc, bindings) {
+export async function renderDocToCanvas(doc, bindings, { transparent = false, scale = 1 } = {}) {
+	await Promise.all((doc.elements || []).filter(el => el.type === "text" && !el.hidden).map(el => document.fonts?.load(`${el.fontStyle || "normal"} ${el.fontWeight || 700} ${el.fontSize || 36}px "${String(el.fontFamily || FALLBACK_FONT).replaceAll('"', '')}"`)));
+	await document.fonts?.ready;
+	if (doc.width * doc.height * scale * scale > 32000000) throw new Error("Export exceeds 32 megapixels. Choose a smaller size.");
 	const canvas = document.createElement("canvas");
-	canvas.width = doc.width;
-	canvas.height = doc.height;
+	canvas.width = Math.round(doc.width * scale);
+	canvas.height = Math.round(doc.height * scale);
 	const ctx = canvas.getContext("2d");
-	ctx.fillStyle = doc.background || "#ffffff";
-	ctx.fillRect(0, 0, canvas.width, canvas.height);
+	ctx.scale(scale, scale);
+	if (!transparent) {
+		ctx.fillStyle = doc.background === "transparent" ? "#ffffff" : doc.background || "#ffffff";
+		ctx.fillRect(0, 0, doc.width, doc.height);
+	}
 	for (const el of doc.elements || []) {
 		if (el.hidden) continue;
 		const bounds = getElementBounds(el);
@@ -780,27 +774,37 @@ async function renderDocToCanvas(doc, bindings) {
 				const img = await loadImageData(svgMarkupToDataUrl(el.svg, el.fill));
 				const frame = getContentFrame(el);
 				ctx.save();
-				roundRectPath(ctx, 0, 0, frame.frameWidth, frame.frameHeight, 12);
+				roundRectPath(ctx, 0, 0, frame.frameWidth, frame.frameHeight, Number(el.radius || 0));
 				ctx.clip();
-				drawImageCover(ctx, img, frame.offsetX, frame.offsetY, frame.contentWidth, frame.contentHeight);
+				drawImageCover(ctx, img, frame.offsetX, frame.offsetY, frame.contentWidth, frame.contentHeight, el.fit || "cover");
 				ctx.restore();
-			} catch {}
+			} catch (error) { throw new Error(`Could not export "${el.name || "Image"}": ${error.message}`); }
 		} else if (el.type === "image" && el.src) {
 			try {
 				const img = await loadImageData(el.src);
 				const frame = getContentFrame(el);
 				ctx.save();
-				roundRectPath(ctx, 0, 0, frame.frameWidth, frame.frameHeight, 12);
+				roundRectPath(ctx, 0, 0, frame.frameWidth, frame.frameHeight, Number(el.radius || 0));
 				ctx.clip();
-				drawImageCover(ctx, img, frame.offsetX, frame.offsetY, frame.contentWidth, frame.contentHeight);
+				drawImageCover(ctx, img, frame.offsetX, frame.offsetY, frame.contentWidth, frame.contentHeight, el.fit || "cover");
 				ctx.restore();
-			} catch {}
+			} catch (error) { throw new Error(`Could not export "${el.name || "Image"}": ${error.message}`); }
 		} else if (el.type === "text") {
 			const text = applyBindings(el.text || "", bindings);
 			ctx.fillStyle = el.color || "#fff";
 			ctx.textBaseline = "top";
-			ctx.font = `${Number(el.fontWeight || 700)} ${Number(el.fontSize || 36)}px ${el.fontFamily || FALLBACK_FONT}`;
-			const lines = String(text).split("\n");
+			ctx.font = `${el.fontStyle || "normal"} ${Number(el.fontWeight || 700)} ${Number(el.fontSize || 36)}px ${el.fontFamily || FALLBACK_FONT}`;
+			ctx.letterSpacing = `${Number(el.letterSpacing || 0)}px`;
+			const lines = [];
+			for (const paragraph of String(text).split("\n")) {
+				let line = "";
+				for (const word of paragraph.split(/(\s+)/)) {
+					if (line && ctx.measureText(line + word).width > bounds.width) { lines.push(line); line = ""; }
+					line += word;
+				}
+				lines.push(line);
+			}
+			ctx.beginPath(); ctx.rect(0, 0, bounds.width, bounds.height); ctx.clip();
 			const lineHeight = Number(el.fontSize || 36) * Number(el.lineHeight || 1.1);
 			for (let i = 0; i < lines.length; i += 1) {
 				const line = lines[i];
@@ -809,6 +813,7 @@ async function renderDocToCanvas(doc, bindings) {
 				if (el.align === "center") x = (Number(el.width || 0) - metrics.width) / 2;
 				if (el.align === "right") x = Number(el.width || 0) - metrics.width;
 				ctx.fillText(line, x, i * lineHeight);
+				if (el.textDecoration === "underline") ctx.fillRect(x, i * lineHeight + Number(el.fontSize || 36), metrics.width, Math.max(1, Number(el.fontSize || 36) / 18));
 			}
 		}
 		ctx.restore();
@@ -823,10 +828,20 @@ export default function Studio() {
 	const pageShellRefs = React.useRef(new Map());
 	const fileInputRef = React.useRef(null);
 	const fontUploadRef = React.useRef(null);
+	const replaceImageRef = React.useRef(null);
+	const lastPropertyEdit = React.useRef(null);
+	const [imageEditor, setImageEditor] = React.useState(null);
+	const [imageNotice, setImageNotice] = React.useState("");
+	const [exportTransparent, setExportTransparent] = React.useState(false);
+	const [exportScale, setExportScale] = React.useState(1);
+	const [exportBusy, setExportBusy] = React.useState(false);
 	const dragPayloadRef = React.useRef(null);
 	const suppressCanvasClickRef = React.useRef(false);
 
 	const [docs, setDocs] = React.useState(() => readDocs(orgId));
+	const docsRef = React.useRef(docs);
+	docsRef.current = docs;
+	const [localSaveError, setLocalSaveError] = React.useState(false);
 	const [currentId, setCurrentId] = React.useState(() => readDocs(orgId)[0]?.id || null);
 	const [activePageIndex, setActivePageIndex] = React.useState(0);
 	const [selectedIds, setSelectedIds] = React.useState([]);
@@ -839,6 +854,8 @@ export default function Studio() {
 	const [fileMenuOpen, setFileMenuOpen] = React.useState(false);
 	const [exportMenuOpen, setExportMenuOpen] = React.useState(false);
 	const [clipboard, setClipboard] = React.useState([]);
+	const clipboardRef = React.useRef(clipboard);
+	clipboardRef.current = clipboard;
 	const [contextMenu, setContextMenu] = React.useState(null);
 	const [selectedGuideId, setSelectedGuideId] = React.useState(null);
 	const [inspectorOpen, setInspectorOpen] = React.useState(false);
@@ -1000,6 +1017,10 @@ try {
 			guides: currentDoc.guides || [],
 		})];
 	}, [currentDoc]);
+	React.useEffect(() => {
+		if (textEditId) [...document.querySelectorAll("[data-studio-text-id]")].find(node => node.dataset.studioTextId === textEditId)?.focus();
+	}, [textEditId]);
+
 	const currentPage = React.useMemo(() => {
 		if (!currentPages.length) return null;
 		return currentPages[Math.max(0, Math.min(activePageIndex, currentPages.length - 1))] || currentPages[0] || null;
@@ -1027,8 +1048,10 @@ try {
 		markStudioLocalEdit();
 		setDocs((prev) => {
 			const next = normalizeDocs(typeof updater === "function" ? updater(prev) : updater);
-			saveDocs(orgId, next);
-			setSavedAt(Date.now());
+			const saved = saveDocs(orgId, next);
+			setLocalSaveError(!saved);
+			if (saved) setSavedAt(Date.now());
+			docsRef.current = next;
 			return next;
 		});
 	}, [orgId, markStudioLocalEdit]);
@@ -1321,12 +1344,15 @@ async function fetchAndApplyRemoteStudioState({ queueIfBusy = true, forceApply =
 }
 
 	const snapshot = React.useCallback(() => {
-		setHistory((prev) => [...prev, clone(docs)]);
+		lastPropertyEdit.current = null;
+		const savedSnapshot = clone(docsRef.current);
+		setHistory((prev) => [...prev.slice(-49), savedSnapshot]);
 		setFuture([]);
-	}, [docs]);
+	}, []);
 
 	const ensureDoc = React.useCallback((preset = "flyer") => {
 		if (currentDoc) return currentDoc.id;
+		if (docsRef.current.length) return docsRef.current[0].id;
 		const doc = makeDoc(preset);
 		const next = normalizeDocs([doc]);
 		commitDocs(next);
@@ -1428,7 +1454,19 @@ async function fetchAndApplyRemoteStudioState({ queueIfBusy = true, forceApply =
 				...page,
 				elements: (page.elements || []).map((el) => {
 					if (!idSet.has(el.id)) return el;
-					const patch = typeof patchOrFn === "function" ? patchOrFn(el) : patchOrFn;
+					const patch = { ...(typeof patchOrFn === "function" ? patchOrFn(el) : patchOrFn) };
+					if (patch.width !== undefined) patch.width = Math.max(1, Number(patch.width) || 1);
+					if (patch.height !== undefined) patch.height = Math.max(1, Number(patch.height) || 1);
+					if (patch.opacity !== undefined) patch.opacity = clamp(Number(patch.opacity) || 0, 0, 1);
+					if (isCropCapableElement(el)) {
+						const frame = getMediaFrame(el);
+						const sx = patch.width !== undefined ? Math.max(1, patch.width) / el.width : 1;
+						const sy = patch.height !== undefined ? Math.max(1, patch.height) / el.height : 1;
+						if (patch.mediaX === undefined) patch.mediaX = (patch.x ?? el.x) + (frame.mediaX - el.x) * sx;
+						if (patch.mediaY === undefined) patch.mediaY = (patch.y ?? el.y) + (frame.mediaY - el.y) * sy;
+						if (patch.mediaWidth === undefined) patch.mediaWidth = frame.mediaWidth * sx;
+						if (patch.mediaHeight === undefined) patch.mediaHeight = frame.mediaHeight * sy;
+					}
 					return { ...el, ...patch };
 				}),
 			}));
@@ -1438,6 +1476,29 @@ async function fetchAndApplyRemoteStudioState({ queueIfBusy = true, forceApply =
 	const updateElement = React.useCallback((elementId, patchOrFn) => {
 		updateElements([elementId], patchOrFn);
 	}, [updateElements]);
+
+	const propertySnapshot = (key) => {
+		const previous = lastPropertyEdit.current;
+		if (!previous || previous.key !== key || Date.now() - previous.time > 750 || future.length) snapshot();
+		lastPropertyEdit.current = { key, time: Date.now() };
+	};
+	const editElement = (id, patch) => {
+		const element = currentPage?.elements.find(el => el.id === id);
+		if (element?.locked) return;
+		if (isCropCapableElement(element) && element.lockAspect !== false) {
+			if (patch.width !== undefined && patch.height === undefined) patch = { ...patch, width: Math.max(1, patch.width), height: Math.max(1, patch.width) * element.height / element.width };
+			if (patch.height !== undefined && patch.width === undefined) patch = { ...patch, height: Math.max(1, patch.height), width: Math.max(1, patch.height) * element.width / element.height };
+		}
+		propertySnapshot(`${currentId}:${id}:${Object.keys(patch).join()}`);
+		updateElement(id, patch);
+	};
+	const editElements = (ids, patch) => { propertySnapshot(`${currentId}:${ids.join()}:${typeof patch === "function" ? "action" : Object.keys(patch).join()}`); updateElements(ids.filter(id => !currentPage?.elements.find(el => el.id === id)?.locked), patch); };
+	const editPage = patch => { propertySnapshot(`${currentId}:page:${activePageIndex}:${Object.keys(patch).join()}`); updatePage(patch); };
+	const positionSelection = action => {
+		if (!currentPage) return;
+		snapshot();
+		updatePage({ elements: positionStudioElements(currentPage.elements, selectedIds, action, currentPage) });
+	};
 
 	const addText = () => {
 		const docId = ensureDoc("flyer");
@@ -1457,14 +1518,19 @@ async function fetchAndApplyRemoteStudioState({ queueIfBusy = true, forceApply =
 		setSelectedIds([element.id]);
 	};
 
-	const addImageFromSrc = React.useCallback((src, name = "Image") => {
+	const importStudioImage = async (src, name = "Image", point, pageIndex = activePageIndex, replaceId = null) => {
 		const docId = ensureDoc(currentDoc?.preset || "flyer");
-		snapshot();
-		const element = makeImageElement({ src, name, mediaX: 140, mediaY: 140, mediaWidth: 320, mediaHeight: 240 });
-		commitDocs((prev) => prev.map((doc) => doc.id !== docId ? doc : commitToActivePage(doc, (page) => ({ ...page, elements: [...(Array.isArray(page.elements) ? page.elements : []), element] }))));
-		setCurrentId(docId);
-		setSelectedIds([element.id]);
-	}, [ensureDoc, currentDoc, snapshot, commitDocs]);
+		const page = currentPages[pageIndex] || PRESETS.flyer;
+		try {
+			const img = await loadImageData(src);
+			const element = makeImageElement({ src, name, fit: "contain", sourceWidth: img.naturalWidth, sourceHeight: img.naturalHeight, ...imagePlacement(img.naturalWidth, img.naturalHeight, page.width, page.height, point) });
+			snapshot();
+			commitDocs(prev => prev.map(doc => doc.id !== docId ? doc : updateStudioPage(doc, pageIndex, page => ({ ...page, elements: replaceId ? page.elements.map(el => el.id === replaceId ? { ...el, src, originalSrc: undefined, name, sourceWidth: img.naturalWidth, sourceHeight: img.naturalHeight } : el) : [...(page.elements || []), element] }))));
+			setCurrentId(docId); setActivePageIndex(pageIndex); setSelectedIds([replaceId || element.id]); setInspectorOpen(true);
+			setImageNotice(/\.jpe?g$/i.test(name) || src.startsWith("data:image/jpeg") ? "JPG images have no transparency. If the background is a checkerboard, select Edit image to remove those pixels, or upload the original transparent PNG." : "Image added at its original proportions. Transparent pixels are preserved.");
+		} catch (error) { setImageNotice(error.message); }
+	};
+	const addImageFromSrc = (src, name) => importStudioImage(src, name);
 
 	
 	const addSvgAsset = (asset) => {
@@ -1480,26 +1546,7 @@ async function fetchAndApplyRemoteStudioState({ queueIfBusy = true, forceApply =
 		setSelectedIds([element.id]);
 	};
 
-	const placeImageAtPoint = React.useCallback((src, name, point, pageIndex = activePageIndex) => {
-		const docId = ensureDoc(currentDoc?.preset || "flyer");
-		snapshot();
-		const element = makeImageElement({
-			src,
-			name: name || "Image",
-			x: Math.max(0, Number(point?.x || 0) - 160),
-			y: Math.max(0, Number(point?.y || 0) - 120),
-			mediaX: Math.max(0, Number(point?.x || 0) - 160),
-			mediaY: Math.max(0, Number(point?.y || 0) - 120),
-			mediaWidth: 320,
-			mediaHeight: 240,
-		});
-		commitDocs((prev) => prev.map((doc) => doc.id !== docId ? doc : updateStudioPage(doc, pageIndex, (page) => ({
-			...page,
-			elements: [...(Array.isArray(page.elements) ? page.elements : []), element],
-		}))));
-		setCurrentId(docId);
-		setSelectedIds([element.id]);
-	}, [ensureDoc, currentDoc, snapshot, commitDocs, activePageIndex]);
+	const placeImageAtPoint = (src, name, point, pageIndex = activePageIndex) => importStudioImage(src, name, point, pageIndex);
 
 	const placeSvgAtPoint = React.useCallback((asset, point, pageIndex = activePageIndex) => {
 		if (!asset?.svg) return;
@@ -1580,13 +1627,20 @@ const addImage = () => {
 		fileInputRef.current?.click();
 	};
 
-	const onUploadImage = (e) => {
-		const file = e.target.files?.[0];
-		if (!file) return;
-		const reader = new FileReader();
-		reader.onload = () => addImageFromSrc(String(reader.result || ""), file.name || "Image");
-		reader.readAsDataURL(file);
+	const onUploadImage = async (e) => {
+		const files = Array.from(e.target.files || []);
 		e.target.value = "";
+		for (const file of files) {
+			try { await addImageFromSrc(await readImageFile(file), file.name); }
+			catch (error) { setImageNotice(error.message); }
+		}
+	};
+	const onReplaceImage = async e => {
+		const file = e.target.files?.[0], id = selected?.id;
+		e.target.value = "";
+		if (!file || !id) return;
+		try { await importStudioImage(await readImageFile(file), file.name, null, activePageIndex, id); }
+		catch (error) { setImageNotice(error.message); }
 	};
 
 	const onUploadFont = async (e) => {
@@ -1634,8 +1688,8 @@ const addImage = () => {
 	const removeSelected = () => {
 		if (!currentDoc || !selectedIds.length) return;
 		snapshot();
-		const selectedSet = new Set(selectedIds);
-		commitDocs((prev) => prev.map((doc) => doc.id !== currentDoc.id ? doc : commitToActivePage(doc, (page) => ({ ...page, elements: (page.elements || []).filter((el) => !selectedSet.has(el.id)) }))));
+		const selectedSet = new Set((currentPage?.elements || []).filter(el => selectedIds.includes(el.id) && !el.locked).map(el => el.id));
+		commitDocs((prev) => prev.map((doc) => doc.id !== currentDoc.id ? doc : commitToActivePage(doc, (page) => ({ ...page, elements: (page.elements || []).filter((el) => el.locked || !selectedSet.has(el.id)) }))));
 		setSelectedIds([]);
 	};
 
@@ -1652,9 +1706,11 @@ const addImage = () => {
 		if (!currentDoc || !selectedIds.length) return;
 		const copied = (currentPage?.elements || []).filter((el) => selectedIds.includes(el.id)).map((el) => clone(el));
 		setClipboard(copied);
+		navigator.clipboard?.writeText(`bondfire-studio:${JSON.stringify(copied)}`).catch(() => {});
 	};
 
-	const pasteClipboard = () => {
+	const pasteClipboard = (source) => {
+		const clipboard = Array.isArray(source) ? source : clipboardRef.current;
 		if (!currentDoc || !Array.isArray(clipboard) || !clipboard.length || !clipboard.every((item) => item && typeof item === "object" && !Array.isArray(item))) return;
 		snapshot();
 		const pasted = withNewIds(clipboard).map((el) => ({
@@ -1674,9 +1730,12 @@ const addImage = () => {
 	const moveLayer = (dir) => {
 		if (!currentDoc || !selectedIds.length) return;
 		snapshot();
-		const selectedSet = new Set(selectedIds);
+		const selectedSet = new Set((currentPage?.elements || []).filter(el => selectedIds.includes(el.id) && !el.locked).map(el => el.id));
 		const elements = (currentPage?.elements || []).slice();
-		if (dir === "up") {
+		if (dir === "front" || dir === "back") {
+			const chosen = elements.filter(el => selectedSet.has(el.id)), rest = elements.filter(el => !selectedSet.has(el.id));
+			elements.splice(0, elements.length, ...(dir === "front" ? [...rest, ...chosen] : [...chosen, ...rest]));
+		} else if (dir === "up") {
 			for (let i = elements.length - 2; i >= 0; i -= 1) {
 				if (selectedSet.has(elements[i].id) && !selectedSet.has(elements[i + 1].id)) {
 					[elements[i], elements[i + 1]] = [elements[i + 1], elements[i]];
@@ -1905,6 +1964,7 @@ const addImage = () => {
 	};
 
 	const undo = () => {
+		lastPropertyEdit.current = null;
 		setHistory((prev) => {
 			if (!prev.length) return prev;
 			const last = prev[prev.length - 1];
@@ -1919,6 +1979,7 @@ const addImage = () => {
 	};
 
 	const redo = () => {
+		lastPropertyEdit.current = null;
 		setFuture((prev) => {
 			if (!prev.length) return prev;
 			const [first, ...rest] = prev;
@@ -1934,19 +1995,20 @@ const addImage = () => {
 
 	React.useEffect(() => {
 		const onKeyDown = (e) => {
+			if (e.defaultPrevented || e.isComposing || e.target.closest?.("[role=dialog]")) return;
 			const tag = document.activeElement?.tagName?.toLowerCase();
 			const isTyping = tag === "input" || tag === "textarea" || document.activeElement?.contentEditable === "true";
 			if (e.code === "Space" && !isTyping) {
 				e.preventDefault();
 				setSpacePan(true);
 			}
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !isTyping) {
 				e.preventDefault();
 				if (e.shiftKey) redo();
 				else undo();
 				return;
 			}
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y" && !isTyping) {
 				e.preventDefault();
 				redo();
 				return;
@@ -1956,20 +2018,9 @@ const addImage = () => {
 				duplicateSelected();
 				return;
 			}
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && selectedIds.length && !isTyping) {
-				e.preventDefault();
-				copySelected();
-				return;
-			}
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x" && selectedIds.length && !isTyping) {
-				e.preventDefault();
-				cutSelected();
-				return;
-			}
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v" && clipboard.length && !isTyping) {
-				e.preventDefault();
-				pasteClipboard();
-				return;
+
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a" && !isTyping) {
+				e.preventDefault(); setSelectedIds((currentPage?.elements || []).filter(el => !el.hidden && !el.locked).map(el => el.id)); return;
 			}
 			if ((e.key === "Delete" || e.key === "Backspace") && !isTyping) {
 				if (selectedGuideId) {
@@ -2266,6 +2317,14 @@ const addImage = () => {
 						nextY = resizeState.y + dy;
 						nextHeight = resizeState.height - dy;
 					}
+					if (isCropCapableElement(el) && el.lockAspect !== false && !e.shiftKey && handle.length === 2) {
+						const anchorX = resizeState.x + (handle.includes("w") ? resizeState.width : 0);
+						const anchorY = resizeState.y + (handle.includes("n") ? resizeState.height : 0);
+						const maxScale = Math.min((handle.includes("w") ? anchorX : currentPage.width - anchorX) / resizeState.width, (handle.includes("n") ? anchorY : currentPage.height - anchorY) / resizeState.height);
+						const scale = clamp(Math.abs(dx) >= Math.abs(dy) ? nextWidth / resizeState.width : nextHeight / resizeState.height, Math.max(24 / resizeState.width, 24 / resizeState.height), maxScale);
+						nextWidth = resizeState.width * scale; nextHeight = resizeState.height * scale;
+						nextX = anchorX - (handle.includes("w") ? nextWidth : 0); nextY = anchorY - (handle.includes("n") ? nextHeight : 0);
+					}
 					const minW = 24;
 					const minH = 24;
 					if (nextWidth < minW) {
@@ -2432,16 +2491,38 @@ const addImage = () => {
 				}
 			} catch {}
 		}
-		const file = e.dataTransfer?.files?.[0];
-		if (file && String(file.type || "").startsWith("image/")) {
-			const reader = new FileReader();
-			reader.onload = () => {
-				placeImageAtPoint(String(reader.result || ""), file.name || "Image", point, targetPageIndex);
-			};
-			reader.readAsDataURL(file);
+		for (const file of Array.from(e.dataTransfer?.files || [])) {
+			if (!String(file.type).startsWith("image/")) continue;
+			readImageFile(file).then(src => placeImageAtPoint(src, file.name, point, targetPageIndex)).catch(error => setImageNotice(error.message));
 		}
 		dragPayloadRef.current = null;
 	};
+
+	const onStudioPaste = e => {
+		if (!currentDoc || e.target.closest?.("input, textarea, [contenteditable=true], [role=dialog]")) return;
+		const images = Array.from(e.clipboardData?.files || []).filter(file => file.type.startsWith("image/"));
+		const text = e.clipboardData?.getData("text/plain") || "";
+		if (images.length) {
+			e.preventDefault();
+			for (const file of images) readImageFile(file).then(src => addImageFromSrc(src, file.name || "Pasted image")).catch(error => setImageNotice(error.message));
+		} else if (text.startsWith("bondfire-studio:")) {
+			try { const items = JSON.parse(text.slice("bondfire-studio:".length)); if (Array.isArray(items) && items.length <= 500 && items.every(el => ["text", "image", "svg", "shape"].includes(el?.type))) { e.preventDefault(); pasteClipboard(items); } } catch { setImageNotice("This copied selection could not be pasted."); }
+		} else if (text.trim()) {
+			e.preventDefault(); snapshot();
+			const element = makeTextElement({ text: text.slice(0, 20000), name: "Pasted text" });
+			updatePage({ elements: [...currentPage.elements, element] }); setSelectedIds([element.id]);
+		} else if (clipboard.length) { e.preventDefault(); pasteClipboard(); }
+	};
+	React.useEffect(() => {
+		const onCopyCut = e => {
+			if (!currentDoc || !selectedIds.length || e.target.closest?.("input, textarea, [contenteditable=true], [role=dialog]")) return;
+			const copied = selectedElements.map(el => clone(el));
+			e.preventDefault(); e.clipboardData.setData("text/plain", `bondfire-studio:${JSON.stringify(copied)}`); setClipboard(copied);
+			if (e.type === "cut") removeSelected();
+		};
+		window.addEventListener("copy", onCopyCut); window.addEventListener("cut", onCopyCut); window.addEventListener("paste", onStudioPaste);
+		return () => { window.removeEventListener("copy", onCopyCut); window.removeEventListener("cut", onCopyCut); window.removeEventListener("paste", onStudioPaste); };
+	});
 
 	const onWorkspaceDragOver = (e) => {
 		e.preventDefault();
@@ -2524,16 +2605,23 @@ const addImage = () => {
 		downloadBlob(`${printableName(currentDoc.name)}.json`, new Blob([JSON.stringify(normalizeDoc(currentDoc), null, 2)], { type: "application/json" }));
 	};
 
-	const exportPng = async () => {
-		if (!currentDoc || !currentPage) return;
-		const pageDoc = normalizeDoc({ ...currentDoc, pages: [clone(currentPage)], width: currentPage.width, height: currentPage.height, background: currentPage.background, elements: currentPage.elements || [], guides: currentPage.guides || [] });
-		const canvas = await renderDocToCanvas(pageDoc, bindings);
-		canvas.toBlob((png) => {
-			if (png) downloadBlob(`${printableName(currentDoc.name)}-page-${activePageIndex + 1}.png`, png);
-		}, "image/png");
+	const exportRaster = async (type = "image/png") => {
+		if (!currentDoc || !currentPage || exportBusy) return;
+		setExportBusy(true); setImageNotice("");
+		try {
+			await Promise.all((currentPage.elements || []).filter(el => el.type === "text").map(el => ensureFontLoaded(el.fontFamily || FALLBACK_FONT)));
+			const canvas = await renderDocToCanvas(currentPage, bindings, { transparent: type === "image/png" && (exportTransparent || currentPage.background === "transparent"), scale: exportScale });
+			const blob = await new Promise(resolve => canvas.toBlob(resolve, type, .95));
+			if (!blob) throw new Error("The browser could not generate this export.");
+			downloadBlob(`${printableName(currentDoc.name)}-page-${activePageIndex + 1}.${type === "image/png" ? "png" : "jpg"}`, blob);
+		} catch (error) { setImageNotice(`Export failed: ${error.message}`); }
+		finally { setExportBusy(false); }
 	};
+	const exportPng = () => exportRaster();
 
 	const exportPdf = async () => {
+		try {
+		await Promise.all((currentPages.flatMap(page => page.elements || [])).filter(el => el.type === "text").map(el => ensureFontLoaded(el.fontFamily || FALLBACK_FONT)));
 		if (!currentDoc || !currentPages.length) return;
 		const pageDataUrls = [];
 		for (const page of currentPages) {
@@ -2553,13 +2641,14 @@ const addImage = () => {
 		const doc = frame.contentWindow?.document;
 		if (!doc) return;
 		doc.open();
-		doc.write(`<!doctype html><html><head><title>${currentDoc.name || "Design"}</title><style>html,body{margin:0;padding:0;background:#fff;} .page-break{break-after:page;page-break-after:always;} img{display:block;width:100%;height:auto;} @page{size:auto;margin:0;}</style></head><body>${pageDataUrls.map((item, index) => `<div class="${index < pageDataUrls.length - 1 ? "page-break" : ""}"><img src="${item.url}" alt="" /></div>`).join("")}</body></html>`);
+		doc.write(`<!doctype html><html><head><title>Studio design</title><style>html,body{margin:0;padding:0;background:#fff;} .page-break{break-after:page;page-break-after:always;} img{display:block;width:100%;height:auto;} @page{size:auto;margin:0;}</style></head><body>${pageDataUrls.map((item, index) => `<div class="${index < pageDataUrls.length - 1 ? "page-break" : ""}"><img src="${item.url}" alt="" /></div>`).join("")}</body></html>`);
 		doc.close();
 		setTimeout(() => {
 			frame.contentWindow?.focus();
 			frame.contentWindow?.print();
 			setTimeout(() => frame.remove(), 1500);
 		}, 150);
+		} catch (error) { setImageNotice(`Export failed: ${error.message}`); }
 	};
 
 	React.useEffect(() => {
@@ -2693,7 +2782,7 @@ React.useEffect(() => {
 
 	return (
 
-		<div className="bfStudioRoot" style={{ padding: 8, display: "grid", gap: 8 }}>
+		<div className="bfStudioRoot" style={{ color: "#f9fafb", padding: 8, display: "grid", gap: 8 }}>
 			<style>{`
 				.bfStudioRoot button:focus-visible, .bfStudioRoot input:focus-visible, .bfStudioRoot textarea:focus-visible, .bfStudioRoot select:focus-visible, .bfStudioRoot [role="button"]:focus-visible { outline: 2px solid #f87171; outline-offset: 2px; }
 				.bfStudioOpacitySlider {
@@ -2732,7 +2821,8 @@ React.useEffect(() => {
 					box-shadow: 0 1px 4px rgba(0,0,0,0.3);
 				}
 			`}</style>
-			<input ref={fileInputRef} type="file" accept="image/*" onChange={onUploadImage} style={{ display: "none" }} />
+			<input ref={fileInputRef} type="file" accept="image/*" multiple onChange={onUploadImage} style={{ display: "none" }} />
+			<input ref={replaceImageRef} type="file" accept="image/*" onChange={onReplaceImage} style={{ display: "none" }} />
 			<input ref={fontUploadRef} type="file" accept=".woff2,.woff,.ttf,.otf,font/woff2,font/woff,font/ttf,font/otf,application/font-woff,application/x-font-ttf,application/x-font-otf" onChange={onUploadFont} style={{ display: "none" }} />
 
 			<div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "space-between", flexWrap: "nowrap" }}>
@@ -2740,14 +2830,15 @@ React.useEffect(() => {
 					<img src="/logos/studio.svg" alt="" aria-hidden="true" style={{ width: 34, height: 34, borderRadius: 9, flex: "0 0 auto" }} />
 					<button aria-label="Studio file menu" style={{ padding: "6px 8px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.96)", color: "white" }} onClick={(e) => { e.stopPropagation(); setFileMenuOpen((v) => !v); setExportMenuOpen(false); setLeftPanel(null); }}>☰</button>
 					<button type="button" onClick={() => { setLeftPanel("new"); setFileMenuOpen(false); setExportMenuOpen(false); }} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid rgba(239,68,68,0.65)", background: "#ef4444", color: "white", fontWeight: 800, whiteSpace: "nowrap" }}>New design</button>
+					<button type="button" onClick={() => setInspectorOpen(v => !v)} disabled={!currentDoc}>Position / Layers</button>
 					<button type="button" onClick={addPage} disabled={!currentDoc} style={{ padding: "7px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.96)", color: "white", whiteSpace: "nowrap" }}>Add page</button>
 					{docSettingsOpen && currentDoc ? (
 						<div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 40, right: 360, width: 220, zIndex: 40, background: "rgba(17,24,39,0.98)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: 10, boxShadow: "0 18px 60px rgba(0,0,0,0.35)" }}>
 							<div style={{ fontWeight: 700, marginBottom: 8 }}>Page background</div>
-							<input type="color" value={currentPage?.background || "#ffffff"} onChange={(e) => updatePage({ background: e.target.value })} style={{ width: "100%", height: 36, marginBottom: 10 }} />
+							<input type="color" value={currentPage?.background === "transparent" ? "#ffffff" : currentPage?.background || "#ffffff"} onChange={(e) => editPage({ background: e.target.value })} style={{ width: "100%", height: 36, marginBottom: 10 }} />
 							<div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
 								{["#ffffff", brandKit.primary, brandKit.secondary, brandKit.accent].map((color) => (
-									<button key={color} onClick={() => updatePage({ background: color })} style={{ height: 30, borderRadius: 8, border: "1px solid rgba(255,255,255,0.12)", background: color }} />
+									<button key={color} onClick={() => editPage({ background: color })} style={{ height: 30, borderRadius: 8, border: "1px solid rgba(255,255,255,0.12)", background: color }} />
 								))}
 							</div>
 						</div>
@@ -2762,7 +2853,10 @@ React.useEffect(() => {
 								<button style={panelButtonStyle(false)} onClick={duplicateDoc} disabled={!currentDoc}>Duplicate Document</button>
 								<button style={panelButtonStyle(false)} onClick={saveCurrentDoc} disabled={!currentDoc}>Save</button>
 								<button style={panelButtonStyle(false)} onClick={exportJson} disabled={!currentDoc}>Export JSON</button>
-								<button style={panelButtonStyle(false)} onClick={exportPng} disabled={!currentDoc}>Export PNG</button>
+								<label style={{ fontSize: 12 }}><input type="checkbox" checked={exportTransparent} onChange={e => setExportTransparent(e.target.checked)} /> Transparent PNG background</label>
+								<label>Export size<select value={exportScale} onChange={e => setExportScale(Number(e.target.value))}>{[1, 2, 3].map(n => <option key={n} value={n}>{n}×</option>)}</select></label>
+								<button style={panelButtonStyle(false)} onClick={exportPng} disabled={!currentDoc || exportBusy}>{exportBusy ? "Exporting…" : "Export PNG"}</button>
+								<button style={panelButtonStyle(false)} onClick={() => exportRaster("image/jpeg")} disabled={!currentDoc || exportBusy}>Export JPG</button>
 								<button style={panelButtonStyle(false)} onClick={exportPdf} disabled={!currentDoc}>Export PDF</button>
 								<button style={panelButtonStyle(false)} onClick={() => currentDoc && deleteDoc(currentDoc.id)} disabled={!currentDoc}>Delete Current Doc</button>
 							</div>
@@ -2776,18 +2870,21 @@ React.useEffect(() => {
 						<div style={{ fontSize: 10, opacity: 0.7 }}>{currentDoc ? `page ${activePageIndex + 1} of ${currentPages.length}` : ""}</div>
 						<div style={{ fontSize: 10, opacity: 0.7 }}>{savedAt ? `Saved ${formatSavedAt(savedAt)}` : "Unsaved"}</div>
 					</div>
-					<button style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} onClick={undo} disabled={!history.length}>↶</button>
-					<button style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} onClick={redo} disabled={!future.length}>↷</button>
+					<button style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} aria-label="Undo" title="Undo (Ctrl+Z)" onClick={undo} disabled={!history.length}>↶</button>
+					<button style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} aria-label="Redo" title="Redo (Ctrl+Y)" onClick={redo} disabled={!future.length}>↷</button>
 					<button style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} onClick={() => setZoom((z) => clamp(z * 0.9, 0.1, 3))} disabled={!currentDoc}>−</button>
 					<button style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} onClick={() => fitCanvas(currentDoc)} disabled={!currentDoc}>Fit</button>
 					<button style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} onClick={() => { setZoom(1); setPan({ x: 80, y: 80 }); }} disabled={!currentDoc}>100</button>
 					<button style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} onClick={() => setZoom((z) => clamp(z * 1.1, 0.1, 3))} disabled={!currentDoc}>+</button>
 					<div style={{ minWidth: 46, textAlign: "center", opacity: 0.8 }}>{Math.round(zoom * 100)}%</div>
-					<button style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} onClick={(e) => { e.stopPropagation(); setExportMenuOpen((v) => !v); setFileMenuOpen(false); }}>⇩</button>
+					<button aria-label="Download design" style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(17,24,39,0.92)", color: "white" }} onClick={(e) => { e.stopPropagation(); setExportMenuOpen((v) => !v); setFileMenuOpen(false); }}>⇩</button>
 					{exportMenuOpen ? (
-						<div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 42, right: 0, width: 170, zIndex: 40, background: "rgba(17,24,39,0.98)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: 8, boxShadow: "0 18px 60px rgba(0,0,0,0.35)" }}>
+						<div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 42, right: 0, width: 240, zIndex: 40, background: "rgba(17,24,39,0.98)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: 8, boxShadow: "0 18px 60px rgba(0,0,0,0.35)" }}>
 							<div style={{ display: "grid", gap: 6 }}>
-								<button style={panelButtonStyle(false)} onClick={exportPng} disabled={!currentDoc}>Export PNG</button>
+								<label style={{ fontSize: 12 }}><input type="checkbox" checked={exportTransparent} onChange={e => setExportTransparent(e.target.checked)} /> Transparent PNG background</label>
+								<label>Export size<select value={exportScale} onChange={e => setExportScale(Number(e.target.value))}>{[1, 2, 3].map(n => <option key={n} value={n}>{n}×</option>)}</select></label>
+								<button style={panelButtonStyle(false)} onClick={exportPng} disabled={!currentDoc || exportBusy}>{exportBusy ? "Exporting…" : "Export PNG"}</button>
+								<button style={panelButtonStyle(false)} onClick={() => exportRaster("image/jpeg")} disabled={!currentDoc || exportBusy}>Export JPG</button>
 								<button style={panelButtonStyle(false)} onClick={exportPdf} disabled={!currentDoc}>Export PDF</button>
 							</div>
 						</div>
@@ -2795,6 +2892,13 @@ React.useEffect(() => {
 				</div>
 			</div>
 
+			{localSaveError ? <div role="alert">This device’s local storage is full. Your design is still open; export a JSON backup from the File menu and wait for shared saving before closing.</div> : null}
+			{imageNotice ? <div role="status" style={{ padding: 12, background: "#172234", color: "#fff", borderRadius: 10 }}>{imageNotice}<button style={{ marginLeft: 12 }} onClick={() => setImageNotice("")}>Dismiss</button></div> : null}
+			{imageEditor ? <StudioImageEditor image={imageEditor} onClose={() => setImageEditor(null)} onApply={src => {
+				snapshot();
+				commitDocs(prev => prev.map(doc => doc.id !== imageEditor.documentId ? doc : updateStudioPage(doc, imageEditor.pageIndex, page => ({ ...page, elements: page.elements.map(el => el.id === imageEditor.id && !el.locked ? { ...el, src, originalSrc: el.originalSrc || el.src } : el) }))));
+				setImageEditor(null); setImageNotice("Transparent PNG applied. You can undo this edit or restore the original image.");
+			}} /> : null}
 			{studioKeyNotice ? (
 				<div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 12px", borderRadius: 14, background: "rgba(127,29,29,0.22)", border: "1px solid rgba(248,113,113,0.45)" }}>
 					<div style={{ fontSize: 13, lineHeight: 1.4, flex: 1, minWidth: 220 }}>{studioKeyNotice.text}</div>
@@ -3044,28 +3148,30 @@ React.useEffect(() => {
 							boxShadow: "0 8px 24px rgba(0,0,0,0.24)",
 							zIndex: 40,
 							maxWidth: "calc(100% - 48px)",
-							overflow: "visible",
+							overflowX: "auto",
+							color: "#f9fafb",
 							whiteSpace: "nowrap",
 						}}
 					>
 						<button type="button" style={{ ...panelButtonStyle(false), width: "auto", padding: "2px 8px", minHeight: 26 }} onClick={(e) => { e.stopPropagation(); duplicateSelected(); }}>Duplicate</button>
 						<button type="button" style={{ ...panelButtonStyle(false), width: "auto", padding: "2px 8px", minHeight: 26 }} onClick={(e) => { e.stopPropagation(); removeSelected(); }}>Delete</button>
-						<button type="button" style={{ ...panelButtonStyle(false), width: "auto", padding: "2px 8px", minHeight: 26 }} onClick={(e) => { e.stopPropagation(); updateElements(selectedIds, (item) => ({ flipX: !item.flipX })); }}>Flip H</button>
-						<button type="button" style={{ ...panelButtonStyle(false), width: "auto", padding: "2px 8px", minHeight: 26 }} onClick={(e) => { e.stopPropagation(); updateElements(selectedIds, (item) => ({ flipY: !item.flipY })); }}>Flip V</button>
+						<button type="button" style={{ ...panelButtonStyle(false), width: "auto", padding: "2px 8px", minHeight: 26 }} onClick={(e) => { e.stopPropagation(); editElements(selectedIds, (item) => ({ flipX: !item.flipX })); }}>Flip H</button>
+						<button type="button" style={{ ...panelButtonStyle(false), width: "auto", padding: "2px 8px", minHeight: 26 }} onClick={(e) => { e.stopPropagation(); editElements(selectedIds, (item) => ({ flipY: !item.flipY })); }}>Flip V</button>
 						<div style={{ display: "flex", alignItems: "center", gap: 4, color: "white", fontSize: 11 }}>
 							<span>Opacity</span>
 							<div style={{ width: 140, display: "flex", alignItems: "center" }}>
-								<input type="range" min="0.05" max="1" step="0.05" value={selected ? Number(selected.opacity ?? 1) : 1} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onChange={(e) => updateElements(selectedIds, { opacity: Number(e.target.value) })} style={{ width: "100%", margin: 0, display: "block" }} />
+								<input type="range" min="0" max="1" step="0.05" value={selected ? Number(selected.opacity ?? 1) : 1} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} onChange={(e) => editElements(selectedIds, { opacity: Number(e.target.value) })} style={{ width: "100%", margin: 0, display: "block" }} />
 							</div>
 						</div>
 						{selected && ["text", "shape", "svg"].includes(selected.type) ? (
 							<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
 								{["#111827", "#ffffff", brandKit.primary, brandKit.secondary, brandKit.accent, "#ef4444", "#22c55e", "#3b82f6"].map((swatch) => (
-									<button type="button" key={swatch} onClick={(e) => { e.stopPropagation(); updateElement(selected.id, selected.type === "text" ? { color: swatch } : { fill: swatch }); }} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid rgba(255,255,255,0.24)", background: swatch, cursor: "pointer", flex: "0 0 auto" }} />
+									<button type="button" key={swatch} onClick={(e) => { e.stopPropagation(); editElement(selected.id, selected.type === "text" ? { color: swatch } : { fill: swatch }); }} style={{ width: 18, height: 18, borderRadius: 999, border: "1px solid rgba(255,255,255,0.24)", background: swatch, cursor: "pointer", flex: "0 0 auto" }} />
 								))}
 							</div>
 						) : null}
-						{selected?.qrValue ? <button type="button" style={{ ...panelButtonStyle(false), width: "auto", padding: "2px 8px", minHeight: 26 }} onClick={(e) => { e.stopPropagation(); const nextValue = window.prompt("Edit QR value", selected.qrValue || ""); if (nextValue) updateElement(selected.id, { qrValue: nextValue, src: buildQrCodeUrl(nextValue, { fg: selected.qrFg || "#000000", bg: selected.qrBg || "#ffffff" }) }); }}>Edit QR</button> : null}
+						{selected?.qrValue ? <button type="button" style={{ ...panelButtonStyle(false), width: "auto", padding: "2px 8px", minHeight: 26 }} onClick={(e) => { e.stopPropagation(); const nextValue = window.prompt("Edit QR value", selected.qrValue || ""); if (nextValue) editElement(selected.id, { qrValue: nextValue, src: buildQrCodeUrl(nextValue, { fg: selected.qrFg || "#000000", bg: selected.qrBg || "#ffffff" }) }); }}>Edit QR</button> : null}
+						{selected?.type === "image" ? <button type="button" disabled={selected.locked} onClick={() => setImageEditor({ ...selected, documentId: currentId, pageIndex: activePageIndex })}>Edit image</button> : null}
 						<button type="button" style={{ ...panelButtonStyle(false), width: "auto", padding: "2px 8px", minHeight: 26 }} onClick={(e) => { e.stopPropagation(); setInspectorOpen(true); }}>Inspector</button>
 					</div>
 				) : null}
@@ -3151,7 +3257,7 @@ React.useEffect(() => {
 												top: layout.top,
 												width: layout.width,
 												height: layout.height,
-												background: page.background || "#ffffff",
+												background: page.background === "transparent" ? "repeating-conic-gradient(#cbd5e1 0% 25%, #fff 0% 50%) 0 / 20px 20px" : page.background || "#ffffff",
 												borderRadius: 18,
 												overflow: "visible",
 												boxShadow: isActive ? "0 24px 80px rgba(0,0,0,0.35)" : "0 18px 50px rgba(0,0,0,0.22)",
@@ -3161,7 +3267,7 @@ React.useEffect(() => {
 											touchAction: isMobileViewport ? "none" : "none",
 											}}
 										>
-											<div onDrop={onWorkspaceDrop} onDragOver={onWorkspaceDragOver} style={{ position: "absolute", inset: 0, width: page.width, height: page.height, transform: `scale(${zoom})`, transformOrigin: "top left", background: page.background || "#ffffff", overflow: "hidden", borderRadius: 18 / Math.max(zoom, 1) }}>
+											<div onDrop={onWorkspaceDrop} onDragOver={onWorkspaceDragOver} style={{ position: "absolute", inset: 0, width: page.width, height: page.height, transform: `scale(${zoom})`, transformOrigin: "top left", background: page.background === "transparent" ? "repeating-conic-gradient(#cbd5e1 0% 25%, #fff 0% 50%) 0 / 20px 20px" : page.background || "#ffffff", overflow: "hidden", borderRadius: 0 }}>
 												{isActive ? (
 													<>
 														{(page.guides || []).map((guide) => guide.orientation === "vertical" ? (
@@ -3178,13 +3284,14 @@ React.useEffect(() => {
 															if (el.type === "text") return <div
 															key={el.id}
 															onMouseDown={(e) => { if (textEditId === el.id) { e.stopPropagation(); return; } startElementDrag(e, el); }} onTouchStart={(e) => { if (textEditId === el.id) { e.stopPropagation(); return; } startElementDrag(e, el); }}
-															onClick={(e) => { e.stopPropagation(); if (!(e.shiftKey || e.ctrlKey || e.metaKey)) { if (selectedIds.includes(el.id)) setTextEditId(el.id); else selectElement(el, false); } closeMenus(); }}
+															onClick={(e) => { e.stopPropagation(); if (!(e.shiftKey || e.ctrlKey || e.metaKey)) { if (selectedIds.includes(el.id)) setTextEditId(el.id); else selectElement(el, false); } setContextMenu(null); setLeftPanel(null); }}
 															onContextMenu={(e) => openContextMenu(e, el)}
-															contentEditable={textEditId === el.id}
+															data-studio-text-id={el.id}
+														contentEditable={textEditId === el.id}
 															suppressContentEditableWarning
-															onBlur={(e) => { updateElement(el.id, { text: e.currentTarget.innerText }); setTextEditId(null); }}
-															style={{ ...common, color: el.color, fontSize: el.fontSize, fontWeight: el.fontWeight, fontFamily: el.fontFamily || FALLBACK_FONT, lineHeight: el.lineHeight, letterSpacing: `${el.letterSpacing || 0}px`, textAlign: el.align, whiteSpace: "pre-wrap", overflow: "hidden", cursor: textEditId === el.id ? "text" : common.cursor }}
-														>{showBoundPreview ? applyBindings(el.text, bindings) : el.text}</div>;
+															onBlur={(e) => { if (e.currentTarget.innerText !== el.text) editElement(el.id, { text: e.currentTarget.innerText }); setTextEditId(null); }}
+															style={{ ...common, color: el.color, fontSize: el.fontSize, fontWeight: el.fontWeight, fontFamily: el.fontFamily || FALLBACK_FONT, fontStyle: el.fontStyle || "normal", textDecoration: el.textDecoration || "none", lineHeight: el.lineHeight, letterSpacing: `${el.letterSpacing || 0}px`, textAlign: el.align, whiteSpace: "pre-wrap", overflow: "hidden", cursor: textEditId === el.id ? "text" : common.cursor }}
+														>{textEditId === el.id ? el.text : showBoundPreview ? applyBindings(el.text, bindings) : el.text}</div>;
 															if (el.type === "shape") return <div key={el.id} onMouseDown={(e) => startElementDrag(e, el)} onTouchStart={(e) => startElementDrag(e, el)} onClick={(e) => { e.stopPropagation(); if (!(e.shiftKey || e.ctrlKey || e.metaKey)) selectElement(el, false); closeMenus(); }} onContextMenu={(e) => openContextMenu(e, el)} style={{ ...common, background: el.fill, border: `${el.strokeWidth || 0}px solid ${el.stroke || "transparent"}`, borderRadius: el.radius || 0 }} />;
 															if (el.type === "svg") return <div key={el.id} onMouseDown={(e) => startElementDrag(e, el)} onTouchStart={(e) => startElementDrag(e, el)} onClick={(e) => { e.stopPropagation(); if (!(e.shiftKey || e.ctrlKey || e.metaKey)) selectElement(el, false); closeMenus(); }} onContextMenu={(e) => openContextMenu(e, el)}><StudioCroppedMedia el={el} common={common} src={svgMarkupToDataUrl(el.svg, el.fill || "#111111")} /></div>;
 															return <div key={el.id} onMouseDown={(e) => startElementDrag(e, el)} onTouchStart={(e) => startElementDrag(e, el)} onClick={(e) => { e.stopPropagation(); if (!(e.shiftKey || e.ctrlKey || e.metaKey)) selectElement(el, false); closeMenus(); }} onContextMenu={(e) => openContextMenu(e, el)}><StudioCroppedMedia el={el} common={common} src={el.src} /></div>;
@@ -3212,7 +3319,7 @@ React.useEffect(() => {
 														if (el.hidden) return null;
 														const bounds = getElementBounds(el);
 													const common = { position: "absolute", left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height, opacity: el.opacity ?? 1, transform: getElementTransform(el), boxSizing: "border-box", pointerEvents: "none" };
-														if (el.type === "text") return <div key={el.id} style={{ ...common, color: el.color, fontSize: el.fontSize, fontWeight: el.fontWeight, fontFamily: el.fontFamily || FALLBACK_FONT, lineHeight: el.lineHeight, letterSpacing: `${el.letterSpacing || 0}px`, textAlign: el.align, whiteSpace: "pre-wrap", overflow: "hidden" }}>{showBoundPreview ? applyBindings(el.text, bindings) : el.text}</div>;
+														if (el.type === "text") return <div key={el.id} style={{ ...common, color: el.color, fontSize: el.fontSize, fontWeight: el.fontWeight, fontFamily: el.fontFamily || FALLBACK_FONT, fontStyle: el.fontStyle || "normal", textDecoration: el.textDecoration || "none", lineHeight: el.lineHeight, letterSpacing: `${el.letterSpacing || 0}px`, textAlign: el.align, whiteSpace: "pre-wrap", overflow: "hidden" }}>{showBoundPreview ? applyBindings(el.text, bindings) : el.text}</div>;
 														if (el.type === "shape") return <div key={el.id} style={{ ...common, background: el.fill, border: `${el.strokeWidth || 0}px solid ${el.stroke || "transparent"}`, borderRadius: el.radius || 0 }} />;
 														if (el.type === "svg") return <StudioCroppedMedia key={el.id} el={el} common={common} src={svgMarkupToDataUrl(el.svg, el.fill || "#111111")} />;
 													return <StudioCroppedMedia key={el.id} el={el} common={common} src={el.src} />;
@@ -3267,7 +3374,7 @@ React.useEffect(() => {
 					</div>
 				) : null}
 				{inspectorOpen ? (
-					<div style={{ position: "absolute", top: 12, right: 12, bottom: 12, width: 340, zIndex: 26, background: "rgba(17,24,39,0.98)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 14, overflow: "auto", boxShadow: "0 18px 60px rgba(0,0,0,0.35)" }}>
+					<div style={{ position: "absolute", top: 12, right: 12, bottom: 12, width: "min(340px, calc(100% - 24px))", boxSizing: "border-box", color: "#f9fafb", zIndex: 26, background: "rgba(17,24,39,0.98)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: 14, overflow: "auto", boxShadow: "0 18px 60px rgba(0,0,0,0.35)" }}>
 						<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
 							<div style={{ fontWeight: 800 }}>Inspector</div>
 							<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -3281,6 +3388,9 @@ React.useEffect(() => {
 							<button onClick={removeSelected} disabled={!selectedIds.length}>Delete</button>
 							<button onClick={() => moveLayer("down")} disabled={!selectedIds.length}>Send Back</button>
 							<button onClick={() => moveLayer("up")} disabled={!selectedIds.length}>Bring Forward</button>
+							<button onClick={() => moveLayer("front")} disabled={!selectedIds.length}>Bring to Front</button>
+							<button onClick={() => moveLayer("back")} disabled={!selectedIds.length}>Send to Back</button>
+							<div className="studioPositionTools" aria-label="Position on page">{["left", "center", "right", "top", "middle", "bottom", "space-x", "space-y"].map(action => <button key={action} disabled={!selectedIds.length || (action.startsWith("space-") && selectedIds.length < 3)} onClick={() => positionSelection(action)}>{({ "space-x": "Space across", "space-y": "Space down" })[action] || action[0].toUpperCase() + action.slice(1)}</button>)}</div>
 							<button onClick={groupSelection} disabled={selectedIds.length < 2}>Group Selected</button>
 							<button onClick={ungroupSelection} disabled={!selectedElements.some((el) => el.groupId)}>Ungroup</button>
 							<button onClick={() => toggleSelectedFlag("locked")} disabled={!selectedIds.length}>{selectedElements.every((el) => el.locked) ? "Unlock" : "Lock"}</button>
@@ -3293,26 +3403,31 @@ React.useEffect(() => {
 							</div>
 						) : selected ? (
 							<div style={{ display: "grid", gap: 10 }}>
-								<label>Layer name<input value={selected.name || ""} onChange={(e) => updateElement(selected.id, { name: e.target.value })} style={{ width: "100%" }} /></label>
+								<label>Layer name<input value={selected.name || ""} onChange={(e) => editElement(selected.id, { name: e.target.value })} style={{ width: "100%" }} /></label>
 								<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-									<label>X<input type="number" value={Math.round(selected.x)} onChange={(e) => updateElement(selected.id, { x: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
-									<label>Y<input type="number" value={Math.round(selected.y)} onChange={(e) => updateElement(selected.id, { y: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
-									<label>Width<input type="number" value={Math.round(selected.width)} onChange={(e) => updateElement(selected.id, { width: Number(e.target.value || 1) })} style={{ width: "100%" }} /></label>
-									<label>Height<input type="number" value={Math.round(selected.height)} onChange={(e) => updateElement(selected.id, { height: Number(e.target.value || 1) })} style={{ width: "100%" }} /></label>
-									<label>Rotation<input type="number" value={selected.rotation || 0} onChange={(e) => updateElement(selected.id, { rotation: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
-									<label>Opacity<input type="number" min="0" max="1" step="0.05" value={selected.opacity ?? 1} onChange={(e) => updateElement(selected.id, { opacity: Number(e.target.value || 1) })} style={{ width: "100%" }} /></label>
+									<label>X<input type="number" value={Math.round(selected.x)} onChange={(e) => editElement(selected.id, { x: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
+									<label>Y<input type="number" value={Math.round(selected.y)} onChange={(e) => editElement(selected.id, { y: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
+									<label>Width<input type="number" value={Math.round(selected.width)} onChange={(e) => editElement(selected.id, { width: Number(e.target.value) })} style={{ width: "100%" }} /></label>
+									<label>Height<input type="number" value={Math.round(selected.height)} onChange={(e) => editElement(selected.id, { height: Number(e.target.value) })} style={{ width: "100%" }} /></label>
+									<label>Rotation<input type="number" value={selected.rotation || 0} onChange={(e) => editElement(selected.id, { rotation: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
+									<label>Opacity<input type="number" min="0" max="1" step="0.05" value={selected.opacity ?? 1} onChange={(e) => editElement(selected.id, { opacity: Number(e.target.value) })} style={{ width: "100%" }} /></label>
 								</div>
 								{selected.type === "text" ? (<>
-									<label>Text<textarea value={selected.text} onChange={(e) => updateElement(selected.id, { text: e.target.value })} rows={5} style={{ width: "100%" }} /></label>
+									<div style={{ display: "flex", gap: 8 }}>
+									<button aria-pressed={Number(selected.fontWeight) >= 700} onClick={() => editElement(selected.id, { fontWeight: Number(selected.fontWeight) >= 700 ? 400 : 700 })}>Bold</button>
+									<button aria-pressed={selected.fontStyle === "italic"} onClick={() => editElement(selected.id, { fontStyle: selected.fontStyle === "italic" ? "normal" : "italic" })}>Italic</button>
+									<button aria-pressed={selected.textDecoration === "underline"} onClick={() => editElement(selected.id, { textDecoration: selected.textDecoration === "underline" ? "none" : "underline" })}>Underline</button>
+									</div>
+									<label>Text<textarea value={selected.text} onChange={(e) => editElement(selected.id, { text: e.target.value })} rows={5} style={{ width: "100%" }} /></label>
 									<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-										<label>Font size<input type="number" value={selected.fontSize} onChange={(e) => updateElement(selected.id, { fontSize: Number(e.target.value || 12) })} style={{ width: "100%" }} /></label>
-										<label>Weight<input type="number" value={selected.fontWeight || 700} onChange={(e) => updateElement(selected.id, { fontWeight: Number(e.target.value || 400) })} style={{ width: "100%" }} /></label>
-										<label>Line height<input type="number" step="0.05" value={selected.lineHeight || 1.1} onChange={(e) => updateElement(selected.id, { lineHeight: Number(e.target.value || 1.1) })} style={{ width: "100%" }} /></label>
-										<label>Letter spacing<input type="number" value={selected.letterSpacing || 0} onChange={(e) => updateElement(selected.id, { letterSpacing: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
+										<label>Font size<input type="number" value={selected.fontSize} onChange={(e) => editElement(selected.id, { fontSize: Number(e.target.value || 12) })} style={{ width: "100%" }} /></label>
+										<label>Weight<input type="number" value={selected.fontWeight || 700} onChange={(e) => editElement(selected.id, { fontWeight: Number(e.target.value || 400) })} style={{ width: "100%" }} /></label>
+										<label>Line height<input type="number" step="0.05" value={selected.lineHeight || 1.1} onChange={(e) => editElement(selected.id, { lineHeight: Number(e.target.value || 1.1) })} style={{ width: "100%" }} /></label>
+										<label>Letter spacing<input type="number" value={selected.letterSpacing || 0} onChange={(e) => editElement(selected.id, { letterSpacing: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
 									</div>
 									<div style={{ display: "grid", gap: 8 }}>
 										<label>Font search<input value={fontSearch} onChange={(e) => setFontSearch(e.target.value)} placeholder="Search Google or uploaded fonts" style={{ width: "100%" }} /></label>
-										<label>Font family<select value={selected.fontFamily || FALLBACK_FONT} onChange={(e) => { const nextFont = e.target.value; updateElement(selected.id, { fontFamily: nextFont }); ensureFontLoaded(nextFont); markFontRecent(nextFont); }} style={{ width: "100%" }}>
+										<label>Font family<select value={selected.fontFamily || FALLBACK_FONT} onChange={(e) => { const nextFont = e.target.value; editElement(selected.id, { fontFamily: nextFont }); ensureFontLoaded(nextFont); markFontRecent(nextFont); }} style={{ width: "100%" }}>
 											<optgroup label="Recent">
 												{recentFonts.map((font) => <option key={`recent_${font.family}`} value={font.family}>{font.family}</option>)}
 											</optgroup>
@@ -3328,42 +3443,51 @@ React.useEffect(() => {
 											<div style={{ fontSize: 12, opacity: 0.72 }}>{fontStatus}</div>
 										</div>
 									</div>
-									<label>Alignment<select value={selected.align || "left"} onChange={(e) => updateElement(selected.id, { align: e.target.value })} style={{ width: "100%" }}><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
-									<label>Text color<input type="color" value={selected.color || "#000000"} onChange={(e) => updateElement(selected.id, { color: e.target.value })} style={{ width: "100%" }} /></label>
+									<label>Alignment<select value={selected.align || "left"} onChange={(e) => editElement(selected.id, { align: e.target.value })} style={{ width: "100%" }}><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
+									<label>Text color<input type="color" value={selected.color || "#000000"} onChange={(e) => editElement(selected.id, { color: e.target.value })} style={{ width: "100%" }} /></label>
 								</>) : null}
 								{selected.type === "shape" ? (<>
-									<label>Fill<input type="color" value={selected.fill || "#ef4444"} onChange={(e) => updateElement(selected.id, { fill: e.target.value })} style={{ width: "100%" }} /></label>
-									<label>Stroke<input type="color" value={selected.stroke || "#ffffff"} onChange={(e) => updateElement(selected.id, { stroke: e.target.value })} style={{ width: "100%" }} /></label>
+									<label>Fill<input type="color" value={selected.fill || "#ef4444"} onChange={(e) => editElement(selected.id, { fill: e.target.value })} style={{ width: "100%" }} /></label>
+									<label>Stroke<input type="color" value={selected.stroke || "#ffffff"} onChange={(e) => editElement(selected.id, { stroke: e.target.value })} style={{ width: "100%" }} /></label>
 									<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-										<label>Stroke width<input type="number" value={selected.strokeWidth || 0} onChange={(e) => updateElement(selected.id, { strokeWidth: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
-										<label>Radius<input type="number" value={selected.radius || 0} onChange={(e) => updateElement(selected.id, { radius: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
+										<label>Stroke width<input type="number" value={selected.strokeWidth || 0} onChange={(e) => editElement(selected.id, { strokeWidth: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
+										<label>Radius<input type="number" value={selected.radius || 0} onChange={(e) => editElement(selected.id, { radius: Number(e.target.value || 0) })} style={{ width: "100%" }} /></label>
 									</div>
 								</>) : null}
 								{selected.type === "image" ? (
 									<>
-										<label>Fit<select value={selected.fit || "cover"} onChange={(e) => updateElement(selected.id, { fit: e.target.value })} style={{ width: "100%" }}><option value="cover">Cover</option><option value="contain">Contain</option><option value="fill">Fill</option></select></label>
+										<button disabled={selected.locked} onClick={() => setImageEditor({ ...selected, documentId: currentId, pageIndex: activePageIndex })}>Edit image / remove background colors</button>
+										<button disabled={selected.locked} onClick={() => replaceImageRef.current?.click()}>Replace image</button>
+										{selected.originalSrc ? <button disabled={selected.locked} onClick={() => editElement(selected.id, { src: selected.originalSrc, originalSrc: undefined })}>Restore original image</button> : null}
+										<p style={{ fontSize: 12 }}>Side handles crop. Corner handles resize. PNG and WebP transparency is preserved.</p>
+										<button disabled={selected.locked} onClick={() => { const frame = getMediaFrame(selected); editElement(selected.id, { x: frame.mediaX, y: frame.mediaY, width: frame.mediaWidth, height: frame.mediaHeight, mediaX: frame.mediaX, mediaY: frame.mediaY, mediaWidth: frame.mediaWidth, mediaHeight: frame.mediaHeight, cropLeft: 0, cropRight: 0, cropTop: 0, cropBottom: 0 }); }}>Reset crop</button>
+										<label><input type="checkbox" checked={selected.lockAspect !== false} onChange={e => editElement(selected.id, { lockAspect: e.target.checked })} /> Keep proportions (Shift to resize freely)</label>
+										<label>Image corners<input type="number" min="0" value={selected.radius || 0} onChange={e => editElement(selected.id, { radius: Math.max(0, Number(e.target.value)) })} /></label>
+										<label>Fit<select value={selected.fit || "cover"} onChange={(e) => editElement(selected.id, { fit: e.target.value })} style={{ width: "100%" }}><option value="cover">Cover</option><option value="contain">Contain</option><option value="fill">Fill</option></select></label>
 										{selected.qrValue ? (
 											<>
-												<label>QR value<textarea value={selected.qrValue || ""} onChange={(e) => updateElement(selected.id, { qrValue: e.target.value, src: buildQrCodeUrl(e.target.value, { fg: selected.qrFg || "#000000", bg: selected.qrBg || "#ffffff" }) })} rows={4} style={{ width: "100%" }} /></label>
+												<label>QR value<textarea value={selected.qrValue || ""} onChange={(e) => editElement(selected.id, { qrValue: e.target.value, src: buildQrCodeUrl(e.target.value, { fg: selected.qrFg || "#000000", bg: selected.qrBg || "#ffffff" }) })} rows={4} style={{ width: "100%" }} /></label>
 												<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-													<label>QR foreground<input type="color" value={selected.qrFg || "#000000"} onChange={(e) => updateElement(selected.id, { qrFg: e.target.value, src: buildQrCodeUrl(selected.qrValue || "", { fg: e.target.value, bg: selected.qrBg || "#ffffff" }) })} style={{ width: "100%" }} /></label>
-													<label>QR background<input type="color" value={selected.qrBg || "#ffffff"} onChange={(e) => updateElement(selected.id, { qrBg: e.target.value, src: buildQrCodeUrl(selected.qrValue || "", { fg: selected.qrFg || "#000000", bg: e.target.value }) })} style={{ width: "100%" }} /></label>
+													<label>QR foreground<input type="color" value={selected.qrFg || "#000000"} onChange={(e) => editElement(selected.id, { qrFg: e.target.value, src: buildQrCodeUrl(selected.qrValue || "", { fg: e.target.value, bg: selected.qrBg || "#ffffff" }) })} style={{ width: "100%" }} /></label>
+													<label>QR background<input type="color" value={selected.qrBg || "#ffffff"} onChange={(e) => editElement(selected.id, { qrBg: e.target.value, src: buildQrCodeUrl(selected.qrValue || "", { fg: selected.qrFg || "#000000", bg: e.target.value }) })} style={{ width: "100%" }} /></label>
 												</div>
-												<button type="button" onClick={() => updateElement(selected.id, { src: buildQrCodeUrl(selected.qrValue || "", { fg: selected.qrFg || "#000000", bg: selected.qrBg || "#ffffff" }) })}>Regenerate QR</button>
+												<button type="button" onClick={() => editElement(selected.id, { src: buildQrCodeUrl(selected.qrValue || "", { fg: selected.qrFg || "#000000", bg: selected.qrBg || "#ffffff" }) })}>Regenerate QR</button>
 											</>
 										) : null}
 									</>
 								) : null}
 							</div>
 						) : <div style={{ display: "grid", gap: 10 }}>
-							<label>Canvas background<input type="color" value={currentPage?.background || "#ffffff"} onChange={(e) => currentPage && updatePage({ background: e.target.value })} style={{ width: "100%" }} /></label>
+							<div style={{ display: "flex", gap: 8 }}><label>Page width<input type="number" min="64" max="8192" key={`${currentPage?.id}-width-${currentPage?.width}`} defaultValue={currentPage?.width || 1080} onBlur={e => editPage({ width: clamp(Number(e.target.value) || 1080, 64, 8192) })} onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }} style={{ width: "100%" }} /></label><label>Page height<input type="number" min="64" max="8192" key={`${currentPage?.id}-height-${currentPage?.height}`} defaultValue={currentPage?.height || 1080} onBlur={e => editPage({ height: clamp(Number(e.target.value) || 1080, 64, 8192) })} onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }} style={{ width: "100%" }} /></label></div>
+							<label><input type="checkbox" checked={currentPage?.background === "transparent"} onChange={e => editPage({ background: e.target.checked ? "transparent" : "#ffffff" })} /> Transparent canvas</label>
+							<label>Canvas background<input type="color" value={currentPage?.background === "transparent" ? "#ffffff" : currentPage?.background || "#ffffff"} onChange={(e) => currentPage && editPage({ background: e.target.value })} style={{ width: "100%" }} /></label>
 							<div style={{ opacity: 0.7 }}>Select a layer to edit it.</div>
 						</div>}
 						<div style={{ marginTop: 14 }}>
 							<div style={{ fontWeight: 700, marginBottom: 8 }}>Layers</div>
 							<div style={{ display: "grid", gap: 6, maxHeight: 320, overflow: "auto" }}>
 								{orderedLayers.length ? orderedLayers.map((el) => (
-									<button key={el.id} onClick={(e) => selectElement(el, e.shiftKey || e.ctrlKey || e.metaKey)} style={{ textAlign: "left", border: selectedIds.includes(el.id) ? "1px solid #ef4444" : "1px solid rgba(255,255,255,0.08)", background: selectedIds.includes(el.id) ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.04)", borderRadius: 10, padding: 8 }}>
+									<button key={el.id} onClick={(e) => selectElement(el, e.shiftKey || e.ctrlKey || e.metaKey)} style={{ color: "#f9fafb", textAlign: "left", border: selectedIds.includes(el.id) ? "1px solid #ef4444" : "1px solid rgba(255,255,255,0.08)", background: selectedIds.includes(el.id) ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.04)", borderRadius: 10, padding: 8 }}>
 										<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}><div style={{ fontWeight: 700 }}>{el.name || el.type}</div><div style={{ fontSize: 10, opacity: 0.7 }}>#{el._order}</div></div>
 										<div style={{ fontSize: 12, opacity: 0.72 }}>{el.type}{el.groupId ? ` • ${el.groupName || "grouped"}` : ""}{el.locked ? " • locked" : ""}{el.hidden ? " • hidden" : ""}</div>
 									</button>

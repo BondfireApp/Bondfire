@@ -1,0 +1,16 @@
+.studioImageBackdrop {position:fixed;inset:0;background:#000b;z-index:1000;display:grid;place-items:center;padding:12px;color:#f9fafb}
+.studioImageDialog {background:#111827;border:1px solid #4b5563;border-radius:16px;padding:20px;width:min(100%,1000px);max-height:94vh;overflow:auto;box-sizing:border-box}
+.studioImageDialog header,.studioImageDialog footer,.studioImageControls {display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.studioImageDialog header,.studioImageDialog footer {justify-content:space-between}
+.studioImageDialog h2 {font-size:20px;margin:0}
+.studioImageDialog p {font-size:13px;color:#d1d5db;max-width:85ch}
+.studioImageControls label {display:grid;gap:4px;font-size:13px}
+.studioImageDialog button,.studioImageDialog select {color:#fff;background:#253247;border:1px solid #64748b;border-radius:8px;padding:8px}
+.studioImageDialog button:disabled {opacity:.4}
+.studioImagePreview {overflow:auto;max-height:55vh;margin:14px 0;display:flex;justify-content:center}
+.studioImagePreview.checker,.studioChecker {background-color:#fff;background-image:conic-gradient(#cbd5e1 25%,transparent 0 50%,#cbd5e1 0 75%,transparent 0);background-size:20px 20px}
+.studioImagePreview.dark {background:#18212f}.studioImagePreview.light {background:white}
+.studioImagePreview canvas {display:block;max-width:100%;height:auto;object-fit:contain;touch-action:none;cursor:crosshair;align-self:flex-start}
+.bfStudioRoot button,.bfStudioRoot label {color:inherit}
+.bfStudioRoot .studioPositionTools {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.bfStudioRoot .studioPositionTools button {font-size:12px;padding:7px 3px}

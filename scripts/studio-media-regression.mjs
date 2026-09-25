@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { imagePlacement, imageDrawRect, eraseImageColor, positionStudioElements } from '../src/studio/studioMedia.js';
+const wide = imagePlacement(1200, 200, 1000, 1000);
+assert.ok(Math.abs(wide.width / wide.height - 6) < .05, 'wide uploads keep aspect ratio');
+assert.equal(wide.mediaWidth, wide.width);
+assert.deepEqual(imageDrawRect(400, 200, 0, 0, 200, 200, 'contain'), [0, 50, 200, 100]);
+assert.deepEqual(imageDrawRect(400, 200, 0, 0, 200, 200, 'cover'), [-100, 0, 400, 200]);
+assert.deepEqual(imageDrawRect(400, 200, 0, 0, 200, 200, 'fill'), [0, 0, 200, 200]);
+// Opaque white regions separated by black line art; connected removal must preserve enclosed whites.
+const makePixels = () => new Uint8ClampedArray([255,255,255,255, 0,0,0,255, 255,255,255,255, 240,240,240,128]);
+const connected = makePixels(); eraseImageColor(connected, 4, 1, 0, 0, 20, true);
+assert.deepEqual([...connected.filter((_,i) => i%4===3)], [0,255,255,128]);
+const all = makePixels(); eraseImageColor(all, 4, 1, 0, 0, 20, false);
+assert.deepEqual([...all.filter((_,i) => i%4===3)], [0,255,0,0]);
+const original = makePixels(); assert.equal(original[3],255, 'source buffer remains available for restore');
+const items = [{id:'a',x:10,y:30,width:20,height:10,mediaX:5,mediaY:25},{id:'b',x:90,y:30,width:20,height:10},{id:'c',x:200,y:30,width:20,height:10},{id:'locked',x:5,y:5,width:30,height:30,locked:true}];
+const centered = positionStudioElements(items, ['a','locked'], 'center', {width:300,height:200});
+assert.equal(centered[0].x,140);assert.equal(centered[0].mediaX,135);assert.equal(centered[3].x,5);
+assert.equal(positionStudioElements(items,['a','b','c'],'space-x',{})[1].x,105);
+const grouped=positionStudioElements(items.slice(0,2).map(el=>({...el,groupId:'g'})),['a','b'],'left',{width:300,height:200});
+assert.equal(grouped[1].x-grouped[0].x,80,'group-relative positions survive alignment');
+console.log('PASS: Studio image proportions, fit modes, alpha/color removal, grouped alignment, locked layers and cropped-media positioning');
