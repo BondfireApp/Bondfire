@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.1",
-    "electron": "^44.3.0",
+    "electron": "^44.9.1",
     "electron-builder": "^26.15.3",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.14.5",
